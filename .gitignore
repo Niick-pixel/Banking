@@ -1,0 +1,14 @@
+node_modules
+dist
+*.local
+.DS_Store
+coverage
+test-results
+playwright-report
+# never commit personal financial data
+*.xlsx
+!fixtures/**/*.xlsx
+backups/
+
+# personal financial data — never commit (repo is public)
+private/
