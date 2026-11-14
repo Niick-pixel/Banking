@@ -20,6 +20,7 @@ import Goals from './routes/Goals';
 import Calculators from './routes/Calculators';
 import Dashboard from './routes/Dashboard';
 import Reports from './routes/Reports';
+import Bills from './routes/Bills';
 import { bootSync } from './sync';
 
 const router = createBrowserRouter([
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Dashboard /> },
       { path: '/reports', element: <Reports /> },
+      { path: '/bills', element: <Bills /> },
       { path: '/design', element: <DesignPage /> },
       { path: '/transactions', element: <Transactions /> },
       { path: '/accounts', element: <Accounts /> },

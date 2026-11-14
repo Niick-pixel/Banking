@@ -11,13 +11,13 @@ import { Empty, PageHeader } from '../ui/Sheet';
 import { monthSummary } from '../domain/insights';
 import { computeTracker, budgetFor } from '../domain/tracker';
 import { debtStatus } from '../domain/ledger';
-import { nextPaymentDate } from '../domain/debts';
-import { planProgress } from '../domain/installments';
 import { emergencyFund, netWorthSeries } from '../domain/networth';
-import { selfLoanProgress } from '../domain/debts';
 import { formatMoney } from '../lib/money';
-import { daysBetween, formatDateCR, todayISO } from '../lib/dates';
+import { formatDateCR, todayISO } from '../lib/dates';
 import { useEssentials } from './NetWorth';
+import { useCalendar, usePendingReminders } from '../app/useRecurring';
+
+const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -37,6 +37,8 @@ export default function Dashboard() {
   const tracker = useMemo(() => computeTracker(year, l.transactions.filter((t) => t.currency === 'CRC'), l.categories, l.budgets, { accountType: (id) => l.account.get(id)?.type }), [l, year]);
   const essentials = useEssentials(year);
   const nw = useMemo(() => netWorthSeries({ accounts: l.accounts, snapshots: l.snapshots, transactions: l.transactions, debts: l.debts, installments: l.installments }, Number(today.slice(0, 4)), today), [l, today]);
+  const calendar = useCalendar(addDays(today, 0), addDays(today, 30));
+  const pending = usePendingReminders();
   const [inc, exp, axis, grid, c1] = useCssVar(['--chart-income', '--chart-expense', '--chart-axis', '--chart-grid', '--chart-1']);
 
   if (l.ready && !l.accounts.length) {
@@ -52,12 +54,8 @@ export default function Dashboard() {
   const maxRank = Math.max(1, ...ranking.map((x) => x.v));
   const budgetRows = tracker.sections.filter((s) => !['Income', 'Savings'].includes(s.group)).flatMap((s) => s.rows).map((r) => ({ r, b: budgetFor(l.budgets, r.category.id, mk), spent: r.months[month - 1]! })).filter((x) => x.b > 0 && x.spent > 0).map((x) => ({ ...x, pct: x.spent / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 6);
 
-  // Upcoming 30 days: Tasa Cero cuotas, debt payments, self-loan plans.
-  const upcoming: { date: string; label: string; amount?: number; to: string }[] = [];
-  for (const p of l.installments.filter((p) => p.status === 'active')) { const pr = planProgress(p, today); if (pr.nextDate && daysBetween(today, pr.nextDate) <= 30) upcoming.push({ date: pr.nextDate, label: `${p.description} · cuota ${pr.billedCount + 1}/${p.months}`, amount: pr.nextAmount, to: '/tasa-cero' }); }
-  for (const d of l.debts.filter((d) => d.status !== 'paid' && d.plannedMonthlyPayment)) { const st = debtStatus(d, l.transactions); if (st.balance <= 0) continue; const dt = nextPaymentDate(d, today); if (daysBetween(today, dt) <= 30) upcoming.push({ date: dt, label: `Pay ${d.creditor}`, amount: Math.min(d.plannedMonthlyPayment!, st.balance), to: '/debts' }); }
-  for (const p of selfLoanProgress(l.selfLoans, l.transactions, l.categories)) if (!p.done && p.loan.plannedDate && daysBetween(today, p.loan.plannedDate) <= 30) upcoming.push({ date: p.loan.plannedDate, label: `Replenish: ${p.loan.description}`, amount: p.remaining, to: '/debts' });
-  upcoming.sort((a, b) => a.date.localeCompare(b.date));
+  // Upcoming 30 days: recurring items, Tasa Cero cuotas, debt payments, card due dates, self-loan plans.
+  const upcoming = calendar.filter((e) => e.status === 'upcoming').map((e) => ({ date: e.date, label: e.title, amount: e.amount, to: e.to }));
 
   const current = nw.at(-1);
   const potBal = new Map(l.pots.map((p) => [p.id, l.balances.get(p.accountId)?.pots.get(p.id) ?? 0]));
@@ -94,11 +92,13 @@ export default function Dashboard() {
 
         <Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Coming up (30 days)</h2>
-          {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. Recurring bills arrive in Phase 8.</p> : (
+          {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> waiting for you to confirm</Link>}
+          {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
-              {upcoming.slice(0, 6).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'inherit', textDecoration: 'none' }}><span><span className="muted small">{formatDateCR(u.date).slice(0, 5)}</span> {u.label}</span>{u.amount !== undefined && <span className="money">{formatMoney(u.amount, 'CRC')}</span>}</Link></li>)}
+              {upcoming.slice(0, 7).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'inherit', textDecoration: 'none' }}><span><span className="muted small">{formatDateCR(u.date).slice(0, 5)}</span> {u.label}</span>{u.amount !== undefined && <span className="money">{formatMoney(u.amount, 'CRC')}</span>}</Link></li>)}
             </ul>
           )}
+          <Link to="/bills" className="small">Calendar →</Link>
         </Glass>
 
         <Glass strong className="span-2"><IncomeExpenseChart title="Income vs expenses" data={flowData} /></Glass>

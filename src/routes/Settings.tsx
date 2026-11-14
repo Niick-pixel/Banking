@@ -11,6 +11,8 @@ import { useHealth } from '../app/data';
 import { backupFileText, restoreFromFileText } from '../sync/backup';
 import { saveFile } from '../export/download';
 import { todayISO } from '../lib/dates';
+import { usePref } from '../app/prefs';
+import { notificationsAllowed } from '../app/reminders';
 
 export const ago = (ms?: number) => {
   if (!ms) return 'never';
@@ -39,6 +41,7 @@ export default function Settings() {
   const [upd, setUpd] = useState<UpdateInfo | null | 'none' | 'checking'>(null);
   const [pct, setPct] = useState<number | null>(null);
   const health = useHealth();
+  const [notify, setNotify] = usePref('notifyBills');
 
   useEffect(() => { void suggestedFolder().then(setSuggest); void hasSavedFolderNeedingPermission().then(setNeedsPerm); }, []);
   useEffect(() => { if (engine) void engine.listBackups().then(setBackups); }, [engine, status?.revision]);
@@ -148,6 +151,15 @@ export default function Settings() {
             <button className="btn" onClick={() => void run('Backup saved', async () => saveFile(`Aufwind_backup_${todayISO()}.aufwind`, await backupFileText(), 'application/json'))}>Download backup</button>
             <label className="btn">Restore from file…<input type="file" accept=".aufwind,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => restoreFromFileText(await f.text())); e.target.value = ''; }} /></label>
           </div>
+        </Glass>
+
+        <Glass strong style={{ display: 'grid', gap: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Reminders</h2>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={notify} onChange={async (e) => { if (e.target.checked) { const ok = await notificationsAllowed(true); if (!ok) { setMsg('Notifications are blocked. Allow them for Aufwind in your system settings.'); return; } } await setNotify(e.target.checked); }} />
+            Notify me about bills, card due dates and pay due today or tomorrow, and about items waiting for confirmation
+          </label>
+          <p className="small muted" style={{ margin: 0 }}>{isTauri() ? 'Shown in the Windows notification center while Aufwind is open or minimized.' : 'In the browser, notifications only appear while Aufwind is open in a tab.'}</p>
         </Glass>
 
         <Glass strong style={{ display: 'grid', gap: 12 }}>

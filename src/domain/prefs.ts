@@ -15,5 +15,6 @@ export const PREF_DEFAULTS = {
   savingsRateTarget: 0.2,
   payroll: { mySavingsPerQuincena: 7_000_000, associationPerQuincena: 3_500_000, aporteObreroMonthly: 1_600_000, aportePatronalMonthly: 1_600_000 } as Payroll,
   calcRates: { cdpAnnualRatePct: 0, programmedAnnualRatePct: 0, withholdingPct: 15 } as CalcRates,
+  notifyBills: false,
 };
 export type PrefKey = keyof typeof PREF_DEFAULTS;

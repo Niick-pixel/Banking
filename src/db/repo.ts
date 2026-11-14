@@ -5,19 +5,20 @@
  */
 import { db, type AufwindDB } from './db';
 import {
-  AccountSchema, CategorySchema, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
-  type Account, type Category, type SelfLoan, type Goal, type BalanceSnapshot, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
+  AccountSchema, CategorySchema, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, RecurringRuleSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
+  type Account, type Category, type SelfLoan, type Goal, type BalanceSnapshot, type RecurringRule, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
 } from '../domain/schemas';
 import type { ImportPlan } from '../import/workbook';
 import { dueCuotaTransactions } from '../domain/installments';
+import { buildOccurrence, dueOccurrences } from '../domain/recurring';
 import { todayISO } from '../lib/dates';
 
 export const newId = () => crypto.randomUUID();
 
-type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans' | 'goals' | 'snapshots';
+type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans' | 'goals' | 'snapshots' | 'recurring';
 const schemas = {
   transactions: TransactionSchema, accounts: AccountSchema, pots: PotSchema, categories: CategorySchema,
-  installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema, goals: GoalSchema, snapshots: BalanceSnapshotSchema,
+  installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema, goals: GoalSchema, snapshots: BalanceSnapshotSchema, recurring: RecurringRuleSchema,
 } as const;
 
 async function audited<T extends { id: string }>(d: AufwindDB, table: Table, record: T): Promise<T> {
@@ -172,4 +173,39 @@ export async function undoImport(batchId: string, d = db) {
     await d.accounts.bulkDelete(c.accounts ?? []);
     await d.importBatches.update(batchId, { status: 'undone', updatedAt: Date.now() });
   });
+}
+
+// ── Recurring ─────────────────────────────────────────────────────────────
+export async function saveRecurring(r: RecurringRule, d = db) {
+  // Validate the template by building a sample occurrence before saving.
+  buildOccurrence(r, r.startDate, Date.now());
+  return d.transaction('rw', d.recurring, d.audit, () => audited(d, 'recurring', { ...r, updatedAt: Date.now() }));
+}
+
+/** Post every auto-post occurrence that's due. Idempotent: ids are deterministic and lastHandledDate moves forward. */
+export async function postDueRecurring(today = todayISO(), d = db): Promise<number> {
+  const rules = (await d.recurring.toArray()).filter((r) => r.active && r.mode === 'auto_post');
+  if (!rules.length) return 0;
+  const posted = new Set((await d.transactions.where('recurringId').anyOf(rules.map((r) => r.id)).primaryKeys()).map(String));
+  let n = 0;
+  for (const r of rules) {
+    const due = dueOccurrences(r, today, posted);
+    if (!due.length) continue;
+    const now = Date.now();
+    await d.transaction('rw', d.transactions, d.recurring, async () => {
+      await d.transactions.bulkPut(due.map((date) => buildOccurrence(r, date, now)));
+      await d.recurring.put({ ...r, lastHandledDate: due.at(-1), updatedAt: now });
+    });
+    n += due.length;
+  }
+  return n;
+}
+
+/** Reminder confirmed (optionally with the real amount): post it. */
+export async function confirmOccurrence(r: RecurringRule, date: string, amount?: number, d = db) {
+  return saveTransaction(buildOccurrence(r, date, Date.now(), amount), d);
+}
+
+export async function skipOccurrence(r: RecurringRule, date: string, d = db) {
+  return saveRecurring({ ...r, skipped: [...new Set([...(r.skipped ?? []), date])] }, d);
 }

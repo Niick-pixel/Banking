@@ -156,7 +156,14 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
         <div className="field"><label htmlFor="ac-date">As of</label><input id="ac-date" className="input" type="date" value={a.openingDate} onChange={(e) => setA({ ...a, openingDate: e.target.value })} /></div>
       </div>
       <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={a.isLiquid} onChange={(e) => setA({ ...a, isLiquid: e.target.checked })} /> Liquid (counts toward the emergency fund)</label>
-      {a.type === 'credit_card' && <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={owed} onChange={(e) => setOwed(e.target.checked)} /> Balance is money owed</label>}
+      {a.type === 'credit_card' && <>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={owed} onChange={(e) => setOwed(e.target.checked)} /> Balance is money owed</label>
+        <div className="grid2">
+          <div className="field"><label htmlFor="ac-st">Statement closes on day</label><input id="ac-st" className="input" type="number" min={1} max={31} value={a.cardStatementDay ?? ''} onChange={(e) => setA({ ...a, cardStatementDay: e.target.value ? Number(e.target.value) : undefined })} /></div>
+          <div className="field"><label htmlFor="ac-due">Payment due on day</label><input id="ac-due" className="input" type="number" min={1} max={31} value={a.cardDueDay ?? ''} onChange={(e) => setA({ ...a, cardDueDay: e.target.value ? Number(e.target.value) : undefined })} /></div>
+        </div>
+        <span className="small muted">The due date shows in Bills & calendar with what you owe, and can notify you.</span>
+      </>}
       {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         {account && <button type="button" className="btn btn-ghost" onClick={() => void saveAccount({ ...a, archived: true }).then(onDone)}>Archive</button>}

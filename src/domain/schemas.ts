@@ -44,6 +44,9 @@ export const AccountSchema = z.object({
   icon: z.string().optional(),
   /** Ledger is confirmed to match the statement up to and including this date. */
   reconciledThrough: ISODateSchema.optional(),
+  /** Credit cards: day the statement closes and day payment is due. */
+  cardStatementDay: z.number().int().min(1).max(31).optional(),
+  cardDueDay: z.number().int().min(1).max(31).optional(),
   ...Timestamps,
 });
 export type Account = z.infer<typeof AccountSchema>;
@@ -231,8 +234,10 @@ export const RecurringRuleSchema = z.object({
   mode: z.enum(['auto_post', 'remind']),
   startDate: ISODateSchema,
   endDate: ISODateSchema.optional(),
-  /** Last occurrence posted or confirmed, so nothing is created twice. */
+  /** Last occurrence auto-posted, so a deleted posting is never recreated. */
   lastHandledDate: ISODateSchema.optional(),
+  /** Reminder occurrences the user chose to skip. */
+  skipped: z.array(ISODateSchema).default([]),
   informational: z.boolean().default(false), // e.g. aporte patronal: tracked, not my cash
   active: z.boolean().default(true),
   ...Timestamps,

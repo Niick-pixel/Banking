@@ -6,13 +6,18 @@ import { isTauri } from '../sync/backends';
 import { checkForUpdate, type UpdateInfo } from '../sync/updater';
 import { Sheet, Toast } from '../ui/Sheet';
 import { ago } from '../routes/Settings';
+import { useCalendar, usePendingReminders } from './useRecurring';
+import { usePref } from './prefs';
+import { notifyDue } from './reminders';
+import { todayISO } from '../lib/dates';
 import { useQuickAdd } from './QuickAdd';
-import { postDueCuotas } from '../db/repo';
+import { postDueCuotas, postDueRecurring } from '../db/repo';
 import { Aurora, GlassDefs } from '../design/components';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '◎', ready: true },
   { to: '/transactions', label: 'Transactions', icon: '≡', ready: true },
+  { to: '/bills', label: 'Bills & calendar', icon: '◷', ready: true },
   { to: '/tracker', label: 'Tracker', icon: '▦', ready: true },
   { to: '/accounts', label: 'Accounts', icon: '▣', ready: true },
   { to: '/pots', label: 'Pots', icon: '◐', ready: true },
@@ -34,7 +39,18 @@ export default function Shell() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [more, setMore] = useState(false);
-  useEffect(() => { void postDueCuotas(); void suggestedFolder().then(setSuggest); }, []);
+  const [notify] = usePref('notifyBills');
+  const today = todayISO();
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const soon = useCalendar(today, tomorrow);
+  const pending = usePendingReminders();
+  useEffect(() => { if (notify) void notifyDue(soon, pending.length, today, tomorrow); }, [notify, soon, pending.length, today, tomorrow]);
+  useEffect(() => {
+    const catchUp = () => { void postDueCuotas(); void postDueRecurring(); };
+    catchUp(); void suggestedFolder().then(setSuggest);
+    const t = setInterval(catchUp, 3600_000); // also catches up when the app stays open past midnight
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     if (!isTauri()) return;
     const run = () => void checkForUpdate().then(setUpdate).catch(() => {});
@@ -82,7 +98,7 @@ export default function Shell() {
       </div>
       <nav className="glass tabbar" aria-label="Main (mobile)">
         {['/', '/transactions', '/tracker', '/debts'].map((to) => { const n = NAV.find((x) => x.to === to)!; return <NavLink key={to} to={to} end={to === '/'} className="tab"><span aria-hidden>{n.icon}</span>{n.label.split(' ')[0]}</NavLink>; })}
-        <button className="tab" style={{ background: 'none', border: 0, font: 'inherit' }} onClick={() => setMore(true)} aria-haspopup="dialog"><span aria-hidden>⋯</span>More</button>
+        <button className="tab" style={{ background: 'none', border: 0, fontFamily: 'inherit', cursor: 'pointer' }} onClick={() => setMore(true)} aria-haspopup="dialog"><span aria-hidden>⋯</span>More</button>
       </nav>
       <Sheet open={more} onClose={() => setMore(false)} title="All sections">
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
