@@ -18,12 +18,16 @@ import Pots from './routes/Pots';
 import NetWorth from './routes/NetWorth';
 import Goals from './routes/Goals';
 import Calculators from './routes/Calculators';
+import Dashboard from './routes/Dashboard';
+import Reports from './routes/Reports';
 import { bootSync } from './sync';
 
 const router = createBrowserRouter([
   {
     element: <QuickAddProvider><Shell /></QuickAddProvider>,
     children: [
+      { path: '/', element: <Dashboard /> },
+      { path: '/reports', element: <Reports /> },
       { path: '/design', element: <DesignPage /> },
       { path: '/transactions', element: <Transactions /> },
       { path: '/accounts', element: <Accounts /> },
@@ -36,7 +40,7 @@ const router = createBrowserRouter([
       { path: '/net-worth', element: <NetWorth /> },
       { path: '/goals', element: <Goals /> },
       { path: '/calculators', element: <Calculators /> },
-      { path: '*', element: <Navigate to="/transactions" replace /> },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ]);

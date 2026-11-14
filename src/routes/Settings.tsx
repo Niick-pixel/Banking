@@ -6,6 +6,11 @@ import { isTauri, supportsFolderAccess } from '../sync/backends';
 import { checkForUpdate, type UpdateInfo } from '../sync/updater';
 import { useTheme, type ThemePref } from '../app/theme';
 import { Segmented } from '../design/components';
+import { Link } from 'react-router-dom';
+import { useHealth } from '../app/data';
+import { backupFileText, restoreFromFileText } from '../sync/backup';
+import { saveFile } from '../export/download';
+import { todayISO } from '../lib/dates';
 
 export const ago = (ms?: number) => {
   if (!ms) return 'never';
@@ -33,6 +38,7 @@ export default function Settings() {
   const [msg, setMsg] = useState('');
   const [upd, setUpd] = useState<UpdateInfo | null | 'none' | 'checking'>(null);
   const [pct, setPct] = useState<number | null>(null);
+  const health = useHealth();
 
   useEffect(() => { void suggestedFolder().then(setSuggest); void hasSavedFolderNeedingPermission().then(setNeedsPerm); }, []);
   useEffect(() => { if (engine) void engine.listBackups().then(setBackups); }, [engine, status?.revision]);
@@ -120,6 +126,29 @@ export default function Settings() {
             {upd && typeof upd === 'object' && upd.notes && <pre style={{ whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }} className="small">{upd.notes}</pre>}
           </Glass>
         )}
+
+        <Glass strong style={{ display: 'grid', gap: 10 }} id="health">
+          <h2 style={{ margin: 0, fontSize: 18 }}>Data health</h2>
+          {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, pots, debts and statements agree.</Pill> : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+              {health.map((h) => (
+                <li key={h.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                  <Pill tone={h.level === 'error' ? 'expense' : h.level === 'warn' ? 'debt' : 'neutral'}>{h.level === 'error' ? 'fix' : h.level === 'warn' ? 'check' : 'info'}</Pill>
+                  <span><b>{h.title}</b><br /><span className="small muted">{h.detail}</span> <Link className="small" to={h.to}>Go →</Link></span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Glass>
+
+        <Glass strong style={{ display: 'grid', gap: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Backup file</h2>
+          <p className="muted small" style={{ margin: 0 }}>A complete copy of your data in one file, the same format as the data folder. Restoring replaces the data on every synced device; your current data is backed up first when a folder is set.</p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={() => void run('Backup saved', async () => saveFile(`Colon_backup_${todayISO()}.colon`, await backupFileText(), 'application/json'))}>Download backup</button>
+            <label className="btn">Restore from file…<input type="file" accept=".colon,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => restoreFromFileText(await f.text())); e.target.value = ''; }} /></label>
+          </div>
+        </Glass>
 
         <Glass strong style={{ display: 'grid', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Appearance</h2>

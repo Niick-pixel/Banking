@@ -65,6 +65,25 @@ fn vault_write_atomic(dir: String, name: String, contents: String) -> Result<(),
     })
 }
 
+/// Binary variant (exports such as .xlsx), same atomic write.
+#[tauri::command]
+fn vault_write_bytes(dir: String, name: String, contents: Vec<u8>) -> Result<(), String> {
+    let path = safe_join(&dir, &name)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let tmp = path.with_extension(format!("tmp-{}", std::process::id()));
+    {
+        let mut f: File = OpenOptions::new().write(true).create(true).truncate(true).open(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(&contents).map_err(|e| e.to_string())?;
+        f.sync_all().map_err(|e| e.to_string())?;
+    }
+    retry(|| fs::rename(&tmp, &path)).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("Saving {}: {e}", path.display())
+    })
+}
+
 #[tauri::command]
 fn vault_list(dir: String, sub: String) -> Result<Vec<String>, String> {
     let path = if sub.is_empty() { PathBuf::from(&dir) } else { safe_join(&dir, &sub)? };
@@ -155,6 +174,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             vault_read,
             vault_write_atomic,
+            vault_write_bytes,
             vault_list,
             vault_move,
             vault_delete,
@@ -201,6 +221,8 @@ mod tests {
         assert_eq!(vault_list(dir.clone(), "backups".into()).unwrap(), vec!["a.colon".to_string()]);
         vault_move(dir.clone(), "colon-data.colon".into(), "backups/moved.colon".into()).unwrap();
         assert_eq!(vault_read(dir.clone(), "colon-data.colon".into()).unwrap(), None);
+        vault_write_bytes(dir.clone(), "exports/x.xlsx".into(), vec![0, 159, 146, 150]).unwrap();
+        assert_eq!(fs::read(d.join("exports/x.xlsx")).unwrap(), vec![0, 159, 146, 150]);
         vault_delete(dir.clone(), "backups/moved.colon".into()).unwrap();
         assert_eq!(vault_list(dir, "backups".into()).unwrap(), vec!["a.colon".to_string()]);
     }

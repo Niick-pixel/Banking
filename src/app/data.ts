@@ -63,3 +63,14 @@ export function suggestCategories(txs: Transaction[], description: string, kind:
   }
   return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
+
+import { dataHealth } from '../domain/health';
+import { todayISO } from '../lib/dates';
+
+export function useHealth() {
+  const l = useLedger();
+  return useMemo(() => {
+    try { return dataHealth({ accounts: l.accounts, pots: l.pots, categories: l.categories, transactions: l.transactions, debts: l.debts, snapshots: l.snapshots, budgets: l.budgets, selfLoans: l.selfLoans }, todayISO()); }
+    catch (e) { console.error(e); return []; }
+  }, [l]);
+}

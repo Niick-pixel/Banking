@@ -11,6 +11,7 @@ import { postDueCuotas } from '../db/repo';
 import { Aurora, GlassDefs } from '../design/components';
 
 const NAV = [
+  { to: '/', label: 'Dashboard', icon: '◎', ready: true },
   { to: '/transactions', label: 'Transactions', icon: '≡', ready: true },
   { to: '/tracker', label: 'Tracker', icon: '▦', ready: true },
   { to: '/accounts', label: 'Accounts', icon: '▣', ready: true },
@@ -20,8 +21,8 @@ const NAV = [
   { to: '/goals', label: 'Savings & goals', icon: '★', ready: true },
   { to: '/tasa-cero', label: 'Tasa Cero', icon: '%', ready: true },
   { to: '/calculators', label: 'Calculators', icon: '∑', ready: true },
+  { to: '/reports', label: 'Reports', icon: '▤', ready: true },
   { to: '/import', label: 'Import', icon: '⇪', ready: true },
-  { to: '/', label: 'Dashboard', icon: '◎', ready: false },
   { to: '/settings', label: 'Settings', icon: '⚙', ready: true },
   { to: '/design', label: 'Design system', icon: '✦', ready: true },
 ];
@@ -53,7 +54,7 @@ export default function Shell() {
             {NAV.map((n) => (
               <li key={n.to}>
                 {n.ready ? (
-                  <NavLink to={n.to} className="nav-item"><span aria-hidden>{n.icon}</span>{n.label}</NavLink>
+                  <NavLink to={n.to} end={n.to === '/'} className="nav-item"><span aria-hidden>{n.icon}</span>{n.label}</NavLink>
                 ) : (
                   <span className="nav-item disabled" aria-disabled="true" title="Coming in a later phase"><span aria-hidden>{n.icon}</span>{n.label}</span>
                 )}
@@ -80,7 +81,7 @@ export default function Shell() {
         </main>
       </div>
       <nav className="glass tabbar" aria-label="Main (mobile)">
-        {['/transactions', '/tracker', '/debts', '/net-worth'].map((to) => { const n = NAV.find((x) => x.to === to)!; return <NavLink key={to} to={to} className="tab"><span aria-hidden>{n.icon}</span>{n.label.split(' ')[0]}</NavLink>; })}
+        {['/', '/transactions', '/tracker', '/debts'].map((to) => { const n = NAV.find((x) => x.to === to)!; return <NavLink key={to} to={to} end={to === '/'} className="tab"><span aria-hidden>{n.icon}</span>{n.label.split(' ')[0]}</NavLink>; })}
         <button className="tab" style={{ background: 'none', border: 0, font: 'inherit' }} onClick={() => setMore(true)} aria-haspopup="dialog"><span aria-hidden>⋯</span>More</button>
       </nav>
       <Sheet open={more} onClose={() => setMore(false)} title="All sections">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useCssVar } from '../../app/theme';
 import { formatMoney, type Minor } from '../../lib/money';
@@ -43,6 +44,7 @@ export interface MonthFlow { month: string; income: number; expenses: number }
 
 export function IncomeExpenseChart({ data, title }: { data: MonthFlow[]; title: string }) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
+  const reduce = useReducedMotion();
   const [inc, exp, grid, axis] = useCssVar(['--chart-income', '--chart-expense', '--chart-grid', '--chart-axis']);
   return (
     <figure style={{ margin: 0 }}>
@@ -59,8 +61,8 @@ export function IncomeExpenseChart({ data, title }: { data: MonthFlow[]; title: 
               <YAxis tickFormatter={fmtShort} tickLine={false} axisLine={false} width={56} tick={{ fill: axis, fontSize: 12 }} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent-soft)', radius: 8 } as object} />
               <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 13, color: 'var(--text-2)' }} />
-              <Bar dataKey="income" name="Income" fill={inc} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expenses" name="Expenses" fill={exp} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={!reduce} dataKey="income" name="Income" fill={inc} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={!reduce} dataKey="expenses" name="Expenses" fill={exp} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -86,8 +88,8 @@ export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
         <Segmented label="Chart view" value={view} onChange={setView} options={[{ value: 'chart', label: 'Chart' }, { value: 'table', label: 'Table' }]} />
       </figcaption>
       {view === 'chart' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 200px) 1fr', gap: 16, alignItems: 'center' }} role="img" aria-label={`${title}. Switch to Table for exact values.`}>
-          <div style={{ height: 200, position: 'relative' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, alignItems: 'center', justifyItems: 'stretch' }} role="img" aria-label={`${title}. Switch to Table for exact values.`}>
+          <div style={{ height: 200, position: 'relative', maxWidth: 220, width: '100%', justifySelf: 'center' }}>
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={data} dataKey="value" nameKey="name" innerRadius="66%" outerRadius="100%" paddingAngle={1.5} cornerRadius={4} stroke={surface} strokeWidth={2} isAnimationActive={false}>

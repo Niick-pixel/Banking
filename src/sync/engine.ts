@@ -215,15 +215,13 @@ export class SyncEngine {
    * win merges, and anything not in the backup gets a tombstone.
    */
   async restore(name: string) {
-    const v = await parseVault(await this.backend.readBackup(name));
+    await this.restoreSnapshot((await parseVault(await this.backend.readBackup(name))).data);
+  }
+
+  /** Make a snapshot the truth on every device (backup first, re-stamp, tombstone extras). */
+  async restoreSnapshot(data: Snapshot) {
     await this.backupNow('pre-restore');
-    const t = this.now();
-    const current = await this.exportLocal();
-    const keep = new Set(SYNCED_TABLES.flatMap((tb) => v.data.tables[tb].map((r) => `${tb}|${r.id}`)));
-    const restored = emptySnapshot();
-    for (const tb of SYNCED_TABLES) restored.tables[tb] = v.data.tables[tb].map((r) => ({ ...r, updatedAt: t }));
-    restored.tombstones = SYNCED_TABLES.flatMap((tb) => current.tables[tb].filter((r) => !keep.has(`${tb}|${r.id}`)).map((r) => ({ table: tb, id: r.id, at: t })));
-    await this.replaceLocal(restored);
+    await this.replaceLocal(restoredSnapshot(await this.exportLocal(), data, this.now()));
     this.dirty = true;
     await this.syncNow();
   }
@@ -245,3 +243,15 @@ export class SyncEngine {
 }
 
 const stamp = (ms: number) => new Date(ms).toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+/**
+ * Records in `backup` are re-stamped "now" so they win merges on other devices;
+ * anything in `current` but not in the backup gets a tombstone.
+ */
+export function restoredSnapshot(current: Snapshot, backup: Snapshot, now: number): Snapshot {
+  const keep = new Set(SYNCED_TABLES.flatMap((tb) => backup.tables[tb].map((r) => `${tb}|${r.id}`)));
+  const out = emptySnapshot();
+  for (const tb of SYNCED_TABLES) out.tables[tb] = backup.tables[tb].map((r) => ({ ...r, updatedAt: now }));
+  out.tombstones = SYNCED_TABLES.flatMap((tb) => current.tables[tb].filter((r) => !keep.has(`${tb}|${r.id}`)).map((r) => ({ table: tb, id: r.id, at: now })));
+  return out;
+}
