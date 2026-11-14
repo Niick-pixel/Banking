@@ -8,7 +8,9 @@ import { useTheme, type ThemePref } from '../app/theme';
 import { Segmented } from '../design/components';
 import { Link } from 'react-router-dom';
 import { useHealth } from '../app/data';
-import { backupFileText, restoreFromFileText } from '../sync/backup';
+import { backupFileText, backupIsEncrypted, restoreFromFileText } from '../sync/backup';
+import { EncryptionPanel } from './EncryptionPanel';
+import { LockPanel } from './LockPanel';
 import { saveFile } from '../export/download';
 import { todayISO } from '../lib/dates';
 import { usePref } from '../app/prefs';
@@ -76,7 +78,7 @@ export default function Settings() {
               <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '6px 16px' }} className="small">
                 <span className="muted">Location</span><code style={{ wordBreak: 'break-all' }}>{status.location}</code>
                 <span className="muted">Status</span>
-                <span>{status.phase === 'error' ? <Pill tone="expense">{status.message}</Pill> : status.phase === 'syncing' ? 'Saving…' : status.dirty ? 'Changes waiting to save' : <Pill tone="income">✓ Saved {ago(status.lastSyncedAt)}</Pill>}</span>
+                <span>{status.phase === 'locked' ? <Pill tone="debt">Encrypted: enter the password below</Pill> : status.phase === 'error' ? <Pill tone="expense">{status.message}</Pill> : status.phase === 'syncing' ? 'Saving…' : status.dirty ? 'Changes waiting to save' : <Pill tone="income">✓ Saved {ago(status.lastSyncedAt)}</Pill>}</span>
                 <span className="muted">Revision</span><span>{status.revision ?? '—'}{status.lastRemoteDevice && <span className="muted"> · last change from {status.lastRemoteDevice}</span>}</span>
               </div>
               {status.conflicts.length > 0 && <Pill tone="debt">{status.conflicts.length} record(s) were edited on two devices. The newer edit was kept, and the vault before the merge is in backups.</Pill>}
@@ -94,6 +96,8 @@ export default function Settings() {
             </>
           )}
         </Glass>
+
+        {engine && status && <EncryptionPanel />}
 
         {engine && (
           <Glass strong style={{ display: 'grid', gap: 10 }}>
@@ -130,6 +134,8 @@ export default function Settings() {
           </Glass>
         )}
 
+        <LockPanel />
+
         <Glass strong style={{ display: 'grid', gap: 10 }} id="health">
           <h2 style={{ margin: 0, fontSize: 18 }}>Data health</h2>
           {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, pots, debts and statements agree.</Pill> : (
@@ -149,7 +155,7 @@ export default function Settings() {
           <p className="muted small" style={{ margin: 0 }}>A complete copy of your data in one file, the same format as the data folder. Restoring replaces the data on every synced device; your current data is backed up first when a folder is set.</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn" onClick={() => void run('Backup saved', async () => saveFile(`Aufwind_backup_${todayISO()}.aufwind`, await backupFileText(), 'application/json'))}>Download backup</button>
-            <label className="btn">Restore from file…<input type="file" accept=".aufwind,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => restoreFromFileText(await f.text())); e.target.value = ''; }} /></label>
+            <label className="btn">Restore from file…<input type="file" accept=".aufwind,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => { const text = await f.text(); const pw = backupIsEncrypted(text) ? prompt('This backup is encrypted. Enter its data password:') ?? '' : undefined; return restoreFromFileText(text, pw); }); e.target.value = ''; }} /></label>
           </div>
         </Glass>
 

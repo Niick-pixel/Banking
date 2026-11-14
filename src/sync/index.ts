@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../db/db';
 import { FolderBackend, TauriBackend, isTauri, supportsFolderAccess, type VaultBackend } from './backends';
 import { SyncEngine, localKV, type SyncStatus } from './engine';
+import type { VaultKey } from './crypto';
 
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0-dev';
 
@@ -40,9 +41,21 @@ async function savedBackend(): Promise<VaultBackend | null> {
   return null;
 }
 
+/**
+ * The data-file key is kept on this device as a non-extractable CryptoKey in
+ * IndexedDB, so you type the password once per device, not on every start.
+ * (Code on this device can use it; nothing can read the key bytes out.)
+ */
+async function storedKey(): Promise<VaultKey | null> {
+  try { return ((await db.settings.get('vaultKey'))?.value as VaultKey | undefined) ?? null; } catch { return null; }
+}
+async function rememberKey(k: VaultKey | null) {
+  if (k) await db.settings.put({ key: 'vaultKey', value: k }); else await db.settings.delete('vaultKey');
+}
+
 async function startWith(backend: VaultBackend) {
   engine?.stop();
-  const e = new SyncEngine(db, backend, { deviceId: deviceId(), deviceName: await deviceName(), appVersion: APP_VERSION });
+  const e = new SyncEngine(db, backend, { deviceId: deviceId(), deviceName: await deviceName(), appVersion: APP_VERSION, key: await storedKey(), onKeyChange: (k) => void rememberKey(k) });
   setEngine(e);
   await e.start();
 }

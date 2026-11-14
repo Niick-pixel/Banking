@@ -3,7 +3,8 @@
  * backup file can be dropped into a data folder too) and restore from a file.
  */
 import { db, type AufwindDB } from '../db/db';
-import { SYNCED_TABLES, emptySnapshot, parseVault, serializeVault, type Snapshot } from './vault';
+import { SYNCED_TABLES, emptySnapshot, parseVault, peekHeader, serializeVault, type Snapshot } from './vault';
+import { deriveVaultKey } from './crypto';
 import { getEngine, APP_VERSION } from './index';
 import { restoredSnapshot } from './engine';
 import { localKV } from './engine';
@@ -16,12 +17,18 @@ export async function snapshotOf(d: AufwindDB = db): Promise<Snapshot> {
 }
 
 export async function backupFileText(): Promise<string> {
+  const e = getEngine();
+  if (e) return e.backupText();
   return serializeVault(await snapshotOf(), { revision: 0, deviceId: localKV.get('aufwind.deviceId') ?? 'web', deviceName: 'manual backup', appVersion: APP_VERSION });
 }
 
-/** Validates the file (format + checksum) before touching anything. */
-export async function restoreFromFileText(text: string): Promise<{ counts: Record<string, number> }> {
-  const v = await parseVault(text);
+export function backupIsEncrypted(text: string) { return !!peekHeader(text)?.encryption; }
+
+/** Validates the file (format + checksum, and the password if it's encrypted) before touching anything. */
+export async function restoreFromFileText(text: string, password?: string): Promise<{ counts: Record<string, number> }> {
+  const h = peekHeader(text);
+  const key = h?.encryption && password ? await deriveVaultKey(password, h.encryption.salt, h.encryption.iterations) : null;
+  const v = await parseVault(text, key);
   const engine = getEngine();
   if (engine) await engine.restoreSnapshot(v.data);
   else {

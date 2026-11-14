@@ -22,6 +22,7 @@ import Dashboard from './routes/Dashboard';
 import Reports from './routes/Reports';
 import Bills from './routes/Bills';
 import { bootSync } from './sync';
+import { LockGate } from './app/LockGate';
 
 const router = createBrowserRouter([
   {
@@ -52,7 +53,9 @@ void bootSync();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <LockGate>
+        <RouterProvider router={router} />
+      </LockGate>
     </ThemeProvider>
   </StrictMode>,
 );

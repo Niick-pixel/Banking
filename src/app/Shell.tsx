@@ -79,6 +79,7 @@ export default function Shell() {
           </ul>
           <Link to="/settings" className="sync-badge small" aria-label="Data sync status">
             {!status ? <><span className="dot" style={{ background: 'var(--text-3)' }} />Not saving to a folder</>
+              : status.phase === 'locked' ? <><span className="dot" style={{ background: 'var(--debt)' }} />Data file locked: enter password</>
               : status.phase === 'error' ? <><span className="dot" style={{ background: 'var(--expense)' }} />Sync problem</>
               : status.phase === 'syncing' || status.dirty ? <><span className="dot" style={{ background: 'var(--debt)' }} />Saving…</>
               : <><span className="dot" style={{ background: 'var(--income)' }} />Saved {ago(status.lastSyncedAt)}</>}

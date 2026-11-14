@@ -19,6 +19,8 @@ export interface Tomb { table: string; id: string; at: number }
 export interface VaultRecord { id: string; updatedAt?: number; [k: string]: unknown }
 export interface Snapshot { tables: Record<SyncedTable, VaultRecord[]>; tombstones: Tomb[] }
 
+import { decryptText, encryptText, keyMatches, type EncryptionHeader, type VaultKey } from './crypto';
+
 export interface VaultHeader {
   format: typeof VAULT_FORMAT;
   formatVersion: number;
@@ -27,13 +29,16 @@ export interface VaultHeader {
   deviceId: string;
   deviceName: string;
   appVersion: string;
+  /** SHA-256 of the data section (the ciphertext when encrypted), so a partial sync is caught even without the password. */
   checksum: string;
   counts: Record<string, number>;
+  /** Present when the data section is encrypted. */
+  encryption?: EncryptionHeader;
 }
 export interface VaultFile extends VaultHeader { data: Snapshot }
 
 export class VaultError extends Error {
-  constructor(message: string, readonly kind: 'corrupt' | 'format' | 'newer') { super(message); this.name = 'VaultError'; }
+  constructor(message: string, readonly kind: 'corrupt' | 'format' | 'newer' | 'locked' | 'wrong-password') { super(message); this.name = 'VaultError'; }
 }
 
 export function emptySnapshot(): Snapshot {
@@ -53,28 +58,46 @@ export async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function serializeVault(data: Snapshot, meta: Pick<VaultHeader, 'revision' | 'deviceId' | 'deviceName' | 'appVersion'> & { savedAt?: number }): Promise<string> {
-  const body = canonical(data);
+export async function serializeVault(data: Snapshot, meta: Pick<VaultHeader, 'revision' | 'deviceId' | 'deviceName' | 'appVersion'> & { savedAt?: number }, key?: VaultKey | null): Promise<string> {
+  const plain = canonical(data);
+  const enc = key ? await encryptText(key, plain) : null;
+  const body = enc ? JSON.stringify(enc.ciphertext) : plain;
   const header: VaultHeader = {
     format: VAULT_FORMAT, formatVersion: VAULT_VERSION, revision: meta.revision, savedAt: meta.savedAt ?? Date.now(),
     deviceId: meta.deviceId, deviceName: meta.deviceName, appVersion: meta.appVersion, checksum: await sha256(body),
-    counts: Object.fromEntries(Object.entries(data.tables).map(([k, v]) => [k, v.length])),
+    // Counts reveal how much data there is; leave them out of encrypted files.
+    counts: enc ? {} : Object.fromEntries(Object.entries(data.tables).map(([k, v]) => [k, v.length])),
+    ...(enc ? { encryption: enc.header } : {}),
   };
   // Header first and human-readable; data last.
   return `{"header":${JSON.stringify(header, null, 1)},\n"data":${body}}\n`;
 }
 
-export async function parseVault(text: string): Promise<VaultFile> {
-  let raw: { header?: VaultHeader; data?: Snapshot };
+/** Read just the header (no password needed): revision, device, whether it's encrypted. */
+export function peekHeader(text: string): VaultHeader | null {
+  try { return (JSON.parse(text) as { header?: VaultHeader }).header ?? null; } catch { return null; }
+}
+
+export async function parseVault(text: string, key?: VaultKey | null): Promise<VaultFile> {
+  let raw: { header?: VaultHeader; data?: Snapshot | string };
   try { raw = JSON.parse(text); } catch { throw new VaultError('The data file is incomplete or damaged (not valid JSON). It may still be syncing.', 'corrupt'); }
   const h = raw.header;
-  if (!h || h.format !== VAULT_FORMAT || !raw.data) throw new VaultError('This is not a Aufwind data file.', 'format');
+  if (!h || h.format !== VAULT_FORMAT || raw.data === undefined) throw new VaultError('This is not an Aufwind data file.', 'format');
   if (h.formatVersion > VAULT_VERSION) throw new VaultError(`This data file was written by a newer version of Aufwind (format ${h.formatVersion}). Update the app first.`, 'newer');
-  const sum = await sha256(canonical(raw.data));
-  if (sum !== h.checksum) throw new VaultError('The data file failed its integrity check (checksum mismatch). It may be a partial sync.', 'corrupt');
+  const body = typeof raw.data === 'string' ? JSON.stringify(raw.data) : canonical(raw.data);
+  if ((await sha256(body)) !== h.checksum) throw new VaultError('The data file failed its integrity check (checksum mismatch). It may be a partial sync.', 'corrupt');
+  let payload: Snapshot;
+  if (h.encryption) {
+    if (typeof raw.data !== 'string') throw new VaultError('Encrypted file has no ciphertext.', 'corrupt');
+    if (!keyMatches(key, h.encryption)) throw new VaultError('The data file is encrypted. Enter your data password to open it.', 'locked');
+    try { payload = JSON.parse(await decryptText(key!, h.encryption, raw.data)); } catch { throw new VaultError('That password doesn\'t open this data file.', 'wrong-password'); }
+  } else {
+    if (typeof raw.data === 'string') throw new VaultError('Unexpected data section.', 'corrupt');
+    payload = raw.data;
+  }
   const data = emptySnapshot();
-  for (const t of SYNCED_TABLES) data.tables[t] = raw.data.tables?.[t] ?? [];
-  data.tombstones = raw.data.tombstones ?? [];
+  for (const t of SYNCED_TABLES) data.tables[t] = payload.tables?.[t] ?? [];
+  data.tombstones = payload.tombstones ?? [];
   return { ...h, data };
 }
 

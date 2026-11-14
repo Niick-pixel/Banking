@@ -12,9 +12,10 @@
  */
 import type { AufwindDB } from '../db/db';
 import type { VaultBackend } from './backends';
+import { deriveVaultKey, type VaultKey } from './crypto';
 import {
   SYNCED_TABLES, VaultError, backupsToPrune, dailyBackupName, emptySnapshot, eventBackupName, isConflictedCopy,
-  mergeSnapshots, parseVault, serializeVault, type Snapshot, type VaultFile,
+  mergeSnapshots, parseVault, peekHeader, serializeVault, type Snapshot, type VaultFile,
 } from './vault';
 
 export interface KV { get(k: string): string | null; set(k: string, v: string): void }
@@ -26,7 +27,9 @@ export const localKV: KV = {
 interface SyncState { revision: number; checksum: string; syncedAt: number }
 
 export interface SyncStatus {
-  phase: 'off' | 'idle' | 'syncing' | 'error';
+  phase: 'off' | 'idle' | 'syncing' | 'error' | 'locked';
+  /** The file in the folder is encrypted (as last read or written). */
+  encrypted?: boolean;
   location?: string;
   revision?: number;
   lastSyncedAt?: number;
@@ -37,7 +40,7 @@ export interface SyncStatus {
   dirty: boolean;
 }
 
-export interface EngineOptions { deviceId: string; deviceName: string; appVersion: string; kv?: KV; now?: () => number; debounceMs?: number }
+export interface EngineOptions { deviceId: string; deviceName: string; appVersion: string; kv?: KV; now?: () => number; debounceMs?: number; key?: VaultKey | null; onKeyChange?: (k: VaultKey | null) => void }
 
 export class SyncEngine {
   private kv: KV;
@@ -49,11 +52,13 @@ export class SyncEngine {
   private applyingRemote = false;
   private unhook: (() => void)[] = [];
   private listeners = new Set<(s: SyncStatus) => void>();
+  private key: VaultKey | null;
   status: SyncStatus;
 
   constructor(private db: AufwindDB, private backend: VaultBackend, private opts: EngineOptions) {
     this.kv = opts.kv ?? localKV;
     this.now = opts.now ?? Date.now;
+    this.key = opts.key ?? null;
     this.status = { phase: 'idle', location: backend.label, conflicts: [], conflictedCopies: [], dirty: this.dirty };
   }
 
@@ -146,9 +151,9 @@ export class SyncEngine {
 
   private async write(data: Snapshot, revision: number, previousText: string | null) {
     await this.dailyBackup(previousText);
-    const text = await serializeVault(data, { revision, deviceId: this.opts.deviceId, deviceName: this.opts.deviceName, appVersion: this.opts.appVersion, savedAt: this.now() });
+    const text = await serializeVault(data, { revision, deviceId: this.opts.deviceId, deviceName: this.opts.deviceName, appVersion: this.opts.appVersion, savedAt: this.now() }, this.key);
     await this.backend.writeMain(text);
-    const v = await parseVault(text);
+    const v = await parseVault(text, this.key);
     this.state = { revision, checksum: v.checksum, syncedAt: this.now() };
     this.dirty = false;
   }
@@ -162,7 +167,7 @@ export class SyncEngine {
       if (text === null) {
         await this.write(await this.exportLocal(), (st?.revision ?? 0) + 1, null);
       } else {
-        const remote = await parseVault(text);
+        const remote = await parseVault(text, this.key);
         const unchanged = st && remote.revision === st.revision && remote.checksum === st.checksum;
         if (unchanged) {
           if (wasDirty) await this.write(await this.exportLocal(), remote.revision + 1, text);
@@ -182,8 +187,13 @@ export class SyncEngine {
         }
       }
       const root = await this.backend.listRoot();
-      this.emit({ phase: 'idle', message: undefined, revision: this.state?.revision, lastSyncedAt: this.state?.syncedAt, conflictedCopies: root.filter(isConflictedCopy) });
+      this.emit({ phase: 'idle', encrypted: !!this.key, message: undefined, revision: this.state?.revision, lastSyncedAt: this.state?.syncedAt, conflictedCopies: root.filter(isConflictedCopy) });
     } catch (e) {
+      if (e instanceof VaultError && (e.kind === 'locked' || e.kind === 'wrong-password')) {
+        // Never overwrite an encrypted file we can't read: wait for the password.
+        this.emit({ phase: 'locked', encrypted: true, message: e.message });
+        return;
+      }
       const msg = e instanceof VaultError ? e.message : `Couldn't reach the data folder: ${e instanceof Error ? e.message : e}`;
       this.emit({ phase: 'error', message: msg });
     }
@@ -203,7 +213,7 @@ export class SyncEngine {
   /** Snapshot this device's data before something risky (import, update, restore). */
   async backupNow(kind: 'pre-update' | 'pre-import' | 'pre-restore'): Promise<string> {
     const name = eventBackupName(kind, stamp(this.now()));
-    const text = await serializeVault(await this.exportLocal(), { revision: this.state?.revision ?? 0, deviceId: this.opts.deviceId, deviceName: this.opts.deviceName, appVersion: this.opts.appVersion, savedAt: this.now() });
+    const text = await serializeVault(await this.exportLocal(), { revision: this.state?.revision ?? 0, deviceId: this.opts.deviceId, deviceName: this.opts.deviceName, appVersion: this.opts.appVersion, savedAt: this.now() }, this.key);
     await this.backend.writeBackup(name, text);
     return name;
   }
@@ -215,7 +225,7 @@ export class SyncEngine {
    * win merges, and anything not in the backup gets a tombstone.
    */
   async restore(name: string) {
-    await this.restoreSnapshot((await parseVault(await this.backend.readBackup(name))).data);
+    await this.restoreSnapshot((await this.readBackupWithKey(name)).data);
   }
 
   /** Make a snapshot the truth on every device (backup first, re-stamp, tombstone extras). */
@@ -228,7 +238,7 @@ export class SyncEngine {
 
   /** Fold a cloud "conflicted copy" back in, then move it into backups/. */
   async mergeConflictedCopy(name: string) {
-    const copy = await parseVault(await this.backend.readRoot(name));
+    const copy = await parseVault(await this.backend.readRoot(name), this.key);
     const local = await this.exportLocal();
     const m = mergeSnapshots(local, copy.data, 0, this.now());
     await this.replaceLocal(m.data);
@@ -239,7 +249,52 @@ export class SyncEngine {
   }
 
   /** Read a vault without applying it (for showing what a backup contains). */
-  async peekBackup(name: string): Promise<VaultFile> { return parseVault(await this.backend.readBackup(name)); }
+  async peekBackup(name: string): Promise<VaultFile> { return this.readBackupWithKey(name); }
+
+  /** Backups made before a password change still open with the old key if this device has it; otherwise ask. */
+  private async readBackupWithKey(name: string): Promise<VaultFile> { return parseVault(await this.backend.readBackup(name), this.key); }
+
+  // ── Encryption ───────────────────────────────────────────────────────────
+  get hasKey() { return !!this.key; }
+
+  /** A complete backup as text, encrypted with the current key when there is one. */
+  async backupText(): Promise<string> {
+    return serializeVault(await this.exportLocal(), { revision: this.state?.revision ?? 0, deviceId: this.opts.deviceId, deviceName: 'manual backup', appVersion: this.opts.appVersion }, this.key);
+  }
+
+  /** Turn encryption on (or change the password): the file is rewritten with the new key right away. */
+  async setPassword(password: string) { await this.rekey(await deriveVaultKey(password)); }
+
+  /** Turn encryption off: the file is rewritten in plain JSON right away. */
+  async removePassword() { await this.rekey(null); }
+
+  /**
+   * Sync with the CURRENT key first (so nothing from other devices is lost and the
+   * file can be read), then write a new revision with the new key (or none).
+   */
+  private async rekey(next: VaultKey | null) {
+    await this.syncNow();
+    if (this.status.phase === 'locked') throw new Error('Unlock the data file with its current password first.');
+    const text = await this.backend.readMain();
+    const current = text ? await parseVault(text, this.key) : null;
+    this.key = next;
+    this.opts.onKeyChange?.(next);
+    await this.write(await this.exportLocal(), (current?.revision ?? this.state?.revision ?? 0) + 1, text);
+    this.emit({ phase: 'idle', encrypted: !!next, revision: this.state?.revision, lastSyncedAt: this.state?.syncedAt });
+  }
+
+  /** Another device encrypted the file (or changed the password): derive the key from the file's own salt. */
+  async unlock(password: string): Promise<boolean> {
+    const text = await this.backend.readMain();
+    const h = text ? peekHeader(text) : null;
+    if (!text || !h?.encryption) return true;
+    const k = await deriveVaultKey(password, h.encryption.salt, h.encryption.iterations);
+    try { await parseVault(text, k); } catch { return false; }
+    this.key = k;
+    this.opts.onKeyChange?.(k);
+    await this.syncNow();
+    return true;
+  }
 }
 
 const stamp = (ms: number) => new Date(ms).toISOString().replace(/[:.]/g, '-').slice(0, 19);
