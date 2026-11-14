@@ -391,6 +391,12 @@ export function parseWorkbook(grid: Grid, opts: ParseOptions): ImportPlan {
   }
 
   // ── Opening-balance sanity for the spending account ──────────────────────
+  // Accounts and debts with no dates of their own start at the first month of data, not Jan 1.
+  if (transactions.length) {
+    const firstMonth = `${transactions.reduce((m, t) => (t.date < m ? t.date : m), transactions[0]!.date).slice(0, 7)}-01`;
+    for (const a of accounts) if (!snapshotSeries.has(a.name) && a.openingBalance === 0) a.openingDate = firstMonth;
+    for (const d of debts) d.startDate = firstMonth;
+  }
   if (!snapshotSeries.has(spending.name) && transactions.length) {
     issues.push({ level: 'warning', sheet: nw?.name ?? '—', message: `No balances for "${spending.name}" in the workbook, so its opening balance is ₡0 and its ledger balance will be wrong until you enter the real opening balance (Accounts → Edit).` });
     const firstDate = transactions.reduce((m, t) => (t.date < m ? t.date : m), transactions[0]!.date);

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useSync, chooseFolder, suggestedFolder } from '../sync';
 import { isTauri } from '../sync/backends';
 import { checkForUpdate, type UpdateInfo } from '../sync/updater';
-import { Toast } from '../ui/Sheet';
+import { Sheet, Toast } from '../ui/Sheet';
 import { ago } from '../routes/Settings';
 import { useQuickAdd } from './QuickAdd';
 import { postDueCuotas } from '../db/repo';
@@ -16,10 +16,12 @@ const NAV = [
   { to: '/accounts', label: 'Accounts', icon: '▣', ready: true },
   { to: '/pots', label: 'Pots', icon: '◐', ready: true },
   { to: '/debts', label: 'Debts', icon: '◇', ready: true },
+  { to: '/net-worth', label: 'Net worth', icon: '△', ready: true },
+  { to: '/goals', label: 'Savings & goals', icon: '★', ready: true },
   { to: '/tasa-cero', label: 'Tasa Cero', icon: '%', ready: true },
+  { to: '/calculators', label: 'Calculators', icon: '∑', ready: true },
   { to: '/import', label: 'Import', icon: '⇪', ready: true },
   { to: '/', label: 'Dashboard', icon: '◎', ready: false },
-  { to: '/net-worth', label: 'Net worth', icon: '△', ready: false },
   { to: '/settings', label: 'Settings', icon: '⚙', ready: true },
   { to: '/design', label: 'Design system', icon: '✦', ready: true },
 ];
@@ -30,6 +32,7 @@ export default function Shell() {
   const [suggest, setSuggest] = useState<string | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [more, setMore] = useState(false);
   useEffect(() => { void postDueCuotas(); void suggestedFolder().then(setSuggest); }, []);
   useEffect(() => {
     if (!isTauri()) return;
@@ -77,9 +80,14 @@ export default function Shell() {
         </main>
       </div>
       <nav className="glass tabbar" aria-label="Main (mobile)">
-        {NAV.slice(0, 4).map((n) => <NavLink key={n.to} to={n.to} className="tab"><span aria-hidden>{n.icon}</span>{n.label}</NavLink>)}
-        <NavLink to="/design" className="tab"><span aria-hidden>✦</span>Design</NavLink>
+        {['/transactions', '/tracker', '/debts', '/net-worth'].map((to) => { const n = NAV.find((x) => x.to === to)!; return <NavLink key={to} to={to} className="tab"><span aria-hidden>{n.icon}</span>{n.label.split(' ')[0]}</NavLink>; })}
+        <button className="tab" style={{ background: 'none', border: 0, font: 'inherit' }} onClick={() => setMore(true)} aria-haspopup="dialog"><span aria-hidden>⋯</span>More</button>
       </nav>
+      <Sheet open={more} onClose={() => setMore(false)} title="All sections">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+          {NAV.filter((n) => n.ready).map((n) => <li key={n.to}><NavLink to={n.to} className="nav-item" onClick={() => setMore(false)}><span aria-hidden>{n.icon}</span>{n.label}</NavLink></li>)}
+        </ul>
+      </Sheet>
       {update && <Toast message={`Update ${update.version} is ready`} action="Install & restart" onAction={() => void update.install()} onDone={() => setUpdate(null)} />}
       <button className="fab" aria-label="Quick add (shortcut N)" onClick={() => qa.open()}>+</button>
     </>

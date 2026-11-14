@@ -7,6 +7,8 @@ import type {
 export interface Setting { key: string; value: unknown }
 /** Records a deletion so it can propagate to other devices through the vault. */
 export interface Tombstone { table: string; id: string; at: number }
+/** Synced user preferences (targets, payroll, calculator rates). */
+export interface Pref { id: string; value: unknown; updatedAt: number }
 export interface Attachment { id: string; blob: Blob; mime: string; createdAt: number }
 
 /**
@@ -31,6 +33,7 @@ export class ColonDB extends Dexie {
   settings!: EntityTable<Setting, 'key'>;
   installments!: EntityTable<InstallmentPlan, 'id'>;
   tombstones!: Dexie.Table<Tombstone, [string, string]>;
+  prefs!: EntityTable<Pref, 'id'>;
 
   constructor(name = 'colon') {
     super(name);
@@ -58,6 +61,7 @@ export class ColonDB extends Dexie {
         'id, date, kind, categoryId, debtId, importBatchId, recurringId, linkId, installmentPlanId, from.accountId, to.accountId, *tags',
     });
     this.version(3).stores({ tombstones: '[table+id], at' });
+    this.version(4).stores({ prefs: 'id' });
   }
 }
 

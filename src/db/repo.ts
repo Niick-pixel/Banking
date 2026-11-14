@@ -5,8 +5,8 @@
  */
 import { db, type ColonDB } from './db';
 import {
-  AccountSchema, CategorySchema, SelfLoanSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
-  type Account, type Category, type SelfLoan, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
+  AccountSchema, CategorySchema, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
+  type Account, type Category, type SelfLoan, type Goal, type BalanceSnapshot, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
 } from '../domain/schemas';
 import type { ImportPlan } from '../import/workbook';
 import { dueCuotaTransactions } from '../domain/installments';
@@ -14,10 +14,10 @@ import { todayISO } from '../lib/dates';
 
 export const newId = () => crypto.randomUUID();
 
-type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans';
+type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans' | 'goals' | 'snapshots';
 const schemas = {
   transactions: TransactionSchema, accounts: AccountSchema, pots: PotSchema, categories: CategorySchema,
-  installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema,
+  installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema, goals: GoalSchema, snapshots: BalanceSnapshotSchema,
 } as const;
 
 async function audited<T extends { id: string }>(d: ColonDB, table: Table, record: T): Promise<T> {
@@ -42,6 +42,18 @@ export async function saveCategory(c: Category, d = db) {
 }
 export async function saveSelfLoan(x: SelfLoan, d = db) {
   return d.transaction('rw', d.selfLoans, d.audit, () => audited(d, 'selfLoans', { ...x, updatedAt: Date.now() }));
+}
+export async function saveGoal(x: Goal, d = db) {
+  return d.transaction('rw', d.goals, d.audit, () => audited(d, 'goals', { ...x, updatedAt: Date.now() }));
+}
+/** One statement balance per account per date (re-entering replaces it). */
+export async function saveSnapshot(accountId: string, date: string, balance: number, d = db) {
+  return d.transaction('rw', d.snapshots, d.audit, async () => {
+    const existing = await d.snapshots.where('[accountId+date]').equals([accountId, date]).first();
+    const now = Date.now();
+    const rec: BalanceSnapshot = existing ? { ...existing, balance, source: 'statement', updatedAt: now } : { id: newId(), accountId, date, balance, source: 'statement', createdAt: now, updatedAt: now };
+    return audited(d, 'snapshots', rec);
+  });
 }
 export async function saveBudget(categoryId: string, month: string, amount: number, d = db) {
   return d.transaction('rw', d.budgets, async () => {

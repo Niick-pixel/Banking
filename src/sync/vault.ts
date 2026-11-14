@@ -11,7 +11,7 @@ export const VAULT_FILE = 'colon-data.colon';
 /** Tables that travel in the vault. The audit log, attachments and local settings stay on the device. */
 export const SYNCED_TABLES = [
   'accounts', 'pots', 'categories', 'transactions', 'debts', 'selfLoans', 'recurring', 'snapshots',
-  'budgets', 'goals', 'rates', 'importBatches', 'installments',
+  'budgets', 'goals', 'rates', 'importBatches', 'installments', 'prefs',
 ] as const;
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
 
