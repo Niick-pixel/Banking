@@ -1,0 +1,134 @@
+import { useEffect, useState } from 'react';
+import { Glass, Pill } from '../design/components';
+import { PageHeader } from '../ui/Sheet';
+import { APP_VERSION, chooseFolder, hasSavedFolderNeedingPermission, openDataFolder, reconnectFolder, suggestedFolder, useSync } from '../sync';
+import { isTauri, supportsFolderAccess } from '../sync/backends';
+import { checkForUpdate, type UpdateInfo } from '../sync/updater';
+import { useTheme, type ThemePref } from '../app/theme';
+import { Segmented } from '../design/components';
+
+export const ago = (ms?: number) => {
+  if (!ms) return 'never';
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return new Date(ms).toLocaleDateString('es-CR');
+};
+
+function backupLabel(n: string) {
+  const m = /^(\d{4}-\d{2}-\d{2})\.colon$/.exec(n);
+  if (m) return `Daily · ${m[1]!.split('-').reverse().join('/')}`;
+  const e = /^(pre-update|pre-import|pre-restore|pre-merge|merged|corrupt)-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})/.exec(n);
+  if (e) return `${{ 'pre-update': 'Before update', 'pre-import': 'Before import', 'pre-restore': 'Before restore', 'pre-merge': 'Before merge', merged: 'Merged copy', corrupt: 'Damaged copy' }[e[1]!]} · ${e[2]!.split('-').reverse().join('/')} ${e[3]}:${e[4]} UTC`;
+  return n;
+}
+
+export default function Settings() {
+  const { engine, status } = useSync();
+  const { theme, setTheme, transparency, setTransparency } = useTheme();
+  const [backups, setBackups] = useState<string[]>([]);
+  const [suggest, setSuggest] = useState<string | null>(null);
+  const [needsPerm, setNeedsPerm] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [upd, setUpd] = useState<UpdateInfo | null | 'none' | 'checking'>(null);
+  const [pct, setPct] = useState<number | null>(null);
+
+  useEffect(() => { void suggestedFolder().then(setSuggest); void hasSavedFolderNeedingPermission().then(setNeedsPerm); }, []);
+  useEffect(() => { if (engine) void engine.listBackups().then(setBackups); }, [engine, status?.revision]);
+
+  async function run(label: string, fn: () => Promise<unknown>) {
+    setMsg('');
+    try { await fn(); setMsg(label); } catch (e) { setMsg(`Failed: ${e instanceof Error ? e.message : e}`); }
+  }
+
+  return (
+    <>
+      <PageHeader title="Settings" sub={`Colón ${APP_VERSION}${isTauri() ? ' · Windows app' : ' · web'}`} />
+      {msg && <Glass strong pad={14} style={{ marginBottom: 16 }} role="status">{msg}</Glass>}
+
+      <div style={{ display: 'grid', gap: 16 }}>
+        <Glass strong style={{ display: 'grid', gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Data folder</h2>
+          <p className="muted small" style={{ margin: 0 }}>
+            Your data is saved as one file, <code>colon-data.colon</code>, in a folder you choose. Put it in OneDrive and it's backed up and shared between your PCs. Daily backups live in its <code>backups</code> subfolder.
+          </p>
+          {!engine && !needsPerm && (
+            isTauri() || supportsFolderAccess() ? (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {suggest && <button className="btn btn-primary" onClick={() => void run('Data folder set', () => chooseFolder(suggest))}>Use {suggest}</button>}
+                <button className={`btn ${suggest ? '' : 'btn-primary'}`} onClick={() => void run('Data folder set', () => chooseFolder())}>Choose folder…</button>
+              </div>
+            ) : <Pill tone="debt">This browser can't save to a folder. Use the Windows app, or Chrome/Edge.</Pill>
+          )}
+          {needsPerm && <button className="btn btn-primary" onClick={() => void run('Reconnected', reconnectFolder)}>Reconnect data folder</button>}
+          {engine && status && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '6px 16px' }} className="small">
+                <span className="muted">Location</span><code style={{ wordBreak: 'break-all' }}>{status.location}</code>
+                <span className="muted">Status</span>
+                <span>{status.phase === 'error' ? <Pill tone="expense">{status.message}</Pill> : status.phase === 'syncing' ? 'Saving…' : status.dirty ? 'Changes waiting to save' : <Pill tone="income">✓ Saved {ago(status.lastSyncedAt)}</Pill>}</span>
+                <span className="muted">Revision</span><span>{status.revision ?? '—'}{status.lastRemoteDevice && <span className="muted"> · last change from {status.lastRemoteDevice}</span>}</span>
+              </div>
+              {status.conflicts.length > 0 && <Pill tone="debt">{status.conflicts.length} record(s) were edited on two devices. The newer edit was kept, and the vault before the merge is in backups.</Pill>}
+              {status.conflictedCopies.map((c) => (
+                <div key={c} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Pill tone="debt">OneDrive made a conflict copy: {c}</Pill>
+                  <button className="btn btn-sm" onClick={() => void run('Copy merged', () => engine.mergeConflictedCopy(c))}>Merge it in</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => void run('Saved', () => engine.syncNow())}>Save now</button>
+                {isTauri() && <button className="btn" onClick={() => void openDataFolder()}>Open folder</button>}
+                <button className="btn btn-ghost" onClick={() => void run('Data folder changed', () => chooseFolder())}>Change folder…</button>
+              </div>
+            </>
+          )}
+        </Glass>
+
+        {engine && (
+          <Glass strong style={{ display: 'grid', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Backups</h2>
+            <p className="muted small" style={{ margin: 0 }}>Kept: the last 30 days, the first of each month for a year, and the last 20 safety copies (before imports, updates, restores). Restoring makes that backup the data on every device; the current data is backed up first.</p>
+            {backups.length === 0 ? <p className="muted" style={{ margin: 0 }}>None yet. The first daily backup appears tomorrow.</p> : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6, maxHeight: 320, overflow: 'auto' }}>
+                {backups.map((b) => (
+                  <li key={b} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                    <span>{backupLabel(b)}</span>
+                    <button className="btn btn-sm" onClick={() => { if (confirm(`Restore "${backupLabel(b)}" on all devices? Your current data is backed up first.`)) void run('Restored', () => engine.restore(b)); }}>Restore</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Glass>
+        )}
+
+        {isTauri() && (
+          <Glass strong style={{ display: 'grid', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Updates</h2>
+            <p className="muted small" style={{ margin: 0 }}>Colón checks for updates on start and every 6 hours. Updates are signed; anything that fails the signature check is discarded. Your data is backed up before installing.</p>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button className="btn" disabled={upd === 'checking'} onClick={async () => { setUpd('checking'); try { setUpd((await checkForUpdate()) ?? 'none'); } catch (e) { setUpd(null); setMsg(`Update check failed: ${e}`); } }}>Check now</button>
+              {upd === 'none' && <Pill tone="income">You're on the latest version</Pill>}
+              {upd && typeof upd === 'object' && (
+                <>
+                  <Pill tone="savings">Version {upd.version} available</Pill>
+                  <button className="btn btn-primary" disabled={pct !== null} onClick={() => void upd.install(setPct)}>{pct === null ? 'Install & restart' : `Installing ${pct}%`}</button>
+                </>
+              )}
+            </div>
+            {upd && typeof upd === 'object' && upd.notes && <pre style={{ whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }} className="small">{upd.notes}</pre>}
+          </Glass>
+        )}
+
+        <Glass strong style={{ display: 'grid', gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Appearance</h2>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Segmented<ThemePref> label="Theme" value={theme} onChange={setTheme} options={[{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+            <Segmented label="Transparency" value={transparency} onChange={setTransparency} options={[{ value: 'auto', label: 'Glass' }, { value: 'reduced', label: 'Solid' }]} />
+          </div>
+        </Glass>
+      </div>
+    </>
+  );
+}

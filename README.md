@@ -17,3 +17,13 @@ npm run dev      # then open http://localhost:5173/design
 ```bash
 npm test
 ```
+
+## Windows app
+
+The desktop app (Tauri) keeps your data in one file, `colon-data.colon`, in a folder you choose (OneDrive recommended), and updates itself from GitHub Releases. See [`docs/DESKTOP_PLAN.md`](docs/DESKTOP_PLAN.md).
+
+```bash
+npm run desktop:dev      # needs Rust; on Windows also WebView2 (preinstalled on Win 10/11)
+```
+
+Releases: bump the version in `package.json` and `src-tauri/Cargo.toml`, then push a `v*` tag. GitHub Actions builds the signed installer and `latest.json`.

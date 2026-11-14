@@ -1,5 +1,16 @@
 # Windows desktop app: installer, OTA updates, data in a folder you choose
 
+> **Status:** D1 (vault + sync engine), D2 (Tauri shell + OneDrive folder) and D3 (signed updater + release pipeline) are **built**. Choices made: **OneDrive**, **no code signing for now**. D4's conflict handling is mostly done too (merge + conflicted-copy detection). Remaining: D5 (encryption, Windows Hello) and D6 (tray, autostart).
+>
+> **Your one-time setup** before the first release:
+> 1. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**:
+>    - `TAURI_SIGNING_PRIVATE_KEY` = the full contents of `colon-updater.key`
+>    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = the contents of `updater-key-password.txt`
+>    Store both files offline too (password manager / USB). Never commit them.
+> 2. Merge the work into `main`, then publish a version: `git tag v0.3.0 && git push origin v0.3.0`.
+> 3. Download `Colon_0.3.0_x64-setup.exe` from the release → run → **More info → Run anyway** (unsigned) → pick `OneDrive\Colon` on first launch.
+> 4. From then on, every new `v*` tag reaches the installed app on its own (checked at start and every 6 h).
+
 Goal: install Colón on Windows with a normal installer. It updates itself, and your data is a file in a folder you pick (inside OneDrive, Google Drive or Dropbox), so the cloud keeps it safe and you never depend on the browser's storage.
 
 ## 1. Decisions

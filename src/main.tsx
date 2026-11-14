@@ -11,6 +11,9 @@ import Accounts from './routes/Accounts';
 import Import from './routes/Import';
 import TasaCero from './routes/TasaCero';
 import { QuickAddProvider } from './app/QuickAdd';
+import Settings from './routes/Settings';
+import Tracker from './routes/Tracker';
+import { bootSync } from './sync';
 
 const router = createBrowserRouter([
   {
@@ -21,10 +24,14 @@ const router = createBrowserRouter([
       { path: '/accounts', element: <Accounts /> },
       { path: '/import', element: <Import /> },
       { path: '/tasa-cero', element: <TasaCero /> },
+      { path: '/settings', element: <Settings /> },
+      { path: '/tracker', element: <Tracker /> },
       { path: '*', element: <Navigate to="/transactions" replace /> },
     ],
   },
 ]);
+
+void bootSync();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

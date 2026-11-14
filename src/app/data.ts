@@ -2,12 +2,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '../db/db';
 import { accountBalances, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
-import type { Account, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
+import type { Account, Budget, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
 
 export interface Ledger {
   ready: boolean;
   accounts: Account[]; pots: Pot[]; categories: Category[]; transactions: Transaction[];
-  debts: Debt[]; installments: InstallmentPlan[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[];
+  debts: Debt[]; installments: InstallmentPlan[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[]; budgets: Budget[];
   account: Map<string, Account>; pot: Map<string, Pot>; category: Map<string, Category>;
   balances: Map<string, AccountBalance>;
   flows: Map<string, MonthFlow>;
@@ -23,9 +23,10 @@ export function useLedger(): Ledger {
     installments: await db.installments.toArray(),
     snapshots: await db.snapshots.orderBy('date').toArray(),
     batches: await db.importBatches.orderBy('importedAt').reverse().toArray(),
+    budgets: await db.budgets.toArray(),
   }), []);
   return useMemo(() => {
-    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], snapshots: [], batches: [] };
+    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], snapshots: [], batches: [], budgets: [] };
     const account = new Map(r.accounts.map((a) => [a.id, a]));
     let balances = new Map<string, AccountBalance>();
     let flows = new Map<string, MonthFlow>();

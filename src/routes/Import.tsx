@@ -8,6 +8,7 @@ import { parseWorkbook, remapCategory, type ImportPlan } from '../import/workboo
 import { commitImport, newId, undoImport, UndoBlockedError } from '../db/repo';
 import { formatMoney } from '../lib/money';
 import { todayISO } from '../lib/dates';
+import { getEngine } from '../sync';
 import type { ImportBatch } from '../domain/schemas';
 
 type Step = 'pick' | 'review' | 'done';
@@ -33,7 +34,7 @@ export default function Import() {
   async function confirm() {
     if (!plan) return;
     setBusy(true);
-    try { setBatch(await commitImport(plan)); setStep('done'); } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+    try { await getEngine()?.backupNow('pre-import'); setBatch(await commitImport(plan)); setStep('done'); } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
   async function undo(id: string) {
     setErr('');

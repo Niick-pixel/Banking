@@ -40,6 +40,14 @@ export async function savePot(p: Pot, d = db) {
 export async function saveCategory(c: Category, d = db) {
   return d.transaction('rw', d.categories, d.audit, () => audited(d, 'categories', { ...c, updatedAt: Date.now() }));
 }
+export async function saveBudget(categoryId: string, month: string, amount: number, d = db) {
+  return d.transaction('rw', d.budgets, async () => {
+    const existing = await d.budgets.where('[categoryId+month]').equals([categoryId, month]).first();
+    const now = Date.now();
+    if (existing) { await d.budgets.put({ ...existing, amount, updatedAt: now }); return; }
+    await d.budgets.add({ id: newId(), categoryId, month, amount, currency: 'CRC', rollover: false, createdAt: now, updatedAt: now });
+  });
+}
 export async function saveDebt(x: Debt, d = db) {
   return d.transaction('rw', d.debts, d.audit, () => audited(d, 'debts', { ...x, updatedAt: Date.now() }));
 }
