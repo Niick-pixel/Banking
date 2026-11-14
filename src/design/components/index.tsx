@@ -83,7 +83,7 @@ export function PressCard({ children, onClick, label }: { children: ReactNode; o
   const reduce = useReducedMotion();
   return (
     <motion.button
-      type="button" aria-label={label} onClick={onClick}
+      type="button" title={label} onClick={onClick}
       whileTap={reduce ? undefined : { scale: 0.97 }} whileHover={reduce ? undefined : { y: -2 }}
       transition={{ type: 'spring', stiffness: 400, damping: 26 }}
       className="glass" style={{ padding: 20, textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit', width: '100%' }}

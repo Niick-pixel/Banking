@@ -1,7 +1,7 @@
 /**
  * Money primitives.
  *
- * Every amount in Colón is an integer number of MINOR units (céntimos for CRC,
+ * Every amount in Aufwind is an integer number of MINOR units (céntimos for CRC,
  * cents for USD). Floats never touch stored money. All arithmetic goes through
  * these helpers so overflow or currency mixing throws instead of silently
  * corrupting a total.

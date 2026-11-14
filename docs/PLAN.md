@@ -1,10 +1,10 @@
-# Colón: build plan, decisions, workbook findings, open questions
+# Aufwind: build plan, decisions, workbook findings, open questions
 
-Status: **Phase 1 (plan & scaffold) is done and waiting for your review.**
+Status: **All 9 phases are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 
 ## Stack (confirmed)
 
-Web app, installable as a PWA. React 19 + TypeScript (strict) + Vite 6, Tailwind 4 plus a custom glass design system in CSS variables, Recharts, Dexie 4 (IndexedDB), Zod, SheetJS for Excel, Vitest + Playwright, Motion for springs. Tauri can wrap it later.
+Web app, installable as a PWA. React 19 + TypeScript (strict) + Vite 6, Tailwind 4 plus a custom glass design system in CSS variables, Recharts, Dexie 4 (IndexedDB), Zod, exceljs for Excel (the SheetJS CDN is unreachable from the build environment), Vitest + Playwright, Motion for springs. Tauri can wrap it later.
 
 I'm not recommending native SwiftUI. You live on Windows, and the web version can reach about 90% of the Liquid Glass look with `backdrop-filter`. SwiftUI would lock you to Apple devices and give you nothing on your PC.
 
@@ -17,20 +17,27 @@ I'm not recommending native SwiftUI. You live on Windows, and the web version ca
 | A transfer with a missing side | It can't exist. A transfer record without both `from` and `to` fails validation. |
 | Negative amounts meaning "withdrawal" | Amounts are always positive. Direction comes from the kind (`savings` has `direction: deposit/withdrawal`). Only `adjustment` is signed. |
 | Debts counted twice / balances typed by hand | Nothing stores a total or a balance. A debt balance = original − linked `debt_payment` records. |
-| Pay-from-pot double count | One user action creates records that share a `linkId`: pot withdrawal + debt payment. Reports count the debt payment once. |
+| Pay-from-pot double count | Paying a debt *from a pot* is one `debt_payment` record whose source is the pot. It counts once as debt service, and Saved drops by the same amount, so free cash isn't hit twice. |
 | Rows not reaching totals (no TYPE, no MONTH) | Each row is validated with Zod at entry and at import. Undated rows get the last day of the month and `dateEstimated: true`. |
 
 ## Phases (I'll stop for your review after each one)
 
 1. ✅ **Plan & scaffold**: schema (`src/domain/schemas.ts`), Dexie DB (`src/db/db.ts`), money and date libraries with 25 tests, design tokens, and the `/design` page.
-2. **Core ledger**: ledger derivation (`legs(tx)` → balances per account and pot), Quick Add (`N`, natural amounts, "Add another"), and the Transactions screen with collapsible months. Tests use your four fixture scenarios.
-3. **Excel import**: the importer for your workbook (findings below), a reconciliation against the Tracker for each month, and undoable batches.
-4. **Tracker & budgets**
-5. **Pots, debts, self-loans**
-6. **Net worth, goals, calculators**
-7. **Dashboard, insights, reports, exports**
-8. **Recurring, bills calendar, reminders**
-9. **Security (PIN/WebAuthn, encrypted backup), PWA install, polish, accessibility pass**
+2. ✅ **Core ledger**: `src/domain/ledger.ts` (legs → balances per account/pot, monthly flows, debt status). All four spec fixtures are tested. Accounts (pots, statement check, data-health notes), Transactions (collapsible months with totals, search/filters, bulk recategorize, delete + undo), Quick Add (`N`, natural amounts, learned category suggestions, "Save & add another"), audit log.
+3. ✅ **Excel import**: `src/import/workbook.ts`, label-based. Preview → category mapping → validation report → reconciliation vs the Tracker → one undoable batch. Against the real workbook, **every month Jun–Nov matches the Tracker to the céntimo** (the test only runs locally; the file is git-ignored).
+   - ✅ **Tasa Cero** (added on request): credit-card accounts, 0% installment plans, a calculator (all terms, % of income, verdict), a 12-month outlook. Cuotas post as card expenses on their billing date with deterministic ids, so they can't be posted twice. Paying the card is a transfer.
+4. ✅ **Tracker & budgets**: `src/domain/tracker.ts`. Matches the workbook's Tracker for every category and month. Inline budgets, pace projection, 80%/100% alerts.
+5. ✅ **Pots, debts, self-loans**: `src/domain/debts.ts`. Interest-aware amortization (0% handled, partial last payment), the workbook's 3/4/6/9/12 scenarios (same PMT and the same verdict thresholds: 15% and 25% of income), an extra-payment accelerator, avalanche vs snowball, and the debt-service ratio (20%, and 36% with rent). Confirmed-balance gaps can be resolved with a payment or a non-cash adjustment. Self-loans fill up from linked or "Replenish" deposits, oldest first. The Pots page has Her/My/Total tiles, loan-fund progress, a one-action "Pay from pot", and a month-by-month table plus a stacked chart.
+6. ✅ **Net worth, goals, calculators**: `src/domain/networth.ts` builds a monthly balance sheet where a statement you entered wins over the ledger. Liabilities = derived debts + credit cards + Tasa Cero cuotas not yet billed; self-loans are excluded. Emergency fund in months, both liquid (her loan fund excluded) and including cesantía, against an editable target. Goals linked to pots or accounts, with the monthly amount needed and an on-track check. Savings rate vs target. The automatic payroll savings floor, including the employer's share. Calculators: CDP (×days/360, editable withholding), programmed savings (daily interest, monthly / quincenal / weekly compared), loan payoff with an extra-payment accelerator, and "what if I save more". Rates are inputs with a "last checked" date. Preferences sync through the vault.
+7. ✅ **Dashboard, insights, reports, exports**: The Dashboard (home) has month KPIs, plain-language insights, the next 30 days, income vs expenses, spending by group, where it went, budget health, free cash by month, net worth and debts. Data-health checks (`src/domain/health.ts`) run as a badge on the Dashboard and a full list in Settings. Reports: monthly P&L vs budget, cash flow by account, year in review, category trends, where the money went, and Print → PDF. Exports: Excel in the workbook's own layout with live SUMIFS Tracker formulas (round-trip tested through the importer), CSV, and a full backup file with restore. On desktop, exports go to `<data folder>/exports`.
+8. ✅ **Recurring, bills calendar, reminders**: `src/domain/recurring.ts` handles quincena, monthly, weekly and yearly schedules. Auto-post is idempotent: fixed ids, and `lastHandledDate` means a deleted posting is never recreated. Reminders wait to be confirmed (with the real amount) or skipped. Suggestions come from your history (steady bills and salary) and payroll settings (savings, association plan and cesantía as non-cash adjustments), plus aguinaldo and marchamo; they start next month when this month is already logged. The calendar merges recurring items, Tasa Cero cuotas, debt payments, card due dates and self-loan plans. Optional system notifications for today/tomorrow (Windows notification center or browser).
+9. ✅ **Security, install, polish, accessibility**:
+   - **Encryption:** the data file can be encrypted with a password (PBKDF2-SHA256 600k → AES-256-GCM). Other devices unlock once, and a file the app can't read is never overwritten.
+   - **App lock:** PIN (salted PBKDF2, with back-off after wrong tries) plus Windows Hello / Face ID through WebAuthn, verified locally. Auto-lock after inactivity.
+   - **Command palette:** Ctrl/⌘ K.
+   - **Installable web app:** manifest, offline service worker, iPhone home-screen support, published to GitHub Pages by `pages.yml`.
+   - **Accessibility:** axe-core audit of all 15 screens in light and dark finds 0 violations.
+10. **Windows desktop**: Tauri installer, signed OTA updates, data vault in a cloud-synced folder. See `DESKTOP_PLAN.md` (D1–D6).
 
 ## Workbook findings & open questions
 

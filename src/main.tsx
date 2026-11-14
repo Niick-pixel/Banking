@@ -6,21 +6,61 @@ import './app/shell.css';
 import { ThemeProvider } from './app/theme';
 import Shell from './app/Shell';
 import DesignPage from './routes/DesignPage';
+import Transactions from './routes/Transactions';
+import Accounts from './routes/Accounts';
+import Import from './routes/Import';
+import TasaCero from './routes/TasaCero';
+import { QuickAddProvider } from './app/QuickAdd';
+import Settings from './routes/Settings';
+import Tracker from './routes/Tracker';
+import Debts from './routes/Debts';
+import Pots from './routes/Pots';
+import NetWorth from './routes/NetWorth';
+import Goals from './routes/Goals';
+import Calculators from './routes/Calculators';
+import Dashboard from './routes/Dashboard';
+import Reports from './routes/Reports';
+import Bills from './routes/Bills';
+import { bootSync } from './sync';
+import { LockGate } from './app/LockGate';
 
 const router = createBrowserRouter([
   {
-    element: <Shell />,
+    element: <QuickAddProvider><Shell /></QuickAddProvider>,
     children: [
+      { path: '/', element: <Dashboard /> },
+      { path: '/reports', element: <Reports /> },
+      { path: '/bills', element: <Bills /> },
       { path: '/design', element: <DesignPage /> },
-      { path: '*', element: <Navigate to="/design" replace /> },
+      { path: '/transactions', element: <Transactions /> },
+      { path: '/accounts', element: <Accounts /> },
+      { path: '/import', element: <Import /> },
+      { path: '/tasa-cero', element: <TasaCero /> },
+      { path: '/settings', element: <Settings /> },
+      { path: '/tracker', element: <Tracker /> },
+      { path: '/debts', element: <Debts /> },
+      { path: '/pots', element: <Pots /> },
+      { path: '/net-worth', element: <NetWorth /> },
+      { path: '/goals', element: <Goals /> },
+      { path: '/calculators', element: <Calculators /> },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-]);
+], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });
+
+void bootSync();
+
+// Installed web app (iPhone "Add to Home Screen", Android, desktop Chrome/Edge): work offline.
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !('__TAURI_INTERNALS__' in window)) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }));
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <LockGate>
+        <RouterProvider router={router} />
+      </LockGate>
     </ThemeProvider>
   </StrictMode>,
 );

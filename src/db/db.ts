@@ -1,17 +1,21 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
   Account, AuditEntry, BalanceSnapshot, Budget, Category, Debt, ExchangeRate, Goal,
-  ImportBatch, Pot, RecurringRule, SelfLoan, Transaction,
+  ImportBatch, InstallmentPlan, Pot, RecurringRule, SelfLoan, Transaction,
 } from '../domain/schemas';
 
 export interface Setting { key: string; value: unknown }
+/** Records a deletion so it can propagate to other devices through the vault. */
+export interface Tombstone { table: string; id: string; at: number }
+/** Synced user preferences (targets, payroll, calculator rates). */
+export interface Pref { id: string; value: unknown; updatedAt: number }
 export interface Attachment { id: string; blob: Blob; mime: string; createdAt: number }
 
 /**
  * Local-first store (IndexedDB via Dexie). Index strings list only what we
  * query on; everything else is stored but not indexed.
  */
-export class ColonDB extends Dexie {
+export class AufwindDB extends Dexie {
   accounts!: EntityTable<Account, 'id'>;
   pots!: EntityTable<Pot, 'id'>;
   categories!: EntityTable<Category, 'id'>;
@@ -27,8 +31,11 @@ export class ColonDB extends Dexie {
   audit!: EntityTable<AuditEntry, 'id'>;
   attachments!: EntityTable<Attachment, 'id'>;
   settings!: EntityTable<Setting, 'key'>;
+  installments!: EntityTable<InstallmentPlan, 'id'>;
+  tombstones!: Dexie.Table<Tombstone, [string, string]>;
+  prefs!: EntityTable<Pref, 'id'>;
 
-  constructor(name = 'colon') {
+  constructor(name = 'aufwind') {
     super(name);
     this.version(1).stores({
       accounts: 'id, type, archived',
@@ -48,7 +55,14 @@ export class ColonDB extends Dexie {
       attachments: 'id',
       settings: 'key',
     });
+    this.version(2).stores({
+      installments: 'id, cardAccountId, status',
+      transactions:
+        'id, date, kind, categoryId, debtId, importBatchId, recurringId, linkId, installmentPlanId, from.accountId, to.accountId, *tags',
+    });
+    this.version(3).stores({ tombstones: '[table+id], at' });
+    this.version(4).stores({ prefs: 'id' });
   }
 }
 
-export const db = new ColonDB();
+export const db = new AufwindDB();

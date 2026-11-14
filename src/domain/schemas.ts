@@ -44,6 +44,9 @@ export const AccountSchema = z.object({
   icon: z.string().optional(),
   /** Ledger is confirmed to match the statement up to and including this date. */
   reconciledThrough: ISODateSchema.optional(),
+  /** Credit cards: day the statement closes and day payment is due. */
+  cardStatementDay: z.number().int().min(1).max(31).optional(),
+  cardDueDay: z.number().int().min(1).max(31).optional(),
   ...Timestamps,
 });
 export type Account = z.infer<typeof AccountSchema>;
@@ -108,6 +111,9 @@ export const IncomeTx = z.object({
 export const ExpenseTx = z.object({
   ...TxBase, kind: z.literal('expense'), from: Side, amount: PositiveMinor,
   categoryId: Id.optional(), splits: z.array(SplitSchema).optional(),
+  /** Set on monthly cuotas generated from a Tasa Cero plan. */
+  installmentPlanId: Id.optional(),
+  installmentNumber: z.number().int().positive().optional(),
 });
 
 /** Between two of MY accounts/pots. Never income, never expense. */
@@ -126,6 +132,8 @@ export const TransferTx = z.object({
 export const SavingsTx = z.object({
   ...TxBase, kind: z.literal('savings'), direction: z.enum(['deposit', 'withdrawal']),
   from: Side, to: Side, amount: PositiveMinor, categoryId: Id,
+  /** A deposit that puts back money borrowed from my own savings. */
+  selfLoanId: Id.optional(),
 });
 
 export const DebtPaymentTx = z.object({
@@ -183,6 +191,12 @@ export const DebtSchema = z.object({
     .partial()
     .default({}),
   notes: z.string().default(''),
+  /** Last balance confirmed with the creditor/statement. Health panel flags any gap vs derived. */
+  confirmedBalance: z.object({ date: ISODateSchema, amount: z.number().int().nonnegative() }).optional(),
+  /** Principal changes that didn't move money in the ledger (paid before tracking, forgiven, added). Positive = reduces the debt. */
+  adjustments: z.array(z.object({ id: Id, date: ISODateSchema, amount: SignedMinor, note: z.string().default('') })).default([]),
+  /** Pot where money is set aside to pay this debt (e.g. her loan fund). */
+  fundPotId: Id.optional(),
   ...Timestamps,
 });
 export type Debt = z.infer<typeof DebtSchema>;
@@ -198,6 +212,7 @@ export const SelfLoanSchema = z.object({
   plannedSource: z.string().default(''),
   plannedDate: ISODateSchema.optional(),
   status: z.enum(['open', 'replenished']).default('open'),
+  notes: z.string().default(''),
   ...Timestamps,
 });
 export type SelfLoan = z.infer<typeof SelfLoanSchema>;
@@ -219,8 +234,10 @@ export const RecurringRuleSchema = z.object({
   mode: z.enum(['auto_post', 'remind']),
   startDate: ISODateSchema,
   endDate: ISODateSchema.optional(),
-  /** Last occurrence posted or confirmed, so nothing is created twice. */
+  /** Last occurrence auto-posted, so a deleted posting is never recreated. */
   lastHandledDate: ISODateSchema.optional(),
+  /** Reminder occurrences the user chose to skip. */
+  skipped: z.array(ISODateSchema).default([]),
   informational: z.boolean().default(false), // e.g. aporte patronal: tracked, not my cash
   active: z.boolean().default(true),
   ...Timestamps,
@@ -262,6 +279,8 @@ export const ImportBatchSchema = z.object({
   id: Id, fileName: z.string(), kind: z.enum(['workbook', 'statement', 'backup']),
   importedAt: z.number().int(),
   counts: z.record(z.number().int()),
+  /** Ids created by this batch per table, so the whole batch can be undone. */
+  created: z.record(z.array(z.string())).default({}),
   status: z.enum(['committed', 'undone']), ...Timestamps,
 });
 export type ImportBatch = z.infer<typeof ImportBatchSchema>;
@@ -272,3 +291,28 @@ export const AuditEntrySchema = z.object({
   before: z.unknown().optional(), after: z.unknown().optional(),
 });
 export type AuditEntry = z.infer<typeof AuditEntrySchema>;
+
+// ── Tasa Cero (0% installment purchases on a credit card) ──────────────────
+/**
+ * One purchase split into N interest-free monthly cuotas. Each cuota posts as an
+ * expense on the card account in the month it's billed (deterministic id, so it
+ * can never be posted twice). Paying the card from checking is a transfer.
+ * Not-yet-billed cuotas are a liability ("pending installments").
+ */
+export const InstallmentPlanSchema = z.object({
+  id: Id,
+  cardAccountId: Id,
+  description: z.string().min(1),
+  merchant: z.string().default(''),
+  categoryId: Id,
+  currency: CurrencySchema,
+  total: PositiveMinor,
+  months: z.number().int().min(1).max(60),
+  purchaseDate: ISODateSchema,
+  /** Date the first cuota is billed; later cuotas fall on the same day each month (clamped). */
+  firstChargeDate: ISODateSchema,
+  status: z.enum(['active', 'paid_off', 'cancelled']).default('active'),
+  notes: z.string().default(''),
+  ...Timestamps,
+});
+export type InstallmentPlan = z.infer<typeof InstallmentPlanSchema>;
