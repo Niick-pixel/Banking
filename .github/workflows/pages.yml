@@ -1,11 +1,11 @@
 # Publishes the web app (no data: everything stays on each device) to GitHub Pages,
 # so it can be opened in Safari on iPhone and added to the Home Screen.
-# One-time: repo Settings → Pages → Source: "GitHub Actions".
+# Manual only for now (phone use is parked). To use it later:
+#   1. repo Settings → Pages → Source: "GitHub Actions"
+#   2. Actions → "Web app (GitHub Pages)" → Run workflow
 name: Web app (GitHub Pages)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

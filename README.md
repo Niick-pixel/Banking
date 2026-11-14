@@ -34,4 +34,4 @@ Releases: bump the version in `package.json` and `src-tauri/Cargo.toml`, then pu
 
 ## iPhone (and any browser)
 
-The web version is published to GitHub Pages by `.github/workflows/pages.yml`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. Then open `https://<user>.github.io/Banking/` in **Safari → Share → Add to Home Screen**. It runs full screen, works offline, and can be locked with Face ID. Data stays on the phone; move it between devices with a backup file (Settings → Backup file) through the Files app / OneDrive.
+Parked for now. When wanted, the web version can be published to GitHub Pages with `.github/workflows/pages.yml` (manual run). One-time setup: repo **Settings → Pages → Source: GitHub Actions**. Then open `https://<user>.github.io/Banking/` in **Safari → Share → Add to Home Screen**. It runs full screen, works offline, and can be locked with Face ID. Data stays on the phone; move it between devices with a backup file (Settings → Backup file) through the Files app / OneDrive.
