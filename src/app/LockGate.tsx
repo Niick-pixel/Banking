@@ -64,7 +64,7 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       <Aurora />
       <main className="lock" aria-label="Aufwind is locked">
         <div className="glass glass-strong lock-card">
-          <img src="/icon.png" alt="" width={72} height={72} style={{ borderRadius: 18 }} />
+          <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" width={72} height={72} style={{ borderRadius: 18 }} />
           <h1 style={{ margin: 0, fontSize: 26 }}>Aufwind is locked</h1>
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: 'grid', gap: 10, width: '100%' }}>
             <label htmlFor="lock-pin" className="small muted">PIN</label>

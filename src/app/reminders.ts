@@ -21,7 +21,7 @@ export async function notificationsAllowed(ask = false): Promise<boolean> {
 
 async function send(title: string, body: string) {
   if (isTauri()) { const n = await import('@tauri-apps/plugin-notification'); n.sendNotification({ title, body }); }
-  else new Notification(title, { body, icon: '/icon.png' });
+  else new Notification(title, { body, icon: `${import.meta.env.BASE_URL}icon.png` });
 }
 
 /** Notify about events due today or tomorrow, plus reminders waiting for confirmation. */

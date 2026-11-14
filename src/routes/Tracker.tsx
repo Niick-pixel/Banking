@@ -115,7 +115,7 @@ function Row({ r, income, curMonth }: { r: TrackerRow; income: boolean; curMonth
           <input className="input" style={{ height: 30, width: 110, fontSize: 13 }} autoFocus aria-label={`Budget for ${r.category.name}`} value={raw}
             onChange={(e) => setRaw(e.target.value)} onBlur={() => void commit()} onKeyDown={(e) => { if (e.key === 'Enter') void commit(); if (e.key === 'Escape') setEditing(false); }} />
         ) : (
-          <button className="budget-btn" onClick={() => { setRaw(r.budget ? String(r.budget / 100) : ''); setEditing(true); }} aria-label={`Edit budget for ${r.category.name}`}>{r.budget ? formatMoney(r.budget, 'CRC') : 'set'}</button>
+          <button className="budget-btn" onClick={() => { setRaw(r.budget ? String(r.budget / 100) : ''); setEditing(true); }} aria-label={`${r.budget ? formatMoney(r.budget, 'CRC') : 'set'}, edit budget for ${r.category.name}`}>{r.budget ? formatMoney(r.budget, 'CRC') : 'set'}</button>
         )}
       </td>
       {r.months.map((v, i) => <td key={i} className={`num ${r.over[i] ? 'over' : ''} ${i === curMonth ? 'cur' : ''}`} title={r.over[i] ? 'Over budget' : undefined}>{fmt(v)}</td>)}

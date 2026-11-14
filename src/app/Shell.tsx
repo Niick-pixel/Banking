@@ -9,6 +9,7 @@ import { ago } from '../routes/Settings';
 import { useCalendar, usePendingReminders } from './useRecurring';
 import { usePref } from './prefs';
 import { notifyDue } from './reminders';
+import { CommandPalette } from './CommandPalette';
 import { todayISO } from '../lib/dates';
 import { useQuickAdd } from './QuickAdd';
 import { postDueCuotas, postDueRecurring } from '../db/repo';
@@ -65,7 +66,7 @@ export default function Shell() {
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="shell">
         <nav className="glass sidebar" aria-label="Main">
-          <div className="brand"><img src="/icon.png" alt="" width={34} height={34} style={{ borderRadius: 9 }} /><span>Aufwind<small className="brand-tag">Rise on what you already have</small></span></div>
+          <div className="brand"><img src={`${import.meta.env.BASE_URL}icon.png`} alt="" width={34} height={34} style={{ borderRadius: 9 }} /><span>Aufwind<small className="brand-tag">Rise on what you already have</small></span></div>
           <ul>
             {NAV.map((n) => (
               <li key={n.to}>
@@ -77,7 +78,8 @@ export default function Shell() {
               </li>
             ))}
           </ul>
-          <Link to="/settings" className="sync-badge small" aria-label="Data sync status">
+          <button className="sync-badge small" style={{ background: 'none', border: 0, font: 'inherit', cursor: 'pointer', marginTop: 'auto' }} onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}><span aria-hidden>⌘</span> Search & commands <kbd className="small muted" style={{ marginLeft: 'auto' }}>Ctrl K</kbd></button>
+          <Link to="/settings" className="sync-badge small">
             {!status ? <><span className="dot" style={{ background: 'var(--text-3)' }} />Not saving to a folder</>
               : status.phase === 'locked' ? <><span className="dot" style={{ background: 'var(--debt)' }} />Data file locked: enter password</>
               : status.phase === 'error' ? <><span className="dot" style={{ background: 'var(--expense)' }} />Sync problem</>
@@ -107,6 +109,7 @@ export default function Shell() {
         </ul>
       </Sheet>
       {update && <Toast message={`Update ${update.version} is ready`} action="Install & restart" onAction={() => void update.install()} onDone={() => setUpdate(null)} />}
+      <CommandPalette pages={NAV} />
       <button className="fab" aria-label="Quick add (shortcut N)" onClick={() => qa.open()}>+</button>
     </>
   );

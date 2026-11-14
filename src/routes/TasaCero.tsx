@@ -124,7 +124,7 @@ export default function TasaCero() {
                   <div><div style={{ fontWeight: 700 }}>{p.description}</div><div className="small muted">{card?.name} · {l.category.get(p.categoryId)?.name} · bought {formatDateCR(p.purchaseDate)}</div></div>
                   <Money amount={p.total} weight={700} />
                 </div>
-                <div className="bar" aria-label={`${pr.billedCount} of ${p.months} cuotas billed`}><span style={{ width: `${(pr.billedCount / p.months) * 100}%`, background: 'var(--chart-4)' }} /></div>
+                <div className="bar" role="img" aria-label={`${pr.billedCount} of ${p.months} cuotas billed`}><span style={{ width: `${(pr.billedCount / p.months) * 100}%`, background: 'var(--chart-4)' }} /></div>
                 <div className="small" style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <span>{pr.billedCount}/{p.months} billed</span>
                   <span>Still to bill <b className="money">{formatMoney(pr.pending, 'CRC')}</b></span>

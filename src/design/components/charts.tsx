@@ -88,8 +88,9 @@ export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
         <Segmented label="Chart view" value={view} onChange={setView} options={[{ value: 'chart', label: 'Chart' }, { value: 'table', label: 'Table' }]} />
       </figcaption>
       {view === 'chart' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, alignItems: 'center', justifyItems: 'stretch' }} role="img" aria-label={`${title}. Switch to Table for exact values.`}>
-          <div style={{ height: 200, position: 'relative', maxWidth: 220, width: '100%', justifySelf: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, alignItems: 'center', justifyItems: 'stretch' }}>
+          {/* The ring is decoration; the legend beside it (and the Table view) carry the numbers. */}
+          <div aria-hidden="true" inert style={{ height: 200, position: 'relative', maxWidth: 220, width: '100%', justifySelf: 'center' }}>
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={data} dataKey="value" nameKey="name" innerRadius="66%" outerRadius="100%" paddingAngle={1.5} cornerRadius={4} stroke={surface} strokeWidth={2} isAnimationActive={false}>
@@ -102,7 +103,7 @@ export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
               <div><div style={{ fontSize: 12, color: 'var(--text-2)' }}>Total</div><div className="money" style={{ fontWeight: 700, fontSize: 18 }}>{fmtShort(total)}</div></div>
             </div>
           </div>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+          <ul aria-label={title} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
             {data.map((d, i) => (
               <li key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
                 <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: colors[i % colors.length], flex: 'none' }} />

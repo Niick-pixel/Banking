@@ -46,9 +46,14 @@ const router = createBrowserRouter([
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-]);
+], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });
 
 void bootSync();
+
+// Installed web app (iPhone "Add to Home Screen", Android, desktop Chrome/Edge): work offline.
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !('__TAURI_INTERNALS__' in window)) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }));
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

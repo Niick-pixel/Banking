@@ -62,13 +62,13 @@ export default function Bills() {
             <h2 className="card-h">{MN[m - 1]} {y}</h2>
             <button className="btn btn-sm" aria-label="Next month" onClick={() => shift(1)}>›</button>
           </div>
-          <div className="cal" role="grid" aria-label={`Calendar ${MN[m - 1]} ${y}`}>
-            {DOW.map((d) => <div key={d} className="cal-dow" role="columnheader">{d}</div>)}
+          <div className="cal" role="group" aria-label={`Calendar ${MN[m - 1]} ${y}`}>
+            {DOW.map((d) => <div key={d} className="cal-dow" aria-hidden="true">{d}</div>)}
             {cells.map((d, i) => {
               if (!d) return <div key={`x${i}`} className="cal-cell empty" />;
               const evs = byDay.get(d) ?? [];
               return (
-                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} aria-label={`${formatDateCR(d)}: ${evs.length ? evs.map((e) => e.title).join(', ') : 'nothing'}`}>
+                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} aria-label={`${Number(d.slice(8))}${evs[0] ? ` ${evs[0].title}` : ''}, ${formatDateCR(d)}${evs.length > 1 ? `, plus ${evs.slice(1).map((e) => e.title).join(', ')}` : evs.length ? '' : ', nothing scheduled'}`}>
                   <span className="cal-num">{Number(d.slice(8))}</span>
                   <span className="cal-dots" aria-hidden>{evs.slice(0, 4).map((e, k) => <i key={k} style={{ background: TONE[e.tone], opacity: e.status === 'skipped' ? 0.3 : 1, outline: e.status === 'pending' ? '2px solid var(--debt)' : undefined }} />)}{evs.length > 4 && <b>+{evs.length - 4}</b>}</span>
                   {evs[0] && <span className="cal-first">{evs[0].title}</span>}

@@ -1,6 +1,6 @@
 # Aufwind: build plan, decisions, workbook findings, open questions
 
-Status: **Phases 1–8 are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
+Status: **All 9 phases are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 
 ## Stack (confirmed)
 
@@ -31,7 +31,12 @@ I'm not recommending native SwiftUI. You live on Windows, and the web version ca
 6. ✅ **Net worth, goals, calculators**: `src/domain/networth.ts` builds a monthly balance sheet where a statement you entered wins over the ledger. Liabilities = derived debts + credit cards + Tasa Cero cuotas not yet billed; self-loans are excluded. Emergency fund in months, both liquid (her loan fund excluded) and including cesantía, against an editable target. Goals linked to pots or accounts, with the monthly amount needed and an on-track check. Savings rate vs target. The automatic payroll savings floor, including the employer's share. Calculators: CDP (×days/360, editable withholding), programmed savings (daily interest, monthly / quincenal / weekly compared), loan payoff with an extra-payment accelerator, and "what if I save more". Rates are inputs with a "last checked" date. Preferences sync through the vault.
 7. ✅ **Dashboard, insights, reports, exports**: The Dashboard (home) has month KPIs, plain-language insights, the next 30 days, income vs expenses, spending by group, where it went, budget health, free cash by month, net worth and debts. Data-health checks (`src/domain/health.ts`) run as a badge on the Dashboard and a full list in Settings. Reports: monthly P&L vs budget, cash flow by account, year in review, category trends, where the money went, and Print → PDF. Exports: Excel in the workbook's own layout with live SUMIFS Tracker formulas (round-trip tested through the importer), CSV, and a full backup file with restore. On desktop, exports go to `<data folder>/exports`.
 8. ✅ **Recurring, bills calendar, reminders**: `src/domain/recurring.ts` handles quincena, monthly, weekly and yearly schedules. Auto-post is idempotent: fixed ids, and `lastHandledDate` means a deleted posting is never recreated. Reminders wait to be confirmed (with the real amount) or skipped. Suggestions come from your history (steady bills and salary) and payroll settings (savings, association plan and cesantía as non-cash adjustments), plus aguinaldo and marchamo; they start next month when this month is already logged. The calendar merges recurring items, Tasa Cero cuotas, debt payments, card due dates and self-loan plans. Optional system notifications for today/tomorrow (Windows notification center or browser).
-9. **Security (PIN/WebAuthn, encrypted backup), PWA install, polish, accessibility pass**
+9. ✅ **Security, install, polish, accessibility**:
+   - **Encryption:** the data file can be encrypted with a password (PBKDF2-SHA256 600k → AES-256-GCM). Other devices unlock once, and a file the app can't read is never overwritten.
+   - **App lock:** PIN (salted PBKDF2, with back-off after wrong tries) plus Windows Hello / Face ID through WebAuthn, verified locally. Auto-lock after inactivity.
+   - **Command palette:** Ctrl/⌘ K.
+   - **Installable web app:** manifest, offline service worker, iPhone home-screen support, published to GitHub Pages by `pages.yml`.
+   - **Accessibility:** axe-core audit of all 15 screens in light and dark finds 0 violations.
 10. **Windows desktop**: Tauri installer, signed OTA updates, data vault in a cloud-synced folder. See `DESKTOP_PLAN.md` (D1–D6).
 
 ## Workbook findings & open questions

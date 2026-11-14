@@ -10,7 +10,11 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    setTimeout(() => ref.current?.querySelector<HTMLElement>('[data-autofocus], input, select, button')?.focus(), 30);
+    setTimeout(() => {
+      const root = ref.current;
+      // Prefer the field marked data-autofocus, then the first form field; the ✕ button only as a last resort.
+      (root?.querySelector<HTMLElement>('[data-autofocus]') ?? root?.querySelector<HTMLElement>('input, select, textarea') ?? root?.querySelector<HTMLElement>('button'))?.focus();
+    }, 30);
     return () => { window.removeEventListener('keydown', onKey); prev?.focus?.(); };
   }, [open, onClose]);
   return (

@@ -16,6 +16,9 @@ import { todayISO } from '../lib/dates';
 import { usePref } from '../app/prefs';
 import { notificationsAllowed } from '../app/reminders';
 
+export const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+export const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
 export const ago = (ms?: number) => {
   if (!ms) return 'never';
   const s = Math.round((Date.now() - ms) / 1000);
@@ -65,11 +68,13 @@ export default function Settings() {
             Your data is saved as one file, <code>aufwind-data.aufwind</code>, in a folder you choose. Put it in OneDrive and it's backed up and shared between your PCs. Daily backups live in its <code>backups</code> subfolder.
           </p>
           {!engine && !needsPerm && (
-            isTauri() || supportsFolderAccess() ? (
+            isTauri() || (supportsFolderAccess() && !isIOS()) ? (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {suggest && <button className="btn btn-primary" onClick={() => void run('Data folder set', () => chooseFolder(suggest))}>Use {suggest}</button>}
                 <button className={`btn ${suggest ? '' : 'btn-primary'}`} onClick={() => void run('Data folder set', () => chooseFolder())}>Choose folder…</button>
               </div>
+            ) : isIOS() ? (
+              <p className="small" style={{ margin: 0 }}>On iPhone, a web app can't keep a OneDrive folder in sync by itself. For now, move data between devices with <b>Backup file</b> below: save it to OneDrive from the Windows app, then <b>Restore from file</b> here and pick it in the Files app. It works the other way too.</p>
             ) : <Pill tone="debt">This browser can't save to a folder. Use the Windows app, or Chrome/Edge.</Pill>
           )}
           {needsPerm && <button className="btn btn-primary" onClick={() => void run('Reconnected', reconnectFolder)}>Reconnect data folder</button>}
@@ -131,6 +136,20 @@ export default function Settings() {
               )}
             </div>
             {upd && typeof upd === 'object' && upd.notes && <pre style={{ whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }} className="small">{upd.notes}</pre>}
+          </Glass>
+        )}
+
+        {!isTauri() && !standalone() && (
+          <Glass strong style={{ display: 'grid', gap: 8 }} id="install">
+            <h2 style={{ margin: 0, fontSize: 18 }}>Install Aufwind</h2>
+            {isIOS() ? (
+              <ol className="small" style={{ margin: 0, paddingLeft: 22, display: 'grid', gap: 4, listStyle: 'decimal' }}>
+                <li>Open this page in <b>Safari</b>.</li>
+                <li>Tap the <b>Share</b> button (square with an arrow).</li>
+                <li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+                <li>Open Aufwind from your Home Screen: full screen, works offline, and Face ID can unlock it (App lock below).</li>
+              </ol>
+            ) : <p className="small" style={{ margin: 0 }}>In Chrome or Edge, use the install icon in the address bar (or menu → <b>Install Aufwind</b>). On Windows, the desktop app from GitHub Releases is better: it syncs with your OneDrive folder.</p>}
           </Glass>
         )}
 

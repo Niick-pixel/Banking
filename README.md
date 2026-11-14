@@ -31,3 +31,7 @@ npm run desktop:dev      # needs Rust; on Windows also WebView2 (preinstalled on
 ```
 
 Releases: bump the version in `package.json` and `src-tauri/Cargo.toml`, then push a `v*` tag. GitHub Actions builds the signed installer and `latest.json`.
+
+## iPhone (and any browser)
+
+The web version is published to GitHub Pages by `.github/workflows/pages.yml`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. Then open `https://<user>.github.io/Banking/` in **Safari → Share → Add to Home Screen**. It runs full screen, works offline, and can be locked with Face ID. Data stays on the phone; move it between devices with a backup file (Settings → Backup file) through the Files app / OneDrive.

@@ -1,6 +1,6 @@
 # Windows desktop app: installer, OTA updates, data in a folder you choose
 
-> **Status:** D1 (vault + sync engine), D2 (Tauri shell + OneDrive folder) and D3 (signed updater + release pipeline) are **built**. Choices made: **OneDrive**, **no code signing for now**. D4's conflict handling is mostly done too (merge + conflicted-copy detection). Remaining: D5 (encryption, Windows Hello) and D6 (tray, autostart).
+> **Status:** D1 (vault + sync engine), D2 (Tauri shell + OneDrive folder) and D3 (signed updater + release pipeline) are **built**. Choices made: **OneDrive**, **no code signing for now**. D4's conflict handling is mostly done too (merge + conflicted-copy detection). D5 (encryption + Windows Hello app lock) is also **built**. Remaining: D6 (tray icon, start with Windows).
 >
 > **Your one-time setup** before the first release:
 > 1. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**:

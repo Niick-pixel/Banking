@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs';
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 export default defineConfig({
+  // GitHub Pages serves the app under /<repo>/; the desktop app and dev server use /.
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version) },
   // Tauri expects a fixed port and doesn't want the screen cleared.

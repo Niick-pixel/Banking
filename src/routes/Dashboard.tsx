@@ -165,7 +165,7 @@ export default function Dashboard() {
             return (
               <div key={d.id} style={{ display: 'grid', gap: 3 }}>
                 <div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{d.creditor}</span><span className="money">{formatMoney(st.balance, 'CRC')}</span></div>
-                <div className="bar" aria-label={`${Math.round(pct * 100)}% paid`}><span style={{ width: `${pct * 100}%`, background: 'var(--debt)' }} /></div>
+                <div className="bar" role="img" aria-label={`${Math.round(pct * 100)}% paid`}><span style={{ width: `${pct * 100}%`, background: 'var(--debt)' }} /></div>
               </div>
             );
           })}
