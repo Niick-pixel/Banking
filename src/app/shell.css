@@ -24,3 +24,44 @@
   .tab.active { background: var(--glass-tint-strong); }
   .fab { bottom: 96px; right: 20px; }
 }
+.sheet-root { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(10, 12, 18, 0.35); }
+:root[data-transparency="reduced"] .sheet-scrim { background: rgba(10,12,18,.6); }
+.sheet { position: relative; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 22px; }
+.sheet-wide { width: min(880px, 100%); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sheet-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+@media (max-width: 860px) {
+  .sheet-root { place-items: end stretch; padding: 0; }
+  .sheet { width: 100%; border-radius: 28px 28px 0 0; max-height: 92vh; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+}
+.toast { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: 28px; display: flex; gap: 14px; align-items: center; padding: 10px 12px 10px 18px; border-radius: 18px; font-weight: 550; }
+@media (max-width: 860px) { .toast { bottom: 100px; width: calc(100% - 32px); justify-content: space-between; } }
+select.input { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%), linear-gradient(135deg, var(--text-2) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
+.grid2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+@media (max-width: 520px) { .grid2 { grid-template-columns: minmax(0,1fr); } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); font: 600 13px var(--font-sans); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--text-on-accent); border-color: transparent; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-weight: 600; color: var(--text-2); padding: 8px 10px; border-bottom: 1px solid var(--glass-hairline); white-space: nowrap; }
+.table td { padding: 9px 10px; border-bottom: 1px solid var(--glass-hairline); }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.muted { color: var(--text-2); }
+.small { font-size: 13px; }
+.bar { height: 8px; border-radius: 999px; background: var(--input-bg); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: 999px; }
+.month-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 16px 18px; background: transparent; border: 0; color: var(--text); cursor: pointer; text-align: left; flex-wrap: wrap; font: inherit; }
+.month-head .chev { width: 14px; color: var(--text-2); }
+.month-totals { margin-left: auto; display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+.tx-list { list-style: none; margin: 0; padding: 0 8px 8px; }
+.tx-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-top: 1px solid var(--glass-hairline); }
+.tx-main { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; }
+.tx-desc { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-amt { white-space: nowrap; font-size: 15px; }
+@media (max-width: 860px) { .month-totals { margin-left: 24px; width: 100%; } }
+.steps { list-style: none; display: flex; gap: 8px; padding: 0; margin: 0 0 18px; flex-wrap: wrap; counter-reset: s; }
+.steps li { counter-increment: s; padding: 6px 14px; border-radius: 999px; background: var(--input-bg); color: var(--text-2); font-weight: 600; font-size: 13px; }
+.steps li::before { content: counter(s) ". "; }
+.steps li[aria-current="step"] { background: var(--accent); color: var(--text-on-accent); }

@@ -108,6 +108,9 @@ export const IncomeTx = z.object({
 export const ExpenseTx = z.object({
   ...TxBase, kind: z.literal('expense'), from: Side, amount: PositiveMinor,
   categoryId: Id.optional(), splits: z.array(SplitSchema).optional(),
+  /** Set on monthly cuotas generated from a Tasa Cero plan. */
+  installmentPlanId: Id.optional(),
+  installmentNumber: z.number().int().positive().optional(),
 });
 
 /** Between two of MY accounts/pots. Never income, never expense. */
@@ -183,6 +186,8 @@ export const DebtSchema = z.object({
     .partial()
     .default({}),
   notes: z.string().default(''),
+  /** Last balance confirmed with the creditor/statement. Health panel flags any gap vs derived. */
+  confirmedBalance: z.object({ date: ISODateSchema, amount: z.number().int().nonnegative() }).optional(),
   ...Timestamps,
 });
 export type Debt = z.infer<typeof DebtSchema>;
@@ -262,6 +267,8 @@ export const ImportBatchSchema = z.object({
   id: Id, fileName: z.string(), kind: z.enum(['workbook', 'statement', 'backup']),
   importedAt: z.number().int(),
   counts: z.record(z.number().int()),
+  /** Ids created by this batch per table, so the whole batch can be undone. */
+  created: z.record(z.array(z.string())).default({}),
   status: z.enum(['committed', 'undone']), ...Timestamps,
 });
 export type ImportBatch = z.infer<typeof ImportBatchSchema>;
@@ -272,3 +279,28 @@ export const AuditEntrySchema = z.object({
   before: z.unknown().optional(), after: z.unknown().optional(),
 });
 export type AuditEntry = z.infer<typeof AuditEntrySchema>;
+
+// ── Tasa Cero (0% installment purchases on a credit card) ──────────────────
+/**
+ * One purchase split into N interest-free monthly cuotas. Each cuota posts as an
+ * expense on the card account in the month it's billed (deterministic id, so it
+ * can never be posted twice). Paying the card from checking is a transfer.
+ * Not-yet-billed cuotas are a liability ("pending installments").
+ */
+export const InstallmentPlanSchema = z.object({
+  id: Id,
+  cardAccountId: Id,
+  description: z.string().min(1),
+  merchant: z.string().default(''),
+  categoryId: Id,
+  currency: CurrencySchema,
+  total: PositiveMinor,
+  months: z.number().int().min(1).max(60),
+  purchaseDate: ISODateSchema,
+  /** Date the first cuota is billed; later cuotas fall on the same day each month (clamped). */
+  firstChargeDate: ISODateSchema,
+  status: z.enum(['active', 'paid_off', 'cancelled']).default('active'),
+  notes: z.string().default(''),
+  ...Timestamps,
+});
+export type InstallmentPlan = z.infer<typeof InstallmentPlanSchema>;

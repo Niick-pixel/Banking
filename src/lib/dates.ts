@@ -62,3 +62,11 @@ export function daysBetween(a: ISODate, b: ISODate): number {
     (Date.UTC(pb.year, pb.month - 1, pb.day) - Date.UTC(pa.year, pa.month - 1, pa.day)) / 86_400_000,
   );
 }
+
+/** Default first billing date for a new card installment: same day next month (clamped). */
+export function cuotaFirstDefault(today: ISODate): ISODate {
+  const { year, month, day } = parseISO(today);
+  const y = month === 12 ? year + 1 : year;
+  const m = month === 12 ? 1 : month + 1;
+  return toISO(y, m, Math.min(day, daysInMonth(y, m)));
+}

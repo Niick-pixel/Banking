@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
   Account, AuditEntry, BalanceSnapshot, Budget, Category, Debt, ExchangeRate, Goal,
-  ImportBatch, Pot, RecurringRule, SelfLoan, Transaction,
+  ImportBatch, InstallmentPlan, Pot, RecurringRule, SelfLoan, Transaction,
 } from '../domain/schemas';
 
 export interface Setting { key: string; value: unknown }
@@ -27,6 +27,7 @@ export class ColonDB extends Dexie {
   audit!: EntityTable<AuditEntry, 'id'>;
   attachments!: EntityTable<Attachment, 'id'>;
   settings!: EntityTable<Setting, 'key'>;
+  installments!: EntityTable<InstallmentPlan, 'id'>;
 
   constructor(name = 'colon') {
     super(name);
@@ -47,6 +48,11 @@ export class ColonDB extends Dexie {
       audit: '++id, at, [table+recordId]',
       attachments: 'id',
       settings: 'key',
+    });
+    this.version(2).stores({
+      installments: 'id, cardAccountId, status',
+      transactions:
+        'id, date, kind, categoryId, debtId, importBatchId, recurringId, linkId, installmentPlanId, from.accountId, to.accountId, *tags',
     });
   }
 }

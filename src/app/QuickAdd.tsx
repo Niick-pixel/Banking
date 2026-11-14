@@ -1,0 +1,203 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Sheet, Toast } from '../ui/Sheet';
+import { Segmented } from '../design/components';
+import { useLedger, suggestCategories, type Ledger } from './data';
+import { formatMoney, parseAmountInput, type Minor } from '../lib/money';
+import { todayISO } from '../lib/dates';
+import { TransactionSchema, type Side, type Transaction } from '../domain/schemas';
+import { lastAuditId, newId, saveTransaction, undoAudit } from '../db/repo';
+
+type Kind = 'expense' | 'income' | 'transfer' | 'savings' | 'debt_payment';
+interface Ctx { open: (tx?: Transaction) => void }
+const QuickAddCtx = createContext<Ctx>({ open: () => {} });
+export const useQuickAdd = () => useContext(QuickAddCtx);
+
+const sideKey = (s?: Side) => (s ? `${s.accountId}|${s.potId ?? ''}` : '');
+const keySide = (k: string): Side | undefined => {
+  if (!k) return undefined;
+  const [accountId, potId] = k.split('|');
+  return potId ? { accountId: accountId!, potId } : { accountId: accountId! };
+};
+
+export function places(l: Ledger) {
+  const out: { key: string; label: string; savings: boolean }[] = [];
+  for (const a of l.accounts.filter((x) => !x.archived)) {
+    const isSav = !['checking', 'cash', 'credit_card'].includes(a.type);
+    out.push({ key: sideKey({ accountId: a.id }), label: a.name, savings: isSav });
+    for (const p of l.pots.filter((p) => p.accountId === a.id && !p.archived)) {
+      out.push({ key: sideKey({ accountId: a.id, potId: p.id }), label: `${a.name} · ${p.name}`, savings: true });
+    }
+  }
+  return out;
+}
+
+export function QuickAddProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<{ open: boolean; edit?: Transaction }>({ open: false });
+  const open = useCallback((tx?: Transaction) => setState({ open: true, edit: tx }), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); open(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  return (
+    <QuickAddCtx.Provider value={{ open }}>
+      {children}
+      <Sheet open={state.open} onClose={() => setState({ open: false })} title={state.edit ? 'Edit movement' : 'Quick add'}>
+        {state.open && <QuickAddForm edit={state.edit} onDone={() => setState({ open: false })} />}
+      </Sheet>
+    </QuickAddCtx.Provider>
+  );
+}
+
+function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void }) {
+  const l = useLedger();
+  const plc = useMemo(() => places(l), [l]);
+  const spending = plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
+  const firstSavings = plc.find((p) => p.savings)?.key ?? '';
+
+  const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : 'expense';
+  const [kind, setKind] = useState<Kind>(initKind);
+  const [amountRaw, setAmountRaw] = useState(edit && 'amount' in edit ? String(edit.amount / 100) : '');
+  const [description, setDescription] = useState(edit?.description ?? '');
+  const [categoryId, setCategoryId] = useState(edit && 'categoryId' in edit ? edit.categoryId ?? '' : '');
+  const [date, setDate] = useState(edit?.date ?? todayISO());
+  const [direction, setDirection] = useState<'deposit' | 'withdrawal'>(edit?.kind === 'savings' ? edit.direction : 'deposit');
+  const [from, setFrom] = useState(edit && 'from' in edit ? sideKey(edit.from) : spending);
+  const [to, setTo] = useState(edit && 'to' in edit ? sideKey(edit.to) : firstSavings);
+  const [debtId, setDebtId] = useState(edit?.kind === 'debt_payment' ? edit.debtId : l.debts.find((d) => d.status === 'active')?.id ?? '');
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ msg: string; auditId?: number } | null>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+
+  const amount = parseAmountInput(amountRaw, 'CRC');
+  const wantGroups: Record<Kind, string[]> = {
+    expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], income: ['Income'], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
+  };
+  const cats = l.categories.filter((c) => !c.archived && wantGroups[kind].includes(c.group));
+  const suggested = suggestCategories(l.transactions, description, kind).filter((id) => cats.some((c) => c.id === id)).slice(0, 5);
+
+  // Keep from/to sensible when switching kind.
+  useEffect(() => {
+    if (edit) return;
+    if (kind === 'savings') { setFrom(direction === 'deposit' ? spending : firstSavings); setTo(direction === 'deposit' ? firstSavings : spending); }
+    else if (kind === 'transfer') { setFrom(spending); setTo(plc.find((p) => p.key !== spending)?.key ?? ''); }
+    else { setFrom(spending); }
+    setCategoryId('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, direction]);
+
+  async function submit(again: boolean) {
+    setError('');
+    if (!amount) { setError('Enter an amount, e.g. 12500 or 12.5k'); amountRef.current?.focus(); return; }
+    const now = Date.now();
+    const base = {
+      id: edit?.id ?? newId(), date, dateEstimated: edit && edit.date === date ? edit.dateEstimated : false, currency: 'CRC' as const,
+      description: description.trim(), tags: edit?.tags ?? [], notes: edit?.notes ?? '', importBatchId: edit?.importBatchId,
+      createdAt: edit?.createdAt ?? now, updatedAt: now,
+    };
+    const f = keySide(from), t = keySide(to);
+    let tx: unknown;
+    switch (kind) {
+      case 'expense': tx = { ...base, kind, from: f, amount, categoryId: categoryId || undefined }; break;
+      case 'income': tx = { ...base, kind, to: f, amount, categoryId }; break;
+      case 'transfer': tx = { ...base, kind, from: f, to: t, amount }; break;
+      case 'savings': tx = { ...base, kind, direction, from: f, to: t, amount, categoryId }; break;
+      case 'debt_payment': tx = { ...base, kind, from: f, amount, debtId, categoryId, interestPortion: 0 }; break;
+    }
+    const parsed = TransactionSchema.safeParse(tx);
+    if (!parsed.success) {
+      const msg = parsed.error.issues.map((i) => (i.path.join('.') === 'categoryId' ? 'Pick a category' : i.path[0] === 'debtId' ? 'Pick a debt' : i.message)).join(' · ');
+      setError(msg); return;
+    }
+    await saveTransaction(parsed.data);
+    const auditId = await lastAuditId();
+    if (again) {
+      setAmountRaw(''); setDescription(''); setCategoryId('');
+      setToast({ msg: `Saved ${formatMoney(amount, 'CRC')}`, auditId });
+      amountRef.current?.focus();
+    } else onDone();
+  }
+
+  const placeSelect = (id: string, label: string, value: string, set: (v: string) => void, filter?: (p: (typeof plc)[number]) => boolean) => (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} className="input" value={value} onChange={(e) => set(e.target.value)}>
+        {plc.filter(filter ?? (() => true)).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+      </select>
+    </div>
+  );
+
+  if (!l.accounts.length) return <p className="muted">Add an account or import your workbook first.</p>;
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); void submit(false); }} style={{ display: 'grid', gap: 14 }}>
+      <Segmented<Kind> label="Kind" value={kind} onChange={setKind} options={[
+        { value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }, { value: 'savings', label: 'Savings' },
+        { value: 'transfer', label: 'Transfer' }, { value: 'debt_payment', label: 'Debt' },
+      ]} />
+      <div className="field">
+        <label htmlFor="qa-amount">Amount</label>
+        <input id="qa-amount" ref={amountRef} data-autofocus className="input input-amount" inputMode="decimal" autoComplete="off" placeholder="₡0"
+          value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} aria-invalid={!!amountRaw && !amount} aria-describedby="qa-amt-hint" />
+        <span id="qa-amt-hint" className="small" style={{ color: amountRaw && !amount ? 'var(--expense)' : 'var(--text-2)' }}>
+          {amount ? formatMoney(amount as Minor, 'CRC', { decimals: amount % 100 ? 2 : 0 }) : amountRaw ? 'Can’t read that amount' : 'Try 70k, 1.5m, 12,500'}
+        </span>
+      </div>
+      <div className="field">
+        <label htmlFor="qa-desc">Description</label>
+        <input id="qa-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Walmart, Uber, rent…" />
+      </div>
+      {kind === 'savings' && (
+        <Segmented label="Direction" value={direction} onChange={setDirection} options={[{ value: 'deposit', label: 'Put money in' }, { value: 'withdrawal', label: 'Take money out' }]} />
+      )}
+      {kind !== 'transfer' && (
+        <div className="field">
+          <label htmlFor="qa-cat">Category</label>
+          {suggested.length > 0 && (
+            <div className="chips" aria-label="Suggested categories">
+              {suggested.map((id) => (
+                <button type="button" key={id} className="chip" aria-pressed={categoryId === id} onClick={() => setCategoryId(id)}>{l.category.get(id)?.name}</button>
+              ))}
+            </div>
+          )}
+          <select id="qa-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">Choose…</option>
+            {[...new Set(cats.map((c) => c.group))].map((g) => (
+              <optgroup key={g} label={g}>{cats.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
+            ))}
+          </select>
+        </div>
+      )}
+      {kind === 'debt_payment' && (
+        <div className="field">
+          <label htmlFor="qa-debt">Debt</label>
+          <select id="qa-debt" className="input" value={debtId} onChange={(e) => setDebtId(e.target.value)}>
+            <option value="">Choose…</option>
+            {l.debts.filter((d) => d.status !== 'paid').map((d) => <option key={d.id} value={d.id}>{d.creditor}</option>)}
+          </select>
+          <span className="small muted">Paying from a pot (e.g. Hers) takes it out of the pot and lowers the debt in one step. It's counted once.</span>
+        </div>
+      )}
+      <div className="grid2">
+        {kind === 'income' ? placeSelect('qa-to', 'Into', from, setFrom)
+          : placeSelect('qa-from', kind === 'savings' && direction === 'withdrawal' ? 'Take from' : 'From', from, setFrom)}
+        {(kind === 'transfer' || kind === 'savings') ? placeSelect('qa-to2', 'To', to, setTo) : (
+          <div className="field"><label htmlFor="qa-date">Date</label><input id="qa-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
+        )}
+      </div>
+      {(kind === 'transfer' || kind === 'savings') && (
+        <div className="field"><label htmlFor="qa-date2">Date</label><input id="qa-date2" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
+      )}
+      {error && <p role="alert" style={{ color: 'var(--expense)', margin: 0, fontWeight: 600 }}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {!edit && <button type="button" className="btn" onClick={() => void submit(true)}>Save & add another</button>}
+        <button type="submit" className="btn btn-primary">Save</button>
+      </div>
+      {toast && <Toast message={toast.msg} action={toast.auditId ? 'Undo' : undefined} onAction={() => toast.auditId && void undoAudit(toast.auditId)} onDone={() => setToast(null)} />}
+    </form>
+  );
+}

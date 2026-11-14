@@ -1,10 +1,10 @@
 # Colón: build plan, decisions, workbook findings, open questions
 
-Status: **Phase 1 (plan & scaffold) is done and waiting for your review.**
+Status: **Phases 1–3 are done, plus Tasa Cero. Waiting for your review.** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 
 ## Stack (confirmed)
 
-Web app, installable as a PWA. React 19 + TypeScript (strict) + Vite 6, Tailwind 4 plus a custom glass design system in CSS variables, Recharts, Dexie 4 (IndexedDB), Zod, SheetJS for Excel, Vitest + Playwright, Motion for springs. Tauri can wrap it later.
+Web app, installable as a PWA. React 19 + TypeScript (strict) + Vite 6, Tailwind 4 plus a custom glass design system in CSS variables, Recharts, Dexie 4 (IndexedDB), Zod, exceljs for Excel (the SheetJS CDN is unreachable from the build environment), Vitest + Playwright, Motion for springs. Tauri can wrap it later.
 
 I'm not recommending native SwiftUI. You live on Windows, and the web version can reach about 90% of the Liquid Glass look with `backdrop-filter`. SwiftUI would lock you to Apple devices and give you nothing on your PC.
 
@@ -17,20 +17,22 @@ I'm not recommending native SwiftUI. You live on Windows, and the web version ca
 | A transfer with a missing side | It can't exist. A transfer record without both `from` and `to` fails validation. |
 | Negative amounts meaning "withdrawal" | Amounts are always positive. Direction comes from the kind (`savings` has `direction: deposit/withdrawal`). Only `adjustment` is signed. |
 | Debts counted twice / balances typed by hand | Nothing stores a total or a balance. A debt balance = original − linked `debt_payment` records. |
-| Pay-from-pot double count | One user action creates records that share a `linkId`: pot withdrawal + debt payment. Reports count the debt payment once. |
+| Pay-from-pot double count | Paying a debt *from a pot* is one `debt_payment` record whose source is the pot. It counts once as debt service, and Saved drops by the same amount, so free cash isn't hit twice. |
 | Rows not reaching totals (no TYPE, no MONTH) | Each row is validated with Zod at entry and at import. Undated rows get the last day of the month and `dateEstimated: true`. |
 
 ## Phases (I'll stop for your review after each one)
 
 1. ✅ **Plan & scaffold**: schema (`src/domain/schemas.ts`), Dexie DB (`src/db/db.ts`), money and date libraries with 25 tests, design tokens, and the `/design` page.
-2. **Core ledger**: ledger derivation (`legs(tx)` → balances per account and pot), Quick Add (`N`, natural amounts, "Add another"), and the Transactions screen with collapsible months. Tests use your four fixture scenarios.
-3. **Excel import**: the importer for your workbook (findings below), a reconciliation against the Tracker for each month, and undoable batches.
+2. ✅ **Core ledger**: `src/domain/ledger.ts` (legs → balances per account/pot, monthly flows, debt status). All four spec fixtures are tested. Accounts (pots, statement check, data-health notes), Transactions (collapsible months with totals, search/filters, bulk recategorize, delete + undo), Quick Add (`N`, natural amounts, learned category suggestions, "Save & add another"), audit log.
+3. ✅ **Excel import**: `src/import/workbook.ts`, label-based. Preview → category mapping → validation report → reconciliation vs the Tracker → one undoable batch. Against the real workbook, **every month Jun–Nov matches the Tracker to the céntimo** (the test only runs locally; the file is git-ignored).
+   - ✅ **Tasa Cero** (added on request): credit-card accounts, 0% installment plans, a calculator (all terms, % of income, verdict), a 12-month outlook. Cuotas post as card expenses on their billing date with deterministic ids, so they can't be posted twice. Paying the card is a transfer.
 4. **Tracker & budgets**
 5. **Pots, debts, self-loans**
 6. **Net worth, goals, calculators**
 7. **Dashboard, insights, reports, exports**
 8. **Recurring, bills calendar, reminders**
 9. **Security (PIN/WebAuthn, encrypted backup), PWA install, polish, accessibility pass**
+10. **Windows desktop**: Tauri installer, signed OTA updates, data vault in a cloud-synced folder. See `DESKTOP_PLAN.md` (D1–D6).
 
 ## Workbook findings & open questions
 
