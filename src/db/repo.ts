@@ -5,8 +5,8 @@
  */
 import { db, type ColonDB } from './db';
 import {
-  AccountSchema, CategorySchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
-  type Account, type Category, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
+  AccountSchema, CategorySchema, SelfLoanSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
+  type Account, type Category, type SelfLoan, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
 } from '../domain/schemas';
 import type { ImportPlan } from '../import/workbook';
 import { dueCuotaTransactions } from '../domain/installments';
@@ -14,10 +14,10 @@ import { todayISO } from '../lib/dates';
 
 export const newId = () => crypto.randomUUID();
 
-type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts';
+type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans';
 const schemas = {
   transactions: TransactionSchema, accounts: AccountSchema, pots: PotSchema, categories: CategorySchema,
-  installments: InstallmentPlanSchema, debts: DebtSchema,
+  installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema,
 } as const;
 
 async function audited<T extends { id: string }>(d: ColonDB, table: Table, record: T): Promise<T> {
@@ -39,6 +39,9 @@ export async function savePot(p: Pot, d = db) {
 }
 export async function saveCategory(c: Category, d = db) {
   return d.transaction('rw', d.categories, d.audit, () => audited(d, 'categories', { ...c, updatedAt: Date.now() }));
+}
+export async function saveSelfLoan(x: SelfLoan, d = db) {
+  return d.transaction('rw', d.selfLoans, d.audit, () => audited(d, 'selfLoans', { ...x, updatedAt: Date.now() }));
 }
 export async function saveBudget(categoryId: string, month: string, amount: number, d = db) {
   return d.transaction('rw', d.budgets, async () => {

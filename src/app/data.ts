@@ -2,19 +2,23 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '../db/db';
 import { accountBalances, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
-import type { Account, Budget, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
+import type { Account, Budget, SelfLoan, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
 
 export interface Ledger {
   ready: boolean;
   accounts: Account[]; pots: Pot[]; categories: Category[]; transactions: Transaction[];
-  debts: Debt[]; installments: InstallmentPlan[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[]; budgets: Budget[];
+  debts: Debt[]; installments: InstallmentPlan[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[]; budgets: Budget[]; selfLoans: SelfLoan[];
   account: Map<string, Account>; pot: Map<string, Pot>; category: Map<string, Category>;
   balances: Map<string, AccountBalance>;
   flows: Map<string, MonthFlow>;
 }
 
+type Raw = Pick<Ledger, 'accounts' | 'pots' | 'categories' | 'transactions' | 'debts' | 'installments' | 'snapshots' | 'batches' | 'budgets' | 'selfLoans'>;
+/** Last loaded data, so forms that mount later start filled instead of empty for a frame. */
+let lastRaw: Raw | undefined;
+
 export function useLedger(): Ledger {
-  const raw = useLiveQuery(async () => ({
+  const raw = useLiveQuery(async (): Promise<Raw> => ({
     accounts: await db.accounts.toArray(),
     pots: await db.pots.toArray(),
     categories: await db.categories.orderBy('group').toArray(),
@@ -24,9 +28,11 @@ export function useLedger(): Ledger {
     snapshots: await db.snapshots.orderBy('date').toArray(),
     batches: await db.importBatches.orderBy('importedAt').reverse().toArray(),
     budgets: await db.budgets.toArray(),
-  }), []);
+    selfLoans: await db.selfLoans.toArray(),
+  }), [], lastRaw);
+  if (raw) lastRaw = raw;
   return useMemo(() => {
-    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], snapshots: [], batches: [], budgets: [] };
+    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], snapshots: [], batches: [], budgets: [], selfLoans: [] };
     const account = new Map(r.accounts.map((a) => [a.id, a]));
     let balances = new Map<string, AccountBalance>();
     let flows = new Map<string, MonthFlow>();

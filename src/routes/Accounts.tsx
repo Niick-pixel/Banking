@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
@@ -114,26 +115,7 @@ export default function Accounts() {
         })}
       </div>
 
-      {l.debts.length > 0 && (
-        <section style={{ marginTop: 26 }}>
-          <h2 style={{ fontSize: 15, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '0 0 10px' }}>Debts</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 330px), 1fr))', gap: 14 }}>
-            {l.debts.map((d) => {
-              const s = debtStatus(d, l.transactions);
-              const pct = Math.max(0, Math.min(1, 1 - s.balance / d.originalAmount));
-              return (
-                <Glass key={d.id} pad={20} style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ fontWeight: 700 }}>{d.creditor}</div>
-                  <Money amount={s.balance} size={28} weight={700} tone="debt" />
-                  <div className="bar" aria-label={`${Math.round(pct * 100)}% paid`}><span style={{ width: `${pct * 100}%`, background: 'var(--debt)' }} /></div>
-                  <div className="small muted">Paid {formatMoney(s.principalPaid, 'CRC')} of {formatMoney(d.originalAmount, 'CRC')} · {(d.annualRateBps / 100).toFixed(2)}% a year</div>
-                  <div className="small muted">Full payoff engine & scenarios arrive in Phase 5.</div>
-                </Glass>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      {l.debts.length > 0 && <p style={{ marginTop: 24 }}><Link to="/debts" className="btn">Debts, payoff plans & self-loans →</Link></p>}
 
       <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit === 'new' ? 'New account' : 'Edit account'}>
         {edit && <AccountForm account={edit === 'new' ? undefined : edit} onDone={() => setEdit(null)} />}

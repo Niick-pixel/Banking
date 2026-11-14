@@ -226,7 +226,7 @@ export function parseWorkbook(grid: Grid, opts: ParseOptions): ImportPlan {
           currency: 'CRC', originalAmount: toCentimos(orig), annualRateBps: isNum(rate) ? Math.round(rate * 10_000) : 0,
           startDate: `${defaultYear}-01-01`, plannedMonthlyPayment: isNum(pay) && pay > 0 ? toCentimos(pay) : undefined,
           status: 'active', checklist: {}, notes: notesCol >= 0 ? norm(row[notesCol]!) : '',
-          confirmedBalance: isNum(bal) ? { date: today, amount: toCentimos(bal) } : undefined, ...stamp,
+          confirmedBalance: isNum(bal) ? { date: today, amount: toCentimos(bal) } : undefined, adjustments: [], ...stamp,
         });
       }
       detected.push({ sheet: debtSheet.name, role: 'Debts', detail: `${debts.length} debt(s)` });
@@ -239,7 +239,7 @@ export function parseWorkbook(grid: Grid, opts: ParseOptions): ImportPlan {
           if (/^TOTAL TAKEN|^STILL|^PUT BACK|^PLANNED/i.test(label)) break;
           const amt = row.slice(1).find(isNum);
           if (label && amt && amt > 0) {
-            selfLoans.push({ id: newId(), description: label, currency: 'CRC', amount: toCentimos(amt), plannedSource: '', status: 'open', ...stamp });
+            selfLoans.push({ id: newId(), description: label, currency: 'CRC', amount: toCentimos(amt), plannedSource: '', status: 'open', notes: '', ...stamp });
           }
         }
         const plannedRow = debtSheet.rows.find((row) => /^Planned source/i.test(norm(row[0] ?? null)));
@@ -354,6 +354,11 @@ export function parseWorkbook(grid: Grid, opts: ParseOptions): ImportPlan {
       }
     }
   }
+
+  // A single "hers" pot + a single family debt → that pot is the loan fund for it.
+  const hersPots = pots.filter((p) => p.owner === 'hers');
+  const familyDebts = debts.filter((d) => d.kind === 'family');
+  if (hersPots.length === 1 && familyDebts.length === 1) familyDebts[0]!.fundPotId = hersPots[0]!.id;
 
   // ── Budgets + reconciliation targets (Tracker sheet) ─────────────────────
   const reconciliation: ReconRow[] = [];

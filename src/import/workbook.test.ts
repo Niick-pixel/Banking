@@ -91,8 +91,9 @@ describe('workbook importer (synthetic)', () => {
     expect(plan.transactions.some((t) => t.kind === 'savings' && t.direction === 'withdrawal' && t.amount === 500000)).toBe(true);
     expect(plan.issues.some((x) => x.level === 'warning' && /TYPE is "Income"/.test(x.message))).toBe(true);
   });
-  it('Hers savings go to the Hers pot', () => {
+  it('Hers savings go to the Hers pot, which becomes the family debt\'s loan fund', () => {
     const hers = plan.pots.find((p) => p.owner === 'hers')!;
+    expect(plan.debts[0]!.fundPotId).toBe(hers.id);
     expect(plan.transactions.some((t) => t.kind === 'savings' && t.to.potId === hers.id)).toBe(true);
   });
   it('accounts, snapshots, copy detector, budgets, debts', () => {

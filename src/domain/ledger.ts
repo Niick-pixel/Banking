@@ -151,6 +151,8 @@ export function monthlyFlows(txs: Transaction[], ctx: FlowContext): Map<MonthKey
 
 export interface DebtStatus {
   debtId: string;
+  /** Sum of non-ledger principal adjustments. */
+  adjusted: number;
   principalPaid: number;
   interestPaid: number;
   balance: number;
@@ -165,13 +167,38 @@ export function debtStatus(debt: Debt, txs: Transaction[]): DebtStatus {
     principalPaid += tx.amount - tx.interestPortion;
     interestPaid += tx.interestPortion;
   }
-  const balance = debt.originalAmount - principalPaid;
+  const adjusted = (debt.adjustments ?? []).reduce((a, x) => a + x.amount, 0);
+  const balance = debt.originalAmount - principalPaid - adjusted;
   let gap = 0;
   if (debt.confirmedBalance) {
     const upTo = txs
       .filter((t) => t.kind === 'debt_payment' && t.debtId === debt.id && t.date <= debt.confirmedBalance!.date)
       .reduce((s, t) => s + (t.kind === 'debt_payment' ? t.amount - t.interestPortion : 0), 0);
-    gap = debt.confirmedBalance.amount - (debt.originalAmount - upTo);
+    const adjUpTo = (debt.adjustments ?? []).filter((x) => x.date <= debt.confirmedBalance!.date).reduce((a, x) => a + x.amount, 0);
+    gap = debt.confirmedBalance.amount - (debt.originalAmount - upTo - adjUpTo);
   }
-  return { debtId: debt.id, principalPaid, interestPaid, balance, gapVsConfirmed: gap };
+  return { debtId: debt.id, adjusted, principalPaid, interestPaid, balance, gapVsConfirmed: gap };
+}
+
+export interface PotMonth { month: string; byOwner: Record<'mine' | 'hers' | 'shared', number>; net: number; endBalance: number }
+
+/** Month-by-month change per pot owner for a year, with the running total of all pots. */
+export function potsByMonth(pots: { id: string; owner: 'mine' | 'hers' | 'shared' }[], txs: Transaction[], year: number): PotMonth[] {
+  const owner = new Map(pots.map((p) => [p.id, p.owner]));
+  const months: PotMonth[] = Array.from({ length: 12 }, (_, i) => ({ month: `${year}-${String(i + 1).padStart(2, '0')}`, byOwner: { mine: 0, hers: 0, shared: 0 }, net: 0, endBalance: 0 }));
+  let opening = 0;
+  for (const tx of txs) {
+    for (const leg of legs(tx)) {
+      const o = leg.potId ? owner.get(leg.potId) : undefined;
+      if (!o) continue;
+      const y = Number(tx.date.slice(0, 4));
+      if (y < year) { opening += leg.amount; continue; }
+      if (y > year) continue;
+      const m = months[Number(tx.date.slice(5, 7)) - 1]!;
+      m.byOwner[o] += leg.amount; m.net += leg.amount;
+    }
+  }
+  let run = opening;
+  for (const m of months) { run += m.net; m.endBalance = run; }
+  return months;
 }

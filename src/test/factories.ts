@@ -15,5 +15,5 @@ export function tx(t: Dist<Transaction>): Transaction {
 }
 
 export function debt(id: string, original: number, extra: Partial<Debt> = {}): Debt {
-  return { id, creditor: id, kind: 'family', currency: 'CRC', originalAmount: original, annualRateBps: 0, startDate: '2026-01-01', status: 'active', checklist: {}, notes: '', createdAt: now, updatedAt: now, ...extra };
+  return { id, creditor: id, kind: 'family', currency: 'CRC', originalAmount: original, annualRateBps: 0, startDate: '2026-01-01', status: 'active', checklist: {}, notes: '', adjustments: [], createdAt: now, updatedAt: now, ...extra };
 }

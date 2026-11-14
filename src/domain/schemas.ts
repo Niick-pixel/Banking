@@ -129,6 +129,8 @@ export const TransferTx = z.object({
 export const SavingsTx = z.object({
   ...TxBase, kind: z.literal('savings'), direction: z.enum(['deposit', 'withdrawal']),
   from: Side, to: Side, amount: PositiveMinor, categoryId: Id,
+  /** A deposit that puts back money borrowed from my own savings. */
+  selfLoanId: Id.optional(),
 });
 
 export const DebtPaymentTx = z.object({
@@ -188,6 +190,10 @@ export const DebtSchema = z.object({
   notes: z.string().default(''),
   /** Last balance confirmed with the creditor/statement. Health panel flags any gap vs derived. */
   confirmedBalance: z.object({ date: ISODateSchema, amount: z.number().int().nonnegative() }).optional(),
+  /** Principal changes that didn't move money in the ledger (paid before tracking, forgiven, added). Positive = reduces the debt. */
+  adjustments: z.array(z.object({ id: Id, date: ISODateSchema, amount: SignedMinor, note: z.string().default('') })).default([]),
+  /** Pot where money is set aside to pay this debt (e.g. her loan fund). */
+  fundPotId: Id.optional(),
   ...Timestamps,
 });
 export type Debt = z.infer<typeof DebtSchema>;
@@ -203,6 +209,7 @@ export const SelfLoanSchema = z.object({
   plannedSource: z.string().default(''),
   plannedDate: ISODateSchema.optional(),
   status: z.enum(['open', 'replenished']).default('open'),
+  notes: z.string().default(''),
   ...Timestamps,
 });
 export type SelfLoan = z.infer<typeof SelfLoanSchema>;

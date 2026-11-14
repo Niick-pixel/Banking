@@ -284,3 +284,7 @@ body {
 }
 :root[data-transparency="reduced"] .glass-lens::after { display: none; }
 @media (prefers-reduced-transparency: reduce) { .glass-lens::after { display: none; } }
+/* Hers/Mine chart fills (validated pair; text keeps --hers/--mine). */
+:root { --chart-hers: #c0337a; --chart-mine: #3b5bdb; }
+:root[data-theme="dark"] { --chart-hers: #d55181; --chart-mine: #3987e5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --chart-hers: #d55181; --chart-mine: #3987e5; } }

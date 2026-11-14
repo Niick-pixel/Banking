@@ -1,6 +1,6 @@
 # Colón: build plan, decisions, workbook findings, open questions
 
-Status: **Phases 1–3 are done, plus Tasa Cero. Waiting for your review.** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
+Status: **Phases 1–5 are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 
 ## Stack (confirmed)
 
@@ -26,8 +26,8 @@ I'm not recommending native SwiftUI. You live on Windows, and the web version ca
 2. ✅ **Core ledger**: `src/domain/ledger.ts` (legs → balances per account/pot, monthly flows, debt status). All four spec fixtures are tested. Accounts (pots, statement check, data-health notes), Transactions (collapsible months with totals, search/filters, bulk recategorize, delete + undo), Quick Add (`N`, natural amounts, learned category suggestions, "Save & add another"), audit log.
 3. ✅ **Excel import**: `src/import/workbook.ts`, label-based. Preview → category mapping → validation report → reconciliation vs the Tracker → one undoable batch. Against the real workbook, **every month Jun–Nov matches the Tracker to the céntimo** (the test only runs locally; the file is git-ignored).
    - ✅ **Tasa Cero** (added on request): credit-card accounts, 0% installment plans, a calculator (all terms, % of income, verdict), a 12-month outlook. Cuotas post as card expenses on their billing date with deterministic ids, so they can't be posted twice. Paying the card is a transfer.
-4. **Tracker & budgets**
-5. **Pots, debts, self-loans**
+4. ✅ **Tracker & budgets**: `src/domain/tracker.ts`. Matches the workbook's Tracker for every category and month. Inline budgets, pace projection, 80%/100% alerts.
+5. ✅ **Pots, debts, self-loans**: `src/domain/debts.ts`. Interest-aware amortization (0% handled, partial last payment), the workbook's 3/4/6/9/12 scenarios (same PMT and the same verdict thresholds: 15% and 25% of income), an extra-payment accelerator, avalanche vs snowball, and the debt-service ratio (20%, and 36% with rent). Confirmed-balance gaps can be resolved with a payment or a non-cash adjustment. Self-loans fill up from linked or "Replenish" deposits, oldest first. The Pots page has Her/My/Total tiles, loan-fund progress, a one-action "Pay from pot", and a month-by-month table plus a stacked chart.
 6. **Net worth, goals, calculators**
 7. **Dashboard, insights, reports, exports**
 8. **Recurring, bills calendar, reminders**
