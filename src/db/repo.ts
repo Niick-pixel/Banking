@@ -3,7 +3,7 @@
  * in the audit log (so it can be undone), and goes through one place, where the
  * folder-vault persistence (desktop plan D1) will hook in.
  */
-import { db, type ColonDB } from './db';
+import { db, type AufwindDB } from './db';
 import {
   AccountSchema, CategorySchema, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
   type Account, type Category, type SelfLoan, type Goal, type BalanceSnapshot, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
@@ -20,7 +20,7 @@ const schemas = {
   installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema, goals: GoalSchema, snapshots: BalanceSnapshotSchema,
 } as const;
 
-async function audited<T extends { id: string }>(d: ColonDB, table: Table, record: T): Promise<T> {
+async function audited<T extends { id: string }>(d: AufwindDB, table: Table, record: T): Promise<T> {
   const parsed = schemas[table].parse(record) as unknown as T;
   const before = await (d[table] as unknown as { get(id: string): Promise<T | undefined> }).get(parsed.id);
   await (d[table] as unknown as { put(v: T): Promise<unknown> }).put(parsed);

@@ -6,7 +6,7 @@ import { isTauri } from '../sync/backends';
 import { localKV } from '../sync/engine';
 
 export async function saveFile(name: string, data: string | ArrayBuffer, mime: string): Promise<string> {
-  const dir = localKV.get('colon.vault.dir');
+  const dir = localKV.get('aufwind.vault.dir');
   if (isTauri() && dir) {
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
     const { invoke } = await import('@tauri-apps/api/core');

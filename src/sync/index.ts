@@ -15,8 +15,8 @@ const setEngine = (e: SyncEngine | null) => { engine = e; listeners.forEach((l) 
 export const getEngine = () => engine;
 
 function deviceId() {
-  let id = localKV.get('colon.deviceId');
-  if (!id) { id = crypto.randomUUID(); localKV.set('colon.deviceId', id); }
+  let id = localKV.get('aufwind.deviceId');
+  if (!id) { id = crypto.randomUUID(); localKV.set('aufwind.deviceId', id); }
   return id;
 }
 async function deviceName() {
@@ -26,7 +26,7 @@ async function deviceName() {
 
 async function savedBackend(): Promise<VaultBackend | null> {
   if (isTauri()) {
-    const dir = localKV.get('colon.vault.dir');
+    const dir = localKV.get('aufwind.vault.dir');
     return dir ? new TauriBackend(dir) : null;
   }
   if (supportsFolderAccess()) {
@@ -65,13 +65,13 @@ export async function chooseFolder(preset?: string): Promise<void> {
     let dir = preset ?? null;
     if (!dir) {
       const { open } = await import('@tauri-apps/plugin-dialog');
-      const picked = await open({ directory: true, title: 'Where should Colón keep your data?', defaultPath: (await suggestedFolder()) ?? undefined });
+      const picked = await open({ directory: true, title: 'Where should Aufwind keep your data?', defaultPath: (await suggestedFolder()) ?? undefined });
       dir = typeof picked === 'string' ? picked : null;
     }
     if (!dir) return;
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('ensure_dir', { dir });
-    localKV.set('colon.vault.dir', dir);
+    localKV.set('aufwind.vault.dir', dir);
     await startWith(new TauriBackend(dir));
     return;
   }
@@ -92,7 +92,7 @@ export async function hasSavedFolderNeedingPermission() {
 }
 
 export async function openDataFolder() {
-  const dir = localKV.get('colon.vault.dir');
+  const dir = localKV.get('aufwind.vault.dir');
   if (!isTauri() || !dir) return;
   const { openPath } = await import('@tauri-apps/plugin-opener');
   await openPath(dir);

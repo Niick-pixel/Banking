@@ -2,13 +2,13 @@
  * Full JSON backup as a downloadable file (same format as the vault, so a
  * backup file can be dropped into a data folder too) and restore from a file.
  */
-import { db, type ColonDB } from '../db/db';
+import { db, type AufwindDB } from '../db/db';
 import { SYNCED_TABLES, emptySnapshot, parseVault, serializeVault, type Snapshot } from './vault';
 import { getEngine, APP_VERSION } from './index';
 import { restoredSnapshot } from './engine';
 import { localKV } from './engine';
 
-export async function snapshotOf(d: ColonDB = db): Promise<Snapshot> {
+export async function snapshotOf(d: AufwindDB = db): Promise<Snapshot> {
   const s = emptySnapshot();
   for (const t of SYNCED_TABLES) s.tables[t] = await d.table(t).toArray();
   s.tombstones = await d.tombstones.toArray();
@@ -16,7 +16,7 @@ export async function snapshotOf(d: ColonDB = db): Promise<Snapshot> {
 }
 
 export async function backupFileText(): Promise<string> {
-  return serializeVault(await snapshotOf(), { revision: 0, deviceId: localKV.get('colon.deviceId') ?? 'web', deviceName: 'manual backup', appVersion: APP_VERSION });
+  return serializeVault(await snapshotOf(), { revision: 0, deviceId: localKV.get('aufwind.deviceId') ?? 'web', deviceName: 'manual backup', appVersion: APP_VERSION });
 }
 
 /** Validates the file (format + checksum) before touching anything. */

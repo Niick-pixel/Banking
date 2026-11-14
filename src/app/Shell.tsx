@@ -49,7 +49,7 @@ export default function Shell() {
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="shell">
         <nav className="glass sidebar" aria-label="Main">
-          <div className="brand"><img src="/icon.svg" alt="" width={32} height={32} /><span>Colón</span></div>
+          <div className="brand"><img src="/icon.png" alt="" width={34} height={34} style={{ borderRadius: 9 }} /><span>Aufwind<small className="brand-tag">Rise on what you already have</small></span></div>
           <ul>
             {NAV.map((n) => (
               <li key={n.to}>
@@ -71,7 +71,7 @@ export default function Shell() {
         <main id="main" className="content">
           {isTauri() && !engine && !dismissed && (
             <div className="glass glass-strong" style={{ padding: 18, marginBottom: 18, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 240 }}><b>Where should Colón keep your data?</b><div className="small muted">Pick a folder in OneDrive so it's backed up and shared between your PCs.</div></div>
+              <div style={{ flex: 1, minWidth: 240 }}><b>Where should Aufwind keep your data?</b><div className="small muted">Pick a folder in OneDrive so it's backed up and shared between your PCs.</div></div>
               {suggest && <button className="btn btn-primary" onClick={() => void chooseFolder(suggest)}>Use {suggest}</button>}
               <button className="btn" onClick={() => void chooseFolder()}>Choose…</button>
               <button className="btn btn-ghost btn-sm" onClick={() => setDismissed(true)}>Later</button>

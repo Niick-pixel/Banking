@@ -8,10 +8,10 @@
 >    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = the contents of `updater-key-password.txt`
 >    Store both files offline too (password manager / USB). Never commit them.
 > 2. Merge the work into `main`, then publish a version: `git tag v0.3.0 && git push origin v0.3.0`.
-> 3. Download `Colon_0.3.0_x64-setup.exe` from the release → run → **More info → Run anyway** (unsigned) → pick `OneDrive\Colon` on first launch.
+> 3. Download `Aufwind_0.3.0_x64-setup.exe` from the release → run → **More info → Run anyway** (unsigned) → pick `OneDrive\Aufwind` on first launch.
 > 4. From then on, every new `v*` tag reaches the installed app on its own (checked at start and every 6 h).
 
-Goal: install Colón on Windows with a normal installer. It updates itself, and your data is a file in a folder you pick (inside OneDrive, Google Drive or Dropbox), so the cloud keeps it safe and you never depend on the browser's storage.
+Goal: install Aufwind on Windows with a normal installer. It updates itself, and your data is a file in a folder you pick (inside OneDrive, Google Drive or Dropbox), so the cloud keeps it safe and you never depend on the browser's storage.
 
 ## 1. Decisions
 
@@ -23,7 +23,7 @@ Goal: install Colón on Windows with a normal installer. It updates itself, and 
 | Update signing | Tauri updater key pair (Ed25519 / minisign) | Mandatory. Without the private key nobody, including someone who takes over the repo, can push an update your app will accept. The private key lives only in GitHub Actions secrets and an offline backup. |
 | Windows code signing | **Optional (decide later)** | Without it, SmartScreen says "Windows protected your PC → More info → Run anyway" on the *first* install. Updates aren't affected because they're verified by the updater key. Azure Trusted Signing costs ~US$10/month and removes the warning. |
 | Builds | GitHub Actions `windows-latest` runner | A Windows installer can't be built in this Linux sandbox. CI builds, signs and publishes on every `v*` tag. |
-| Data location | **A folder you choose** (e.g. `OneDrive\Colón\`) | See §3. |
+| Data location | **A folder you choose** (e.g. `OneDrive\Aufwind\`) | See §3. |
 
 > The repo is public, so release builds are public too. That's fine: the app contains **no data**. Your data only ever lives in your folder.
 
@@ -35,7 +35,7 @@ git tag v0.4.0 && git push --tags
         ▼
 GitHub Actions (windows-latest)
   1. npm ci && npm test            ← a money-logic test failure blocks the release
-  2. tauri build (NSIS)            → Colon_0.4.0_x64-setup.exe
+  2. tauri build (NSIS)            → Aufwind_0.4.0_x64-setup.exe
   3. sign update bundle            (TAURI_SIGNING_PRIVATE_KEY secret)
   4. create GitHub Release, upload .exe + .sig + latest.json
         │
@@ -47,7 +47,7 @@ Installed app on your PC
 ```
 
 Safety rules for updates:
-- **Data migrations are versioned and forward-only.** Before any update that changes the data format, the app writes `backups/pre-update-<version>-<date>.colon`.
+- **Data migrations are versioned and forward-only.** Before any update that changes the data format, the app writes `backups/pre-update-<version>-<date>.aufwind`.
 - Updates that fail the signature check are discarded and reported.
 - Channels: `stable` by default. An optional `beta` toggle in Settings uses a separate `latest-beta.json`.
 - "What's new" notes come from the release body.
@@ -59,17 +59,17 @@ Cloud sync clients (OneDrive, Google Drive, Dropbox) are **not** safe for a live
 **Working store vs. vault file**
 - The app works on a **local working database** in AppData (fast, never touched by sync).
 - After every change (debounced ~2 s) and on close, it writes a **vault file** to your folder:
-  `<your folder>/Colon/colon-data.colon`. This is one JSON document (optionally encrypted, see below) holding every record.
-- Writes are **atomic**: write `colon-data.colon.tmp` → flush → rename over the old file. The sync client only ever sees a complete file.
+  `<your folder>/Colon/aufwind-data.aufwind`. This is one JSON document (optionally encrypted, see below) holding every record.
+- Writes are **atomic**: write `aufwind-data.aufwind.tmp` → flush → rename over the old file. The sync client only ever sees a complete file.
 
 **Folder layout**
 ```
-OneDrive/Colon/
-  colon-data.colon            ← the vault (source of truth across devices)
+OneDrive/Aufwind/
+  aufwind-data.aufwind            ← the vault (source of truth across devices)
   backups/
-    2026-11-14.colon          ← daily snapshot, keeps 30 daily + 12 monthly
-    pre-update-0.4.0.colon
-    pre-import-<batch>.colon  ← before every Excel import
+    2026-11-14.aufwind          ← daily snapshot, keeps 30 daily + 12 monthly
+    pre-update-0.4.0.aufwind
+    pre-import-<batch>.aufwind  ← before every Excel import
   exports/                    ← XLSX/CSV/PDF you generate
   attachments/                ← receipt photos, by id
 ```
@@ -79,7 +79,7 @@ OneDrive/Colon/
 2. If the vault's `revision` is newer than the working DB (you used another PC), load it.
 3. If both changed since the last common revision, show a **conflict screen** instead of guessing: "This PC: 3 changes · Vault: 5 changes". Records merge by id and `updatedAt`. True conflicts (same record edited on both) are listed for you to pick.
 4. If the checksum fails (a truncated sync), fall back to the newest good backup and tell you.
-5. Sync "conflicted copy" files the cloud client creates (e.g. `colon-data (1).colon`) are detected and offered for merge.
+5. Sync "conflicted copy" files the cloud client creates (e.g. `aufwind-data (1).aufwind`) are detected and offered for merge.
 
 **Encryption (optional, recommended because the folder lives in a cloud)**
 - Password → PBKDF2-SHA256 (600k iterations) → AES-256-GCM via WebCrypto.
@@ -101,7 +101,7 @@ These slot in after the core ledger and import, because they wrap a working app.
 | D3 | Updater plugin + signing keys + `latest.json`. GitHub Actions release workflow. | Tag `v0.x.0-test` → installer on Releases → an older installed build updates itself. |
 | D4 | Conflict screen, conflicted-copy detection, pre-update/pre-import snapshots. | Simulated two-device edit merges correctly. |
 | D5 | Optional encryption + Windows Hello unlock, auto-lock. | Vault unreadable without the password; a wrong password never corrupts it. |
-| D6 | Polish: tray icon (quick add), start with Windows (optional), file association for `.colon`, code signing if you choose it. | |
+| D6 | Polish: tray icon (quick add), start with Windows (optional), file association for `.aufwind`, code signing if you choose it. | |
 
 ## 5. What you'll need to do (once)
 

@@ -1,12 +1,12 @@
 /**
  * The vault: one self-describing JSON file holding every synced record.
- * It lives in a folder you choose (e.g. OneDrive\Colon) and is the source of
+ * It lives in a folder you choose (e.g. OneDrive\Aufwind) and is the source of
  * truth across devices. Pure functions only. I/O lives in backends.ts.
  */
 
-export const VAULT_FORMAT = 'colon-vault';
+export const VAULT_FORMAT = 'aufwind-vault';
 export const VAULT_VERSION = 1;
-export const VAULT_FILE = 'colon-data.colon';
+export const VAULT_FILE = 'aufwind-data.aufwind';
 
 /** Tables that travel in the vault. The audit log, attachments and local settings stay on the device. */
 export const SYNCED_TABLES = [
@@ -68,8 +68,8 @@ export async function parseVault(text: string): Promise<VaultFile> {
   let raw: { header?: VaultHeader; data?: Snapshot };
   try { raw = JSON.parse(text); } catch { throw new VaultError('The data file is incomplete or damaged (not valid JSON). It may still be syncing.', 'corrupt'); }
   const h = raw.header;
-  if (!h || h.format !== VAULT_FORMAT || !raw.data) throw new VaultError('This is not a Colón data file.', 'format');
-  if (h.formatVersion > VAULT_VERSION) throw new VaultError(`This data file was written by a newer version of Colón (format ${h.formatVersion}). Update the app first.`, 'newer');
+  if (!h || h.format !== VAULT_FORMAT || !raw.data) throw new VaultError('This is not a Aufwind data file.', 'format');
+  if (h.formatVersion > VAULT_VERSION) throw new VaultError(`This data file was written by a newer version of Aufwind (format ${h.formatVersion}). Update the app first.`, 'newer');
   const sum = await sha256(canonical(raw.data));
   if (sum !== h.checksum) throw new VaultError('The data file failed its integrity check (checksum mismatch). It may be a partial sync.', 'corrupt');
   const data = emptySnapshot();
@@ -143,22 +143,22 @@ export function mergeSnapshots(local: Snapshot, remote: Snapshot, since: number,
 
 // ── Backup naming & retention ───────────────────────────────────────────────
 export const BACKUP_DIR = 'backups';
-export const dailyBackupName = (isoDate: string) => `${isoDate}.colon`;
-export const eventBackupName = (kind: 'pre-update' | 'pre-import' | 'pre-restore' | 'pre-merge' | 'corrupt', stamp: string) => `${kind}-${stamp}.colon`;
+export const dailyBackupName = (isoDate: string) => `${isoDate}.aufwind`;
+export const eventBackupName = (kind: 'pre-update' | 'pre-import' | 'pre-restore' | 'pre-merge' | 'corrupt', stamp: string) => `${kind}-${stamp}.aufwind`;
 
 /** Keep the newest 30 daily backups plus the first backup of each of the last 12 months; event backups: newest 20. */
 export function backupsToPrune(names: string[]): string[] {
-  const daily = names.filter((n) => /^\d{4}-\d{2}-\d{2}\.colon$/.test(n)).sort().reverse();
+  const daily = names.filter((n) => /^\d{4}-\d{2}-\d{2}\.aufwind$/.test(n)).sort().reverse();
   const keep = new Set(daily.slice(0, 30));
   const months = new Map<string, string>();
   for (const n of [...daily].reverse()) if (!months.has(n.slice(0, 7))) months.set(n.slice(0, 7), n);
   [...months.values()].sort().reverse().slice(0, 12).forEach((n) => keep.add(n));
   const events = names.filter((n) => /^(pre-|corrupt-)/.test(n)).sort().reverse();
   events.slice(0, 20).forEach((n) => keep.add(n));
-  return names.filter((n) => n.endsWith('.colon') && !keep.has(n));
+  return names.filter((n) => n.endsWith('.aufwind') && !keep.has(n));
 }
 
-/** OneDrive/Dropbox/Google Drive name their conflict copies like "colon-data-LAPTOP.colon" or "colon-data (1).colon". */
+/** OneDrive/Dropbox/Google Drive name their conflict copies like "aufwind-data-LAPTOP.aufwind" or "aufwind-data (1).aufwind". */
 export function isConflictedCopy(name: string): boolean {
-  return name !== VAULT_FILE && /^colon-data.*\.colon$/i.test(name) && !name.endsWith('.tmp');
+  return name !== VAULT_FILE && /^aufwind-data.*\.aufwind$/i.test(name) && !name.endsWith('.tmp');
 }

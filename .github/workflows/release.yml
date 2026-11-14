@@ -50,9 +50,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Colón ${{ github.ref_name }}'
+          releaseName: 'Aufwind ${{ github.ref_name }}'
           releaseBody: |
-            Install: download `Colon_*_x64-setup.exe` below and run it.
+            Install: download `Aufwind_*_x64-setup.exe` below and run it.
             Already installed? The app updates itself.
             Windows may say "Windows protected your PC" on the first install (the app isn't code-signed): click More info → Run anyway.
           releaseDraft: false

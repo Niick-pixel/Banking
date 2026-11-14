@@ -39,14 +39,14 @@ export default function Reports() {
     try {
       const nw = netWorthSeries({ accounts: l.accounts, snapshots: l.snapshots, transactions: l.transactions, debts: l.debts, installments: l.installments }, year, today);
       const buf = await buildWorkbook({ year, accounts: l.accounts, pots: l.pots, categories: l.categories, transactions: l.transactions, budgets: l.budgets, debts: l.debts, netWorth: nw });
-      setToast(`Saved ${await saveFile(`Colon_${year}.xlsx`, buf, XLSX_MIME)}`);
+      setToast(`Saved ${await saveFile(`Aufwind_${year}.xlsx`, buf, XLSX_MIME)}`);
     } catch (e) { setToast(`Export failed: ${e instanceof Error ? e.message : e}`); } finally { setBusy(''); }
   }
   async function exportCsv() {
     const inRange = l.transactions.filter((x) => (scope === 'year' || tab === 'year' ? x.date.startsWith(`${year}-`) : x.date.startsWith(mk)));
-    setToast(`Saved ${await saveFile(`Colon_${scope === 'year' || tab === 'year' ? year : mk}.csv`, transactionsCsv(inRange, l.accounts, l.pots, l.categories), 'text/csv')}`);
+    setToast(`Saved ${await saveFile(`Aufwind_${scope === 'year' || tab === 'year' ? year : mk}.csv`, transactionsCsv(inRange, l.accounts, l.pots, l.categories), 'text/csv')}`);
   }
-  async function exportJson() { setToast(`Saved ${await saveFile(`Colon_backup_${today}.colon`, await backupFileText(), 'application/json')}`); }
+  async function exportJson() { setToast(`Saved ${await saveFile(`Aufwind_backup_${today}.aufwind`, await backupFileText(), 'application/json')}`); }
 
   const monthPicker = (
     <>
@@ -107,7 +107,7 @@ export default function Reports() {
         )}
         {tab === 'where' && <WhereItWent year={year} month={scope === 'month' ? month : null} />}
       </div>
-      <p className="print-only small">Colón · generated {formatDateCR(today)}</p>
+      <p className="print-only small">Aufwind · generated {formatDateCR(today)}</p>
       {toast && <Toast message={toast} onDone={() => setToast('')} />}
     </>
   );

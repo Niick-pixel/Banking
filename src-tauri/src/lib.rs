@@ -1,5 +1,5 @@
-//! Colón desktop shell. The UI is the same React app as the web version; Rust
-//! only provides safe file access to the data folder you chose (e.g. OneDrive\Colon).
+//! Aufwind desktop shell. The UI is the same React app as the web version; Rust
+//! only provides safe file access to the data folder you chose (e.g. OneDrive\Aufwind).
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -129,21 +129,21 @@ fn ensure_dir(dir: String) -> Result<(), String> {
     fs::create_dir_all(p).map_err(|e| e.to_string())
 }
 
-/// Suggest %OneDrive%\Colon (personal OneDrive first), else Documents\Colon.
+/// Suggest %OneDrive%\Colon (personal OneDrive first), else Documents\Aufwind.
 #[tauri::command]
 fn suggest_data_dir() -> Option<String> {
     for var in ["OneDriveConsumer", "OneDrive", "OneDriveCommercial"] {
         if let Ok(root) = std::env::var(var) {
             let p = Path::new(&root);
             if p.is_dir() {
-                return Some(p.join("Colon").to_string_lossy().into_owned());
+                return Some(p.join("Aufwind").to_string_lossy().into_owned());
             }
         }
     }
     std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .ok()
-        .map(|h| Path::new(&h).join("Documents").join("Colon").to_string_lossy().into_owned())
+        .map(|h| Path::new(&h).join("Documents").join("Aufwind").to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -183,7 +183,7 @@ pub fn run() {
             device_name
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Colón");
+        .expect("error while running Aufwind");
 }
 
 #[cfg(test)]
@@ -191,7 +191,7 @@ mod tests {
     use super::*;
 
     fn tmpdir() -> PathBuf {
-        let d = std::env::temp_dir().join(format!("colon-test-{}-{}", std::process::id(), rand_suffix()));
+        let d = std::env::temp_dir().join(format!("aufwind-test-{}-{}", std::process::id(), rand_suffix()));
         fs::create_dir_all(&d).unwrap();
         d
     }
@@ -206,24 +206,24 @@ mod tests {
         assert!(safe_join(&dir, "../evil").is_err());
         assert!(safe_join(&dir, "backups/../../x").is_err());
         assert!(safe_join("relative", "x").is_err());
-        assert!(safe_join(&dir, "backups/2026-11-14.colon").is_ok());
+        assert!(safe_join(&dir, "backups/2026-11-14.aufwind").is_ok());
     }
 
     #[test]
     fn atomic_write_roundtrip_and_list() {
         let d = tmpdir();
         let dir = d.to_string_lossy().to_string();
-        vault_write_atomic(dir.clone(), "colon-data.colon".into(), "one".into()).unwrap();
-        vault_write_atomic(dir.clone(), "colon-data.colon".into(), "two".into()).unwrap();
-        assert_eq!(vault_read(dir.clone(), "colon-data.colon".into()).unwrap().as_deref(), Some("two"));
-        vault_write_atomic(dir.clone(), "backups/a.colon".into(), "b".into()).unwrap();
-        assert_eq!(vault_list(dir.clone(), "".into()).unwrap(), vec!["colon-data.colon".to_string()]);
-        assert_eq!(vault_list(dir.clone(), "backups".into()).unwrap(), vec!["a.colon".to_string()]);
-        vault_move(dir.clone(), "colon-data.colon".into(), "backups/moved.colon".into()).unwrap();
-        assert_eq!(vault_read(dir.clone(), "colon-data.colon".into()).unwrap(), None);
+        vault_write_atomic(dir.clone(), "aufwind-data.aufwind".into(), "one".into()).unwrap();
+        vault_write_atomic(dir.clone(), "aufwind-data.aufwind".into(), "two".into()).unwrap();
+        assert_eq!(vault_read(dir.clone(), "aufwind-data.aufwind".into()).unwrap().as_deref(), Some("two"));
+        vault_write_atomic(dir.clone(), "backups/a.aufwind".into(), "b".into()).unwrap();
+        assert_eq!(vault_list(dir.clone(), "".into()).unwrap(), vec!["aufwind-data.aufwind".to_string()]);
+        assert_eq!(vault_list(dir.clone(), "backups".into()).unwrap(), vec!["a.aufwind".to_string()]);
+        vault_move(dir.clone(), "aufwind-data.aufwind".into(), "backups/moved.aufwind".into()).unwrap();
+        assert_eq!(vault_read(dir.clone(), "aufwind-data.aufwind".into()).unwrap(), None);
         vault_write_bytes(dir.clone(), "exports/x.xlsx".into(), vec![0, 159, 146, 150]).unwrap();
         assert_eq!(fs::read(d.join("exports/x.xlsx")).unwrap(), vec![0, 159, 146, 150]);
-        vault_delete(dir.clone(), "backups/moved.colon".into()).unwrap();
-        assert_eq!(vault_list(dir, "backups".into()).unwrap(), vec!["a.colon".to_string()]);
+        vault_delete(dir.clone(), "backups/moved.aufwind".into()).unwrap();
+        assert_eq!(vault_list(dir, "backups".into()).unwrap(), vec!["a.aufwind".to_string()]);
     }
 }

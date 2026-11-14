@@ -1,4 +1,4 @@
-# Colón: build plan, decisions, workbook findings, open questions
+# Aufwind: build plan, decisions, workbook findings, open questions
 
 Status: **Phases 1–7 are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 

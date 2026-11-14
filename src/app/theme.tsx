@@ -15,17 +15,17 @@ function load<T extends string>(key: string, fallback: T): T {
 function save(key: string, v: string) { try { localStorage.setItem(key, v); } catch { /* private mode */ } }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<ThemePref>(() => load('colon.theme', 'auto'));
-  const [transparency, setTransparency] = useState<TransparencyPref>(() => load('colon.transparency', 'auto'));
+  const [theme, setTheme] = useState<ThemePref>(() => load('aufwind.theme', 'auto'));
+  const [transparency, setTransparency] = useState<TransparencyPref>(() => load('aufwind.transparency', 'auto'));
   useEffect(() => {
     const el = document.documentElement;
     if (theme === 'auto') el.removeAttribute('data-theme'); else el.setAttribute('data-theme', theme);
-    save('colon.theme', theme);
+    save('aufwind.theme', theme);
   }, [theme]);
   useEffect(() => {
     const el = document.documentElement;
     if (transparency === 'reduced') el.setAttribute('data-transparency', 'reduced'); else el.removeAttribute('data-transparency');
-    save('colon.transparency', transparency);
+    save('aufwind.transparency', transparency);
   }, [transparency]);
   return <Ctx.Provider value={{ theme, setTheme, transparency, setTransparency }}>{children}</Ctx.Provider>;
 }

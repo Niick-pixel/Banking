@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ColonDB } from '../db/db';
+import { AufwindDB } from '../db/db';
 import { MemoryBackend } from './backends';
 import { SyncEngine, type KV } from './engine';
 import { VAULT_FILE } from './vault';
@@ -10,7 +10,7 @@ const memKV = (): KV => { const m = new Map<string, string>(); return { get: (k)
 let n = 0;
 const engines: SyncEngine[] = [];
 async function device(name: string, backend: MemoryBackend, clock: { t: number }) {
-  const db = new ColonDB(`sync-${name}-${++n}`);
+  const db = new AufwindDB(`sync-${name}-${++n}`);
   await db.open();
   const e = new SyncEngine(db, backend, { deviceId: name, deviceName: name, appVersion: 'test', kv: memKV(), now: () => clock.t, debounceMs: 60_000 });
   engines.push(e);
@@ -77,10 +77,10 @@ describe('vault sync between two devices', () => {
     await pc.db.transactions.add(expense('new', 2, clock.t));
     await pc.e.syncNow();
     const backups = await pc.e.listBackups();
-    expect(backups).toContain('2026-11-15.colon');
+    expect(backups).toContain('2026-11-15.aufwind');
     const laptop = await device('laptop', cloud, clock);
     clock.t += 1000;
-    await pc.e.restore('2026-11-15.colon'); // contains only "old"
+    await pc.e.restore('2026-11-15.aufwind'); // contains only "old"
     await laptop.e.syncNow();
     expect((await laptop.db.transactions.toArray()).map((t) => t.id)).toEqual(['old']);
     expect((await pc.e.listBackups()).some((b) => b.startsWith('pre-restore'))).toBe(true);
@@ -98,10 +98,10 @@ describe('vault sync between two devices', () => {
     await o.db.accounts.add(account('c', 'checking'));
     await o.db.transactions.add(expense('b', 2, 1500));
     await o.e.syncNow();
-    cloud.files.set('colon-data-LAPTOP.colon', other.files.get(VAULT_FILE)!);
+    cloud.files.set('aufwind-data-LAPTOP.aufwind', other.files.get(VAULT_FILE)!);
     await pc.e.syncNow();
-    expect(pc.e.status.conflictedCopies).toEqual(['colon-data-LAPTOP.colon']);
-    await pc.e.mergeConflictedCopy('colon-data-LAPTOP.colon');
+    expect(pc.e.status.conflictedCopies).toEqual(['aufwind-data-LAPTOP.aufwind']);
+    await pc.e.mergeConflictedCopy('aufwind-data-LAPTOP.aufwind');
     expect((await pc.db.transactions.toArray()).map((t) => t.id).sort()).toEqual(['a', 'b']);
     expect(pc.e.status.conflictedCopies).toEqual([]);
   });

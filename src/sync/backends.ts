@@ -8,7 +8,7 @@ import { BACKUP_DIR, VAULT_FILE } from './vault';
 
 export interface VaultBackend {
   kind: 'tauri' | 'folder' | 'memory';
-  /** Human-readable location, e.g. C:\Users\you\OneDrive\Colon */
+  /** Human-readable location, e.g. C:\Users\you\OneDrive\Aufwind */
   label: string;
   readMain(): Promise<string | null>;
   /** Must be atomic: readers see the old file or the new file, never half of one. */
@@ -72,7 +72,7 @@ export class FolderBackend implements VaultBackend {
   constructor(readonly dir: DirHandle) {}
   get label() { return this.dir.name; }
   static async pick(): Promise<FolderBackend> {
-    const dir = await (window as unknown as { showDirectoryPicker(o: object): Promise<DirHandle> }).showDirectoryPicker({ id: 'colon-data', mode: 'readwrite' });
+    const dir = await (window as unknown as { showDirectoryPicker(o: object): Promise<DirHandle> }).showDirectoryPicker({ id: 'aufwind-data', mode: 'readwrite' });
     return new FolderBackend(dir);
   }
   async ensurePermission(): Promise<boolean> {

@@ -58,18 +58,18 @@ describe('merge', () => {
 describe('backups', () => {
   it('retention keeps 30 daily + monthly firsts + 20 events', () => {
     const names: string[] = [];
-    for (let i = 0; i < 400; i++) { const d = new Date(Date.UTC(2026, 0, 1) + i * 86_400_000); names.push(`${d.toISOString().slice(0, 10)}.colon`); }
-    for (let i = 0; i < 25; i++) names.push(`pre-update-2026-01-${String(i + 1).padStart(2, '0')}.colon`);
+    for (let i = 0; i < 400; i++) { const d = new Date(Date.UTC(2026, 0, 1) + i * 86_400_000); names.push(`${d.toISOString().slice(0, 10)}.aufwind`); }
+    for (let i = 0; i < 25; i++) names.push(`pre-update-2026-01-${String(i + 1).padStart(2, '0')}.aufwind`);
     const prune = new Set(backupsToPrune(names));
     const kept = names.filter((n) => !prune.has(n));
     expect(kept.filter((n) => n.startsWith('pre-'))).toHaveLength(20);
     expect(kept.filter((n) => /^\d/.test(n)).length).toBeLessThanOrEqual(42);
-    expect(kept).toContain('2027-02-04.colon'); // newest
-    expect(kept).toContain('2026-06-01.colon'); // a month's first, within 12 months
+    expect(kept).toContain('2027-02-04.aufwind'); // newest
+    expect(kept).toContain('2026-06-01.aufwind'); // a month's first, within 12 months
   });
   it('recognises OneDrive conflict copies', () => {
-    expect(isConflictedCopy('colon-data-LAPTOP-7.colon')).toBe(true);
-    expect(isConflictedCopy('colon-data (1).colon')).toBe(true);
-    expect(isConflictedCopy('colon-data.colon')).toBe(false);
+    expect(isConflictedCopy('aufwind-data-LAPTOP-7.aufwind')).toBe(true);
+    expect(isConflictedCopy('aufwind-data (1).aufwind')).toBe(true);
+    expect(isConflictedCopy('aufwind-data.aufwind')).toBe(false);
   });
 });

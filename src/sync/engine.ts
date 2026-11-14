@@ -10,7 +10,7 @@
  *   vault changed elsewhere    → not dirty: load it · dirty: merge, then write
  * Before the first write each day the previous vault is copied to backups/.
  */
-import type { ColonDB } from '../db/db';
+import type { AufwindDB } from '../db/db';
 import type { VaultBackend } from './backends';
 import {
   SYNCED_TABLES, VaultError, backupsToPrune, dailyBackupName, emptySnapshot, eventBackupName, isConflictedCopy,
@@ -51,17 +51,17 @@ export class SyncEngine {
   private listeners = new Set<(s: SyncStatus) => void>();
   status: SyncStatus;
 
-  constructor(private db: ColonDB, private backend: VaultBackend, private opts: EngineOptions) {
+  constructor(private db: AufwindDB, private backend: VaultBackend, private opts: EngineOptions) {
     this.kv = opts.kv ?? localKV;
     this.now = opts.now ?? Date.now;
     this.status = { phase: 'idle', location: backend.label, conflicts: [], conflictedCopies: [], dirty: this.dirty };
   }
 
   // ── state ────────────────────────────────────────────────────────────────
-  private get state(): SyncState | null { const s = this.kv.get('colon.sync.state'); return s ? JSON.parse(s) : null; }
-  private set state(s: SyncState | null) { this.kv.set('colon.sync.state', JSON.stringify(s)); }
-  get dirty() { return this.kv.get('colon.sync.dirty') === '1'; }
-  private set dirty(v: boolean) { this.kv.set('colon.sync.dirty', v ? '1' : '0'); }
+  private get state(): SyncState | null { const s = this.kv.get('aufwind.sync.state'); return s ? JSON.parse(s) : null; }
+  private set state(s: SyncState | null) { this.kv.set('aufwind.sync.state', JSON.stringify(s)); }
+  get dirty() { return this.kv.get('aufwind.sync.dirty') === '1'; }
+  private set dirty(v: boolean) { this.kv.set('aufwind.sync.dirty', v ? '1' : '0'); }
   private emit(p: Partial<SyncStatus>) { this.status = { ...this.status, ...p, dirty: this.dirty }; this.listeners.forEach((l) => l(this.status)); }
   subscribe(fn: (s: SyncStatus) => void) { this.listeners.add(fn); fn(this.status); return () => this.listeners.delete(fn); }
 
@@ -97,14 +97,14 @@ export class SyncEngine {
 
   /** Deletions are written to localStorage synchronously, then into the DB, so none is lost on a crash. */
   private addPendingTomb(t: { table: string; id: string; at: number }) {
-    const list = JSON.parse(this.kv.get('colon.sync.pendingTombs') ?? '[]');
-    list.push(t); this.kv.set('colon.sync.pendingTombs', JSON.stringify(list));
+    const list = JSON.parse(this.kv.get('aufwind.sync.pendingTombs') ?? '[]');
+    list.push(t); this.kv.set('aufwind.sync.pendingTombs', JSON.stringify(list));
   }
   private async flushPendingTombs() {
-    const list = JSON.parse(this.kv.get('colon.sync.pendingTombs') ?? '[]');
+    const list = JSON.parse(this.kv.get('aufwind.sync.pendingTombs') ?? '[]');
     if (!list.length) return;
     await this.db.tombstones.bulkPut(list);
-    this.kv.set('colon.sync.pendingTombs', '[]');
+    this.kv.set('aufwind.sync.pendingTombs', '[]');
   }
 
   markDirty() {
@@ -208,7 +208,7 @@ export class SyncEngine {
     return name;
   }
 
-  listBackups() { return this.backend.listBackups().then((l) => l.filter((n) => n.endsWith('.colon')).sort().reverse()); }
+  listBackups() { return this.backend.listBackups().then((l) => l.filter((n) => n.endsWith('.aufwind')).sort().reverse()); }
 
   /**
    * Make a backup the truth on every device: records are re-stamped "now" so they

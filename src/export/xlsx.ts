@@ -40,7 +40,7 @@ export function workbookRows(t: Transaction): { type: 'Income' | 'Expense' | 'Sa
 export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
   const ExcelJS = (await import('exceljs')).default as typeof ExcelJSNS;
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Colón';
+  wb.creator = 'Aufwind';
   wb.created = new Date();
   const cats = new Map(inp.categories.map((c) => [c.id, c]));
   const accName = (id: string) => inp.accounts.find((a) => a.id === id)?.name ?? '?';
@@ -49,7 +49,7 @@ export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
 
   // ── Setup ────────────────────────────────────────────────────────────────
   const setup = wb.addWorksheet('Setup');
-  setup.getCell('A1').value = 'SETUP — CATEGORIES & GROUPS (exported from Colón)';
+  setup.getCell('A1').value = 'SETUP — CATEGORIES & GROUPS (exported from Aufwind)';
   setup.getCell('A1').font = { bold: true, size: 14 };
   setup.getRow(3).values = ['CATEGORY', 'GROUP'];
   setup.getRow(3).font = { bold: true };
@@ -58,7 +58,7 @@ export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
 
   // ── Transactions (month blocks) ──────────────────────────────────────────
   const tx = wb.addWorksheet('Transactions', { properties: { outlineLevelRow: 1 } });
-  tx.getCell('A1').value = 'TRANSACTION LEDGER (exported from Colón)';
+  tx.getCell('A1').value = 'TRANSACTION LEDGER (exported from Aufwind)';
   tx.getCell('A1').font = { bold: true, size: 14 };
   tx.getRow(4).values = ['DATE (optional)', 'MONTH', 'TYPE', 'CATEGORY', 'DESCRIPTION', 'AMOUNT (₡)'];
   tx.getRow(4).font = { bold: true };
@@ -94,7 +94,7 @@ export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
   // ── Tracker (live formulas over Transactions) ────────────────────────────
   const t = computeTracker(inp.year, inp.transactions.filter((x) => x.currency === 'CRC'), inp.categories, inp.budgets, { accountType: (id) => inp.accounts.find((a) => a.id === id)?.type });
   const tr = wb.addWorksheet(`${inp.year} Tracker`, { views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }] });
-  tr.getCell('A1').value = `${inp.year} PERSONAL FINANCES (exported from Colón)`;
+  tr.getCell('A1').value = `${inp.year} PERSONAL FINANCES (exported from Aufwind)`;
   tr.getCell('A1').font = { bold: true, size: 14 };
   tr.getColumn(1).width = 34; tr.getColumn(2).width = 16;
   for (let c = 3; c <= 16; c++) tr.getColumn(c).width = 14;
@@ -156,7 +156,7 @@ export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
 
   // ── Net Worth ────────────────────────────────────────────────────────────
   const nw = wb.addWorksheet('Net Worth');
-  nw.getCell('A1').value = 'NET WORTH — MONTH-END BALANCES (exported from Colón; S = statement, otherwise ledger)';
+  nw.getCell('A1').value = 'NET WORTH — MONTH-END BALANCES (exported from Aufwind; S = statement, otherwise ledger)';
   nw.getCell('A1').font = { bold: true, size: 14 };
   nw.getRow(4).values = ['ACCOUNT', ...MONTHS];
   nw.getRow(4).font = { bold: true };
@@ -184,7 +184,7 @@ export async function buildWorkbook(inp: ExportInput): Promise<ArrayBuffer> {
 
   // ── Debts ────────────────────────────────────────────────────────────────
   const ds = wb.addWorksheet('Debts');
-  ds.getCell('A1').value = 'DEBTS (exported from Colón)';
+  ds.getCell('A1').value = 'DEBTS (exported from Aufwind)';
   ds.getCell('A1').font = { bold: true, size: 14 };
   ds.getRow(4).values = ['DEBT / CREDITOR', 'CCY', 'ORIGINAL', 'BALANCE NOW', 'ANNUAL RATE', 'MONTHLY PAYMENT', 'NOTES'];
   ds.getRow(4).font = { bold: true };

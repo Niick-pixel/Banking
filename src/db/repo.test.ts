@@ -1,15 +1,15 @@
 import 'fake-indexeddb/auto';
 import { existsSync, readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ColonDB } from './db';
+import { AufwindDB } from './db';
 import { commitImport, deleteTransaction, lastAuditId, postDueCuotas, saveInstallmentPlan, saveTransaction, undoAudit, undoImport, UndoBlockedError } from './repo';
 import { parseWorkbook } from '../import/workbook';
 import { gridFromXlsx } from '../import/grid';
 import { account, crc, tx } from '../test/factories';
 
-let d: ColonDB;
+let d: AufwindDB;
 let n = 0;
-beforeEach(async () => { d = new ColonDB(`test-${++n}`); await d.open(); });
+beforeEach(async () => { d = new AufwindDB(`test-${++n}`); await d.open(); });
 
 describe('repo', () => {
   it('rejects invalid transactions and audits valid ones; undo restores', async () => {

@@ -40,7 +40,7 @@ export default function Dashboard() {
   const [inc, exp, axis, grid, c1] = useCssVar(['--chart-income', '--chart-expense', '--chart-axis', '--chart-grid', '--chart-1']);
 
   if (l.ready && !l.accounts.length) {
-    return (<><PageHeader title="Colón" /><Empty title="Welcome"><p className="muted" style={{ margin: 0 }}>Import your workbook to see your month at a glance.</p><Link className="btn btn-primary" to="/import">Import workbook</Link></Empty></>);
+    return (<><PageHeader title="Aufwind" sub="Rise on what you already have." /><Empty title="Welcome"><p className="muted" style={{ margin: 0 }}>Import your workbook to see your month at a glance.</p><Link className="btn btn-primary" to="/import">Import workbook</Link></Empty></>);
   }
 
   // Last 6 months with any data, ending at the selected month.

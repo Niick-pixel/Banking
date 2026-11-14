@@ -1,4 +1,8 @@
-# Colón
+# Aufwind
+
+> **Rise on what you already have.**
+
+*Aufwind* (German: updraft) is the rising air a glider climbs on without an engine. The app helps you get ahead with the money you already have: seeing it clearly, never counting it twice, and steadily building room to breathe.
 
 A local-first personal finance and banking tracker for Costa Rica (CRC/USD, quincenas, aguinaldo, Asociación Solidarista), with a liquid-glass UI. It replaces a hand-built Excel workbook.
 
@@ -20,7 +24,7 @@ npm test
 
 ## Windows app
 
-The desktop app (Tauri) keeps your data in one file, `colon-data.colon`, in a folder you choose (OneDrive recommended), and updates itself from GitHub Releases. See [`docs/DESKTOP_PLAN.md`](docs/DESKTOP_PLAN.md).
+The desktop app (Tauri) keeps your data in one file, `aufwind-data.aufwind`, in a folder you choose (OneDrive recommended), and updates itself from GitHub Releases. See [`docs/DESKTOP_PLAN.md`](docs/DESKTOP_PLAN.md).
 
 ```bash
 npm run desktop:dev      # needs Rust; on Windows also WebView2 (preinstalled on Win 10/11)

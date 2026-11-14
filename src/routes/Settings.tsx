@@ -22,7 +22,7 @@ export const ago = (ms?: number) => {
 };
 
 function backupLabel(n: string) {
-  const m = /^(\d{4}-\d{2}-\d{2})\.colon$/.exec(n);
+  const m = /^(\d{4}-\d{2}-\d{2})\.aufwind$/.exec(n);
   if (m) return `Daily · ${m[1]!.split('-').reverse().join('/')}`;
   const e = /^(pre-update|pre-import|pre-restore|pre-merge|merged|corrupt)-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})/.exec(n);
   if (e) return `${{ 'pre-update': 'Before update', 'pre-import': 'Before import', 'pre-restore': 'Before restore', 'pre-merge': 'Before merge', merged: 'Merged copy', corrupt: 'Damaged copy' }[e[1]!]} · ${e[2]!.split('-').reverse().join('/')} ${e[3]}:${e[4]} UTC`;
@@ -50,14 +50,14 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Settings" sub={`Colón ${APP_VERSION}${isTauri() ? ' · Windows app' : ' · web'}`} />
+      <PageHeader title="Settings" sub={`Aufwind ${APP_VERSION}${isTauri() ? ' · Windows app' : ' · web'}`} />
       {msg && <Glass strong pad={14} style={{ marginBottom: 16 }} role="status">{msg}</Glass>}
 
       <div style={{ display: 'grid', gap: 16 }}>
         <Glass strong style={{ display: 'grid', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Data folder</h2>
           <p className="muted small" style={{ margin: 0 }}>
-            Your data is saved as one file, <code>colon-data.colon</code>, in a folder you choose. Put it in OneDrive and it's backed up and shared between your PCs. Daily backups live in its <code>backups</code> subfolder.
+            Your data is saved as one file, <code>aufwind-data.aufwind</code>, in a folder you choose. Put it in OneDrive and it's backed up and shared between your PCs. Daily backups live in its <code>backups</code> subfolder.
           </p>
           {!engine && !needsPerm && (
             isTauri() || supportsFolderAccess() ? (
@@ -112,7 +112,7 @@ export default function Settings() {
         {isTauri() && (
           <Glass strong style={{ display: 'grid', gap: 10 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>Updates</h2>
-            <p className="muted small" style={{ margin: 0 }}>Colón checks for updates on start and every 6 hours. Updates are signed; anything that fails the signature check is discarded. Your data is backed up before installing.</p>
+            <p className="muted small" style={{ margin: 0 }}>Aufwind checks for updates on start and every 6 hours. Updates are signed; anything that fails the signature check is discarded. Your data is backed up before installing.</p>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn" disabled={upd === 'checking'} onClick={async () => { setUpd('checking'); try { setUpd((await checkForUpdate()) ?? 'none'); } catch (e) { setUpd(null); setMsg(`Update check failed: ${e}`); } }}>Check now</button>
               {upd === 'none' && <Pill tone="income">You're on the latest version</Pill>}
@@ -145,8 +145,8 @@ export default function Settings() {
           <h2 style={{ margin: 0, fontSize: 18 }}>Backup file</h2>
           <p className="muted small" style={{ margin: 0 }}>A complete copy of your data in one file, the same format as the data folder. Restoring replaces the data on every synced device; your current data is backed up first when a folder is set.</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => void run('Backup saved', async () => saveFile(`Colon_backup_${todayISO()}.colon`, await backupFileText(), 'application/json'))}>Download backup</button>
-            <label className="btn">Restore from file…<input type="file" accept=".colon,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => restoreFromFileText(await f.text())); e.target.value = ''; }} /></label>
+            <button className="btn" onClick={() => void run('Backup saved', async () => saveFile(`Aufwind_backup_${todayISO()}.aufwind`, await backupFileText(), 'application/json'))}>Download backup</button>
+            <label className="btn">Restore from file…<input type="file" accept=".aufwind,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm(`Replace all current data with "${f.name}"?`)) void run('Restored from file', async () => restoreFromFileText(await f.text())); e.target.value = ''; }} /></label>
           </div>
         </Glass>
 
