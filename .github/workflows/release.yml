@@ -2,7 +2,9 @@
 # manifest (latest.json), to GitHub Releases.
 #
 #   1. bump "version" in package.json (and src-tauri/Cargo.toml)
-#   2. git tag v0.4.0 && git push --tags
+#   2. either push a tag (git tag v0.4.0 && git push --tags)
+#      or run this workflow from the Actions tab on main: the tag v<version>
+#      is then created on that commit by the release step.
 #
 # Requires repository secrets TAURI_SIGNING_PRIVATE_KEY and
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD (see docs/DESKTOP_PLAN.md).
@@ -49,8 +51,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Aufwind ${{ github.ref_name }}'
+          # __VERSION__ = the app version from package.json, so the tag is always v<version>
+          # whether this run came from a pushed tag or from "Run workflow".
+          tagName: v__VERSION__
+          releaseName: 'Aufwind v__VERSION__'
           releaseBody: |
             Install: download `Aufwind_*_x64-setup.exe` below and run it.
             Already installed? The app updates itself.
