@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLedger } from '../app/data';
 import { useQuickAdd } from '../app/QuickAdd';
 import { Money, Pill } from '../design/components';
@@ -20,16 +20,22 @@ const KIND_LABEL: Record<Transaction['kind'], string> = {
 export default function Transactions() {
   const l = useLedger();
   const qa = useQuickAdd();
+  // Filters can arrive in the URL from a chart click: ?month=2026-11&group=Living, ?date=2026-11-03, ?kind=income
+  const [params, setParams] = useSearchParams();
+  const pMonth = params.get('month') ?? '', pDate = params.get('date') ?? '', pGroup = params.get('group') ?? '';
   const [q, setQ] = useState('');
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useState(params.get('kind') ?? '');
   const [acc, setAcc] = useState('');
-  const [cat, setCat] = useState('');
+  const [cat, setCat] = useState(params.get('cat') ?? '');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
 
   const filtered = useMemo(() => l.transactions.filter((t) => {
     if (kind && t.kind !== kind) return false;
+    if (pDate && t.date !== pDate) return false;
+    if (pMonth && !t.date.startsWith(pMonth)) return false;
+    if (pGroup && !('categoryId' in t && t.categoryId && l.category.get(t.categoryId)?.group === pGroup)) return false;
     if (acc && !(('from' in t && t.from.accountId === acc) || ('to' in t && t.to.accountId === acc) || (t.kind === 'adjustment' && t.side.accountId === acc))) return false;
     if (cat && !('categoryId' in t && t.categoryId === cat) && !(t.kind === 'expense' && t.splits?.some((s) => s.categoryId === cat))) return false;
     if (q) {
@@ -38,7 +44,7 @@ export default function Transactions() {
       if (!`${t.description} ${t.notes} ${c} ${t.tags.join(' ')}`.toLowerCase().includes(s)) return false;
     }
     return true;
-  }), [l, q, kind, acc, cat]);
+  }), [l, q, kind, acc, cat, pDate, pMonth, pGroup]);
 
   const months = useMemo(() => {
     const m = new Map<string, Transaction[]>();
@@ -87,6 +93,16 @@ export default function Transactions() {
       <PageHeader title="Transactions" sub={`${filtered.length} of ${l.transactions.length} movements`}>
         <button className="btn btn-primary" onClick={() => qa.open()}>+ Add <kbd className="small" style={{ opacity: .7 }}>N</kbd></button>
       </PageHeader>
+
+      {(pDate || pMonth || pGroup) && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+          <span className="small muted">From a chart:</span>
+          {pDate && <span className="chip" aria-pressed>Day {formatDateCR(pDate)}</span>}
+          {pMonth && <span className="chip" aria-pressed>{pMonth.split('-').reverse().join('/')}</span>}
+          {pGroup && <span className="chip" aria-pressed>{pGroup}</span>}
+          <button className="btn btn-sm btn-ghost" onClick={() => { setParams({}, { replace: true }); setKind(''); setCat(''); }}>Clear ✕</button>
+        </div>
+      )}
 
       <div className="glass" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 16 }}>
         <input className="input" type="search" placeholder="Search description, notes, category…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />

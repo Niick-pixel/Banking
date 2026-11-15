@@ -34,6 +34,8 @@ export interface FxPrefs {
 export const DASH_CARDS: { id: string; label: string }[] = [
   { id: 'insights', label: 'What happened' },
   { id: 'upcoming', label: 'Coming up (30 days)' },
+  { id: 'waterfall', label: 'Where the month’s money went (waterfall)' },
+  { id: 'pace', label: 'Spending pace' },
   { id: 'flow', label: 'Income vs expenses' },
   { id: 'groups', label: 'Spending by group' },
   { id: 'where', label: 'Where it went' },
@@ -41,5 +43,6 @@ export const DASH_CARDS: { id: string; label: string }[] = [
   { id: 'freecash', label: 'Free cash by month' },
   { id: 'networth', label: 'Net worth' },
   { id: 'debts', label: 'Debts' },
+  { id: 'calendar', label: 'Daily spending calendar' },
 ];
 export type PrefKey = keyof typeof PREF_DEFAULTS;

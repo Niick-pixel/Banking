@@ -5,13 +5,13 @@ import { useCssVar } from '../../app/theme';
 import { formatMoney, type Minor } from '../../lib/money';
 import { Segmented } from '.';
 
-const fmt = (v: number) => formatMoney(v as Minor, 'CRC');
-const fmtShort = (v: number) => {
+export const fmt = (v: number) => formatMoney(v as Minor, 'CRC');
+export const fmtShort = (v: number) => {
   const c = v / 100;
   return Math.abs(c) >= 1e6 ? `₡${(c / 1e6).toFixed(1)}M` : `₡${Math.round(c / 1000)}k`;
 };
 
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+export function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="glass glass-strong" style={{ padding: '10px 14px', borderRadius: 14, fontSize: 13 }}>
@@ -28,7 +28,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 /** Every chart ships a table view: screen readers and CVD readers get the exact numbers. */
-function DataTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: (string | number)[][] }) {
+export function DataTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: (string | number)[][] }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
       <caption style={{ textAlign: 'left', color: 'var(--text-2)', paddingBottom: 8 }}>{caption}</caption>
@@ -73,7 +73,7 @@ export function IncomeExpenseChart({ data, title }: { data: MonthFlow[]; title: 
   );
 }
 
-export interface Slice { name: string; value: number }
+export interface Slice { name: string; value: number; /** Fixed categorical slot, so a group keeps its color when others are empty. */ slot?: number }
 
 export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
@@ -94,7 +94,7 @@ export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={data} dataKey="value" nameKey="name" innerRadius="66%" outerRadius="100%" paddingAngle={1.5} cornerRadius={4} stroke={surface} strokeWidth={2} isAnimationActive={false}>
-                  {data.map((d, i) => <Cell key={d.name} fill={colors[i % colors.length]} />)}
+                  {data.map((d, i) => <Cell key={d.name} fill={colors[(d.slot ?? i) % colors.length]} />)}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
               </PieChart>
@@ -106,7 +106,7 @@ export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
           <ul aria-label={title} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
             {data.map((d, i) => (
               <li key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-                <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: colors[i % colors.length], flex: 'none' }} />
+                <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: colors[(d.slot ?? i) % colors.length], flex: 'none' }} />
                 <span style={{ color: 'var(--text-2)' }}>{d.name}</span>
                 <span className="money" style={{ marginLeft: 'auto', fontWeight: 600 }}>{Math.round((d.value / total) * 100)}%</span>
               </li>

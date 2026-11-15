@@ -16,6 +16,8 @@ import { formatMoney } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
+import { MonthWaterfall, SpendingCalendar, SpendingPace } from '../design/components/insightCharts';
+import { SPEND_GROUPS, cumulative, dailySpending, monthWaterfall } from '../domain/spending';
 
 const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
@@ -47,11 +49,18 @@ export default function Dashboard() {
     return (<><PageHeader title="Aufwind" sub="Rise on what you already have." /><Empty title="Welcome"><p className="muted" style={{ margin: 0 }}>Import your workbook to see your month at a glance.</p><Link className="btn btn-primary" to="/import">Import workbook</Link></Empty></>);
   }
 
+  // Insight charts: daily spending for the calendar (30 weeks) and the pace lines (this + last month).
+  const daysIn = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+  const dim = daysIn(mk);
+  const paceDay = mk === today.slice(0, 7) ? Number(today.slice(8, 10)) : mk < today.slice(0, 7) ? dim : 0;
+  const daily = dailySpending(l.transactions, `${shift(today.slice(0, 7), -13)}-01`, today);
+  const spendBudget = l.categories.filter((c) => SPEND_GROUPS.includes(c.group as (typeof SPEND_GROUPS)[number])).reduce((s, c) => s + budgetFor(l.budgets, c.id, mk), 0);
+
   // Last 6 months with any data, ending at the selected month.
   const months = Array.from({ length: 6 }, (_, i) => shift(mk, i - 5)).filter((m) => l.flows.has(m));
   const flowData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, income: l.flows.get(m)!.income, expenses: l.flows.get(m)!.expenses }));
   const netData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, net: l.flows.get(m)!.freeCash }));
-  const groups = (['Fixed', 'Living', 'Discretionary', 'Debt Service'] as const).map((g) => ({ name: g, value: [...(f?.byCategory ?? [])].filter(([id]) => l.category.get(id)?.group === g).reduce((s, [, v]) => s + Math.max(0, v), 0) })).filter((x) => x.value > 0);
+  const groups = (['Fixed', 'Living', 'Discretionary', 'Debt Service'] as const).map((g, slot) => ({ name: g, slot, value: [...(f?.byCategory ?? [])].filter(([id]) => l.category.get(id)?.group === g).reduce((s, [, v]) => s + Math.max(0, v), 0) })).filter((x) => x.value > 0);
   const ranking = [...(f?.byCategory ?? [])].map(([id, v]) => ({ c: l.category.get(id)!, v })).filter((x) => x.c && !['Income', 'Savings'].includes(x.c.group) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
   const maxRank = Math.max(1, ...ranking.map((x) => x.v));
   const budgetRows = tracker.sections.filter((s) => !['Income', 'Savings'].includes(s.group)).flatMap((s) => s.rows).map((r) => ({ r, b: budgetFor(l.budgets, r.category.id, mk), spent: r.months[month - 1]! })).filter((x) => x.b > 0 && x.spent > 0).map((x) => ({ ...x, pct: x.spent / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 6);
@@ -103,6 +112,8 @@ export default function Dashboard() {
           <Link to="/bills" className="small">Calendar →</Link>
         </Glass>)}
 
+        {show('waterfall') && f && (<Glass strong className="span-2"><MonthWaterfall steps={monthWaterfall(f, l.category)} month={mk} /></Glass>)}
+        {show('pace') && (<Glass strong className="span-2"><SpendingPace month={mk} days={dim} today={paceDay} thisMonth={cumulative(daily.byDay, mk, dim, paceDay)} lastMonth={cumulative(daily.byDay, shift(mk, -1), daysIn(shift(mk, -1)))} budget={spendBudget} label="All spending this month" /></Glass>)}
         {show('flow') && (<Glass strong className="span-2"><IncomeExpenseChart title="Income vs expenses" data={flowData} /></Glass>)}
         {show('groups') && (<Glass strong><GroupDonut title="Spending by group" data={groups} /></Glass>)}
 
@@ -173,6 +184,7 @@ export default function Dashboard() {
           })}
           <Link to="/debts" className="small">Payoff plans →</Link>
         </Glass>)}
+        {show('calendar') && (<Glass strong className="span-wide"><SpendingCalendar byDay={daily.byDay} to={today} estimated={daily.estimated} weeks={52} /></Glass>)}
       </div>
     </>
   );
