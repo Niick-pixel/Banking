@@ -1,0 +1,26 @@
+import { R1 } from './r01-overspend-pace';
+import { R2 } from './r02-budget-threshold';
+import { R3 } from './r03-unusual-transaction';
+import { R4 } from './r04-impulse-cluster';
+import { R5 } from './r05-payday-splurge';
+import { R6 } from './r06-safe-to-spend-negative';
+import { R7 } from './r07-cashflow-dip';
+import { R8 } from './r08-missing-recurring';
+import { R9 } from './r09-savings-at-risk';
+import { R10 } from './r10-hers-pot-withdrawal';
+import { R11 } from './r11-payoff-slipping';
+import { R12 } from './r12-debt-service-ratio';
+import { R13 } from './r13-subscriptions';
+import { R14 } from './r14-lifestyle-creep';
+import { R15 } from './r15-windfall';
+import { R16 } from './r16-emergency-fund';
+import { R17 } from './r17-duplicates';
+import { R18 } from './r18-uncategorized';
+import { R19 } from './r19-upcoming-bills';
+import { R20 } from './r20-sinking-funds';
+import { R21 } from './r21-wins';
+import { A1 } from './a01-balance-nudge';
+import type { Rule } from './rule';
+
+export const RULES: Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, A1];
+export type { Rule };
