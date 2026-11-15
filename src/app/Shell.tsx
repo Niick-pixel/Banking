@@ -96,7 +96,7 @@ export default function Shell() {
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="shell">
         <nav className="glass sidebar" aria-label="Main" data-tour="sidebar">
-          <Link to="/" className="brand" aria-label="Aufwind home">
+          <Link to="/" className="brand">
             <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" width={38} height={38} style={{ borderRadius: 10 }} />
             <span>Aufwind<small className="brand-tag">Rise on what you already have</small></span>
           </Link>

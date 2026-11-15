@@ -219,14 +219,15 @@ function CoachPanel() {
             const on = cfg.on !== false;
             const votes = st.notUseful[r.id] ?? 0;
             return (
-              <details key={r.id} className="rule-row">
+              <div key={r.id} className="rule-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <input type="checkbox" style={{ marginTop: 4 }} aria-label={`${r.name} on`} checked={on} onChange={(e) => setRule(r.id, { on: e.target.checked })} />
+              <details style={{ flex: 1 }}>
                 <summary>
-                  <input type="checkbox" aria-label={`${r.name} on`} checked={on} onClick={(e) => e.stopPropagation()} onChange={(e) => setRule(r.id, { on: e.target.checked })} />
                   <span style={{ flex: 1 }}><b>{r.id} · {r.name}</b><br /><span className="small muted">{r.trigger}</span></span>
                   {votes > 0 && <Pill>{votes} not useful · weight {Math.pow(0.5, Math.floor(votes / 3))}</Pill>}
                 </summary>
                 {Object.keys(r.defaults).length > 0 && (
-                  <div style={{ display: 'grid', gap: 4, padding: '8px 0 4px 30px' }}>
+                  <div style={{ display: 'grid', gap: 4, padding: '8px 0 4px' }}>
                     {Object.entries(r.defaults).map(([k, def]) => {
                       const val = typeof cfg[k] === 'number' ? (cfg[k] as number) : def;
                       const money = /marchamo|december/.test(k);
@@ -236,6 +237,7 @@ function CoachPanel() {
                   </div>
                 )}
               </details>
+              </div>
             );
           })}
         </div>

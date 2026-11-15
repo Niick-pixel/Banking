@@ -85,7 +85,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
           </span>
         )}
       </header>
-      <h3 className="insight-title">{i.title}</h3>
+      {compact ? <h3 className="insight-title">{i.title}</h3> : <h2 className="insight-title">{i.title}</h2>}
       {!compact && <p className="insight-body">{i.body}</p>}
       {compact && <p className="insight-body small">{i.body}</p>}
 
