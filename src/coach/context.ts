@@ -123,7 +123,8 @@ export function buildContext(input: CoachInput): Ctx {
     const pm = perCatMonth.get(s.categoryId) ?? new Map<string, number>();
     pm.set(mk, (pm.get(mk) ?? 0) + s.amount); perCatMonth.set(s.categoryId, pm);
     if (!t.tags.includes('migrated-summary')) (perCatTx.get(s.categoryId) ?? perCatTx.set(s.categoryId, []).get(s.categoryId)!).push(s.amount);
-    if (!t.dateEstimated) {
+    // Undated rows and old monthly-total rows sit on the last day: they'd teach a false "all spending on day 30" curve.
+    if (!t.dateEstimated && !t.tags.includes('migrated-summary')) {
       const dm = perCatDated.get(s.categoryId) ?? new Map<string, number[]>();
       const arr = dm.get(mk) ?? Array<number>(32).fill(0);
       arr[Number(t.date.slice(8, 10))]! += s.amount; dm.set(mk, arr); perCatDated.set(s.categoryId, dm);
@@ -163,7 +164,8 @@ export function buildContext(input: CoachInput): Ctx {
     const snap = (input.snapshots ?? []).filter((s) => s.accountId === a.id && s.date <= today).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
     if (!snap) { known.set(a.id, balances.get(a.id)?.total ?? 0); continue; }
     let v = snap.balance;
-    for (const t of past) if (t.date > snap.date) for (const l of legs(t)) if (l.accountId === a.id) v += l.amount;
+    // A balance you typed already includes everything logged before it, including undated rows of that month.
+    for (const t of past) if (t.date > snap.date && !(t.dateEstimated && t.date.slice(0, 7) <= snap.date.slice(0, 7))) for (const l of legs(t)) if (l.accountId === a.id) v += l.amount;
     known.set(a.id, v);
   }
   // Spending accounts with activity but no statement: their balance is a guess, so balance-based rules stay quiet.

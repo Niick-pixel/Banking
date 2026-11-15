@@ -22,7 +22,7 @@ export default function Transactions() {
   const qa = useQuickAdd();
   // Filters can arrive in the URL from a chart click: ?month=2026-11&group=Living, ?date=2026-11-03, ?kind=income
   const [params, setParams] = useSearchParams();
-  const pMonth = params.get('month') ?? '', pDate = params.get('date') ?? '', pGroup = params.get('group') ?? '';
+  const pMonth = params.get('month') ?? '', pDate = params.get('date') ?? '', pGroup = params.get('group') ?? '', pUncat = params.get('uncat') === '1';
   const [q, setQ] = useState('');
   const [kind, setKind] = useState(params.get('kind') ?? '');
   const [acc, setAcc] = useState('');
@@ -34,6 +34,7 @@ export default function Transactions() {
   const filtered = useMemo(() => l.transactions.filter((t) => {
     if (kind && t.kind !== kind) return false;
     if (pDate && t.date !== pDate) return false;
+    if (pUncat && !(t.kind === 'expense' && !t.categoryId && !t.splits?.length)) return false;
     if (pMonth && !t.date.startsWith(pMonth)) return false;
     if (pGroup && !('categoryId' in t && t.categoryId && l.category.get(t.categoryId)?.group === pGroup)) return false;
     if (acc && !(('from' in t && t.from.accountId === acc) || ('to' in t && t.to.accountId === acc) || (t.kind === 'adjustment' && t.side.accountId === acc))) return false;
@@ -44,7 +45,7 @@ export default function Transactions() {
       if (!`${t.description} ${t.notes} ${c} ${t.tags.join(' ')}`.toLowerCase().includes(s)) return false;
     }
     return true;
-  }), [l, q, kind, acc, cat, pDate, pMonth, pGroup]);
+  }), [l, q, kind, acc, cat, pDate, pMonth, pGroup, pUncat]);
 
   const months = useMemo(() => {
     const m = new Map<string, Transaction[]>();
@@ -94,12 +95,13 @@ export default function Transactions() {
         <button className="btn btn-primary" onClick={() => qa.open()}>+ Add <kbd className="small" style={{ opacity: .7 }}>N</kbd></button>
       </PageHeader>
 
-      {(pDate || pMonth || pGroup) && (
+      {(pDate || pMonth || pGroup || pUncat) && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
           <span className="small muted">From a chart:</span>
           {pDate && <span className="chip" aria-pressed>Day {formatDateCR(pDate)}</span>}
           {pMonth && <span className="chip" aria-pressed>{pMonth.split('-').reverse().join('/')}</span>}
           {pGroup && <span className="chip" aria-pressed>{pGroup}</span>}
+          {pUncat && <span className="chip" aria-pressed>No category</span>}
           <button className="btn btn-sm btn-ghost" onClick={() => { setParams({}, { replace: true }); setKind(''); setCat(''); }}>Clear ✕</button>
         </div>
       )}

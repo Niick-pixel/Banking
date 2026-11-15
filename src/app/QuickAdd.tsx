@@ -4,6 +4,9 @@ import { Segmented } from '../design/components';
 import { useLedger, suggestCategories, type Ledger } from './data';
 import { convert, formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { rateForDay } from './fx';
+import { useCoach } from './coach';
+import { hoursOfWork } from '../coach/forecast';
+import { guessCategory } from '../coach/autocat';
 import type { RateSource } from '../fx/rates';
 import { todayISO } from '../lib/dates';
 import { TransactionSchema, type FxInfo, type Side, type Transaction } from '../domain/schemas';
@@ -74,6 +77,7 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ msg: string; auditId?: number } | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const coach = useCoach();
 
   // Dollar expenses: type dollars, convert at the rate of the expense's day.
   const [cur, setCur] = useState<'CRC' | 'USD'>(edit?.fx ? 'USD' : 'CRC');
@@ -104,6 +108,14 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
     expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], income: ['Income'], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
   };
   const cats = l.categories.filter((c) => !c.archived && wantGroups[kind].includes(c.group));
+  // Learned from your history: ≥ 90% sure → picked for you; 60–90% → suggested first.
+  const guess = useMemo(() => (description.trim().length >= 3 ? guessCategory(l.transactions, description, kind) : null), [l.transactions, description, kind]);
+  const [autoPicked, setAutoPicked] = useState(false);
+  useEffect(() => {
+    if (edit || !guess || guess.mode !== 'auto' || !cats.some((c) => c.id === guess.categoryId)) return;
+    if (!categoryId || autoPicked) { setCategoryId(guess.categoryId); setAutoPicked(true); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guess?.categoryId, guess?.mode]);
   const suggested = suggestCategories(l.transactions, description, kind).filter((id) => cats.some((c) => c.id === id)).slice(0, 5);
 
   // Keep from/to sensible when switching kind.
@@ -126,6 +138,13 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
       rateDate: quote && quote.source !== 'manual' ? quote.rateDate : date,
       source: quote?.source ?? 'manual', side: quote?.side ?? 'sell',
     } : undefined;
+    // Spending cap set from a Coach alert: confirm before going over today's cap.
+    const cap = kind === 'expense' && categoryId ? coach?.state.caps.find((c) => c.categoryId === categoryId && c.month === date.slice(0, 7)) : undefined;
+    if (cap && !edit) {
+      const todaySpent = l.transactions.filter((t) => t.kind === 'expense' && t.categoryId === categoryId && t.date === date).reduce((s, t) => s + (t.kind === 'expense' ? t.amount : 0), 0);
+      const over = todaySpent + amount - cap.dailyCap;
+      if (over > 0 && !confirm(`This puts you ${formatMoney(over as Minor, 'CRC', { decimals: 0 })} over your ${formatMoney(cap.dailyCap as Minor, 'CRC', { decimals: 0 })}/day cap for ${l.category.get(categoryId)?.name}. Continue?`)) return;
+    }
     const now = Date.now();
     const base = {
       id: edit?.id ?? newId(), date, dateEstimated: edit && edit.date === date ? edit.dateEstimated : false, currency: 'CRC' as const,
@@ -229,7 +248,10 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
               ))}
             </div>
           )}
-          <select id="qa-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          {guess && guess.mode !== 'ask' && cats.some((c) => c.id === guess.categoryId) && (
+            <span className="small muted">{guess.mode === 'auto' && categoryId === guess.categoryId ? 'Picked for you' : `Suggested (${Math.round(guess.confidence * 100)}% sure)`}: {l.category.get(guess.categoryId)?.name}, learned from {guess.similar} similar transaction{guess.similar > 1 ? 's' : ''}{guess.mode === 'suggest' && categoryId !== guess.categoryId ? <> · <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCategoryId(guess.categoryId)}>Use it</button></> : null}</span>
+          )}
+          <select id="qa-cat" className="input" value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setAutoPicked(false); }}>
             <option value="">Choose…</option>
             {[...new Set(cats.map((c) => c.group))].map((g) => (
               <optgroup key={g} label={g}>{cats.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
@@ -237,6 +259,14 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
           </select>
         </div>
       )}
+      {(() => {
+        const c = l.category.get(categoryId);
+        const run = coach?.run;
+        if (kind !== 'expense' || !amount || !run || !c || !(c.group === 'Discretionary' || c.discretionary || c.group === 'Living') || amount < run.ctx.prefs.hoursNoteMin) return null;
+        const h = hoursOfWork(run.ctx, amount);
+        const cap = coach.state.caps.find((x) => x.categoryId === categoryId && x.month === date.slice(0, 7));
+        return <p className="small muted" style={{ margin: '-6px 0 0' }}>≈ {h.toFixed(1)} hours of work{cap ? ` · cap ${formatMoney(cap.dailyCap as Minor, 'CRC', { decimals: 0 })}/day` : ''}{amount >= run.ctx.prefs.coolingMin && (c.group === 'Discretionary' || c.discretionary) ? <> · not sure? <a href="/coach/wants" onClick={(e) => { e.preventDefault(); void coach.addWant({ name: description || c.name, amount, categoryId }).then(onDone); }}>add it to your cooling-off list</a></> : null}</p>;
+      })()}
       {kind === 'debt_payment' && (
         <div className="field">
           <label htmlFor="qa-debt">Debt</label>

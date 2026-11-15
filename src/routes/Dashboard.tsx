@@ -16,6 +16,8 @@ import { formatMoney } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
+import { useCoach } from '../app/coach';
+import { CoachTop, SafeToSpendCard } from './Coach';
 import { MonthWaterfall, SpendingCalendar, SpendingPace } from '../design/components/insightCharts';
 import { SPEND_GROUPS, cumulative, dailySpending, monthWaterfall } from '../domain/spending';
 
@@ -28,6 +30,7 @@ const shift = (mk: string, d: number) => { const [y, m] = mk.split('-').map(Numb
 export default function Dashboard() {
   const l = useLedger();
   const qa = useQuickAdd();
+  const coach = useCoach();
   const health = useHealth();
   const today = todayISO();
   const [mk, setMk] = useState(today.slice(0, 7));
@@ -92,6 +95,8 @@ export default function Dashboard() {
       </div>
 
       <div className="dash-grid stagger">
+        {show('safe') && coach.run && (<Glass strong className="span-2" data-tour="safe"><SafeToSpendCard /></Glass>)}
+        {show('coach') && coach.run && (<Glass strong className="span-2"><CoachTop /></Glass>)}
         {show('insights') && (<Glass strong className="span-2" style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">What happened</h2>
           {sum.insights.length === 0 ? <p className="muted" style={{ margin: 0 }}>No movements yet this month.</p> : (

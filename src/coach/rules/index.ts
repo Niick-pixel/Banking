@@ -20,7 +20,9 @@ import { R19 } from './r19-upcoming-bills';
 import { R20 } from './r20-sinking-funds';
 import { R21 } from './r21-wins';
 import { A1 } from './a01-balance-nudge';
+import { A2 } from './a02-pay-yourself-first';
+import { A3 } from './a03-month-end-sweep';
 import type { Rule } from './rule';
 
-export const RULES: Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, A1];
+export const RULES: Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, A1, A2, A3];
 export type { Rule };

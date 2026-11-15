@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Bell, Coins, Database, DollarSign, HelpCircle, LayoutDashboard, Palette, PieChart, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
+import { Bell, Coins, Compass, ArrowUp, ArrowDown, Database, DollarSign, HelpCircle, LayoutDashboard, Palette, PieChart, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
 import { Glass, Pill, Segmented } from '../design/components';
 import { PageHeader } from '../ui/Sheet';
 import { APP_VERSION, chooseFolder, hasSavedFolderNeedingPermission, openDataFolder, reconnectFolder, suggestedFolder, useSync } from '../sync';
@@ -22,6 +22,9 @@ import { CATEGORY_GROUPS, type Category } from '../domain/schemas';
 import { saveCategory } from '../db/repo';
 import { rateForDay } from '../app/fx';
 import { startTour } from '../app/Tour';
+import { RULES } from '../coach/rules';
+import { COACH_DEFAULTS } from '../coach/prefs';
+import type { CoachPrefs, WindfallTarget } from '../coach/types';
 
 export const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 export const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
@@ -43,10 +46,11 @@ function backupLabel(n: string) {
   return n;
 }
 
-type CatId = 'appearance' | 'dashboard' | 'money' | 'budgets' | 'fx' | 'notifications' | 'data' | 'security' | 'updates' | 'help';
+type CatId = 'coach' | 'appearance' | 'dashboard' | 'money' | 'budgets' | 'fx' | 'notifications' | 'data' | 'security' | 'updates' | 'help';
 const CATS: { id: CatId; label: string; icon: LucideIcon; blurb: string; desktopOnly?: boolean }[] = [
   { id: 'appearance', label: 'Appearance', icon: Palette, blurb: 'Themes, size, motion' },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, blurb: 'Which cards to show' },
+  { id: 'coach', label: 'Coach', icon: Compass, blurb: 'Rules, tone, alerts' },
   { id: 'money', label: 'Money & targets', icon: Coins, blurb: 'Savings, payroll, rates' },
   { id: 'budgets', label: 'Budgets & categories', icon: PieChart, blurb: 'Alerts, names, groups' },
   { id: 'fx', label: 'Exchange rates', icon: DollarSign, blurb: 'BCCR and dollar expenses' },
@@ -159,6 +163,85 @@ function DashboardPanel() {
         ))}
       </div>
     </Section>
+  );
+}
+
+const WINDFALL_LABEL: Record<WindfallTarget, string> = { replenish: 'Replenish self-loans', hers: 'Her loan fund', emergency: 'Emergency fund', sinking: 'Year-end funds (marchamo, December)', free: 'Free money (capped)' };
+
+function CoachPanel() {
+  const [c, setC] = usePref('coach');
+  const [st, setSt] = usePref('coachState');
+  const save = (patch: Partial<CoachPrefs>) => void setC({ ...c, ...patch });
+  const ruleCfg = (id: string) => c.rules[id] ?? {};
+  const setRule = (id: string, patch: Record<string, number | boolean>) => save({ rules: { ...c.rules, [id]: { ...ruleCfg(id), ...patch } } });
+  const move = (i: number, d: -1 | 1) => { const o = [...c.windfallOrder]; const j = i + d; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j]!, o[i]!]; save({ windfallOrder: o }); };
+  return (
+    <>
+      <Section title="Coach" sub="Deterministic rules over your own data. Nothing leaves this device, and nothing changes unless you tap an action.">
+        <Row label="Coach on"><input type="checkbox" aria-label="Coach on" checked={c.enabled} onChange={(e) => save({ enabled: e.target.checked })} /></Row>
+        <Row label="Tone" hint="Direct: blunt, numbers first. Gentle: same numbers, softer words.">
+          <Segmented<CoachPrefs['tone']> label="Tone" value={c.tone} onChange={(tone) => save({ tone })} options={[{ value: 'direct', label: 'Direct' }, { value: 'gentle', label: 'Gentle' }]} />
+        </Row>
+        <Row label="Buffer" hint="Kept aside in safe-to-spend and the forecast."><MoneyField label="Buffer" value={c.buffer} onSave={(v) => save({ buffer: v })} /></Row>
+        <Row label="Work hours per month" hint="For “≈ N hours of work” next to purchases."><NumberField label="Work hours" value={c.workHoursPerMonth} min={40} max={320} onSave={(v) => save({ workHoursPerMonth: v })} /></Row>
+        <Row label="Show hours of work from"><MoneyField label="Hours note threshold" value={c.hoursNoteMin} onSave={(v) => save({ hoursNoteMin: v })} /></Row>
+      </Section>
+      <Section title="Alerts on your desktop" sub="Only warnings and critical alerts are pushed. Everything else waits in the Inbox.">
+        <Row label="Send notifications"><input type="checkbox" aria-label="Send notifications" checked={c.push} onChange={async (e) => { if (e.target.checked && !(await notificationsAllowed(true))) return; save({ push: e.target.checked }); }} /></Row>
+        <Row label="At most per day"><NumberField label="Pushes per day" value={c.maxPushPerDay} min={0} max={10} onSave={(v) => save({ maxPushPerDay: v })} /></Row>
+        <Row label="Quiet hours" hint="No notifications in this window.">
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><NumberField label="Quiet from" value={c.quietStart} min={0} max={23} suffix=":00 to" onSave={(v) => save({ quietStart: v })} /><NumberField label="Quiet until" value={c.quietEnd} min={0} max={23} suffix=":00" onSave={(v) => save({ quietEnd: v })} /></span>
+        </Row>
+        <Row label="Repeat a warning after"><NumberField label="Warning cooldown" value={c.cooldownWarningDays} min={1} max={30} suffix="days" onSave={(v) => save({ cooldownWarningDays: v })} /></Row>
+        <Row label="Repeat a critical alert after"><NumberField label="Critical cooldown" value={c.cooldownCriticalDays} min={1} max={30} suffix="days" onSave={(v) => save({ cooldownCriticalDays: v })} /></Row>
+      </Section>
+      <Section title="Cooling-off list">
+        <Row label="Wait for items from"><MoneyField label="Cooling-off minimum" value={c.coolingMin} onSave={(v) => save({ coolingMin: v })} /></Row>
+        <Row label="…for"><NumberField label="Short wait" value={c.coolingShortHours} min={1} max={240} suffix="hours" onSave={(v) => save({ coolingShortHours: v })} /></Row>
+        <Row label="Longer wait from"><MoneyField label="Long wait threshold" value={c.coolingLong} onSave={(v) => save({ coolingLong: v })} /></Row>
+        <Row label="…for"><NumberField label="Long wait" value={c.coolingLongDays} min={1} max={60} suffix="days" onSave={(v) => save({ coolingLongDays: v })} /></Row>
+      </Section>
+      <Section title="Windfall splitter" sub="When extra money arrives (aguinaldo, quinquenio, a sale), the Coach proposes a split in this order. Anything left after every need goes to the emergency fund.">
+        <ol style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
+          {c.windfallOrder.map((t, i) => (
+            <li key={t} className="check-card" style={{ justifyContent: 'space-between' }}>
+              <span><b>{i + 1}.</b> {WINDFALL_LABEL[t]}</span>
+              <span><button className="icon-btn" aria-label={`Move ${WINDFALL_LABEL[t]} up`} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></button><button className="icon-btn" aria-label={`Move ${WINDFALL_LABEL[t]} down`} disabled={i === c.windfallOrder.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></button></span>
+            </li>
+          ))}
+        </ol>
+        <Row label="Free money at most"><NumberField label="Free money cap" value={Math.round(c.windfallFreeMaxPct * 100)} min={0} max={100} suffix="%" onSave={(v) => save({ windfallFreeMaxPct: v / 100 })} /></Row>
+      </Section>
+      <Section title="Rules" sub={<>Turn rules on or off and tune their thresholds. Marking an alert “not useful” 3 times halves that rule's weight. <button className="btn btn-ghost btn-sm" onClick={() => void setSt({ ...st, notUseful: {}, weights: {} })}>Reset weights</button> <button className="btn btn-ghost btn-sm" onClick={() => save({ rules: {} })}>Reset thresholds</button></>}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {RULES.map((r) => {
+            const cfg = ruleCfg(r.id);
+            const on = cfg.on !== false;
+            const votes = st.notUseful[r.id] ?? 0;
+            return (
+              <details key={r.id} className="rule-row">
+                <summary>
+                  <input type="checkbox" aria-label={`${r.name} on`} checked={on} onClick={(e) => e.stopPropagation()} onChange={(e) => setRule(r.id, { on: e.target.checked })} />
+                  <span style={{ flex: 1 }}><b>{r.id} · {r.name}</b><br /><span className="small muted">{r.trigger}</span></span>
+                  {votes > 0 && <Pill>{votes} not useful · weight {Math.pow(0.5, Math.floor(votes / 3))}</Pill>}
+                </summary>
+                {Object.keys(r.defaults).length > 0 && (
+                  <div style={{ display: 'grid', gap: 4, padding: '8px 0 4px 30px' }}>
+                    {Object.entries(r.defaults).map(([k, def]) => {
+                      const val = typeof cfg[k] === 'number' ? (cfg[k] as number) : def;
+                      const money = /marchamo|december/.test(k);
+                      const label = (r.labels as Record<string, string> | undefined)?.[k] ?? k;
+                      return <Row key={k} label={label} hint={`Default ${money ? formatMoney(def as never, 'CRC') : def}`}>{money ? <MoneyField label={label} value={val} onSave={(v) => setRule(r.id, { [k]: v })} /> : <NumberField label={label} value={val} min={0} max={100000} step={def % 1 ? 0.01 : 1} onSave={(v) => setRule(r.id, { [k]: v })} />}</Row>;
+                    })}
+                  </div>
+                )}
+              </details>
+            );
+          })}
+        </div>
+      </Section>
+      <p className="small muted">Defaults: buffer {formatMoney(COACH_DEFAULTS.buffer as never, 'CRC')}, {COACH_DEFAULTS.workHoursPerMonth} h/month, quiet {COACH_DEFAULTS.quietStart}:00–{COACH_DEFAULTS.quietEnd}:00, max {COACH_DEFAULTS.maxPushPerDay} pushes a day.</p>
+    </>
   );
 }
 
@@ -440,6 +523,7 @@ export default function Settings() {
               initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0, transition: { duration: dur(0.45), ease: [0.2, 0.8, 0.2, 1] } }} exit={{ opacity: 0, x: -10, transition: { duration: dur(0.2) } }}>
               {cat === 'appearance' && <AppearancePanel />}
               {cat === 'dashboard' && <DashboardPanel />}
+              {cat === 'coach' && <CoachPanel />}
               {cat === 'money' && <MoneyPanel />}
               {cat === 'budgets' && <BudgetsPanel />}
               {cat === 'fx' && <FxPanel />}

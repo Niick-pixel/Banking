@@ -294,7 +294,7 @@ body {
 @media print {
   :root { --glass-tint: #fff; --glass-tint-strong: #fff; --glass-blur: 0px; --glass-specular: none; --text: #000; --text-2: #333; --text-3: #555; --solid-surface: #fff; }
   body { background: #fff !important; }
-  .aurora, .sidebar, .tabbar, .fab, .no-print, .toast, .skip-link { display: none !important; }
+  .aurora, .sidebar, .tabbar, .fab, .no-print, .toast, .skip-link, .section-tabs, .insight-menu { display: none !important; }
   .shell { display: block !important; padding: 0 !important; }
   .glass { box-shadow: none !important; border: 1px solid #ddd !important; backdrop-filter: none !important; break-inside: avoid; }
   .print-only { display: block; }

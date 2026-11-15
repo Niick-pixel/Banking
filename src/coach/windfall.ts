@@ -6,6 +6,9 @@ import { debtStatus } from '../domain/ledger';
 import { selfLoanProgress } from '../domain/debts';
 import { shiftMonth, type Ctx } from './context';
 import type { WindfallTarget } from './types';
+import { formatMoney, minor } from '../lib/money';
+
+const crc = (n: number) => formatMoney(minor(Math.round(n)), 'CRC', { decimals: 0 });
 
 export interface SplitLine { target: WindfallTarget; label: string; need: number; amount: number; potId?: string; accountId?: string; detail: string }
 
@@ -31,8 +34,8 @@ export function windfallNeeds(ctx: Ctx): Record<WindfallTarget, { need: number; 
   const mine = ctx.pots.find((p) => p.owner === 'mine');
   return {
     replenish: { need: replenish, label: 'Replenish self-loans', detail: loans.length ? `${loans.length} open: ${loans.map((x) => x.loan.description).join(', ')}` : 'none open', potId: mine?.id, accountId: mine?.accountId },
-    hers: { need: Math.max(0, owed - hersBal), label: 'Her loan fund', detail: `owed ${owed / 100 | 0}, set aside ${hersBal / 100 | 0}`, potId: hersPot?.id, accountId: hersPot?.accountId },
-    emergency: { need: emergency, label: 'Emergency fund', detail: `target ${ctx.efTargetMonths} months of ~${Math.round(monthly / 100)} essentials`, potId: mine?.id, accountId: mine?.accountId },
+    hers: { need: Math.max(0, owed - hersBal), label: 'Her loan fund', detail: `owed ${crc(owed)}, set aside ${crc(hersBal)}`, potId: hersPot?.id, accountId: hersPot?.accountId },
+    emergency: { need: emergency, label: 'Emergency fund', detail: `target ${ctx.efTargetMonths} months × ${crc(monthly)} essentials`, potId: mine?.id, accountId: mine?.accountId },
     sinking: { need: sinking, label: 'Year-end funds (marchamo, December)', detail: sinkingGoals.length ? sinkingGoals.map((g) => g.name).join(', ') : 'no marchamo/December goal yet' },
     free: { need: Infinity, label: 'Free money', detail: `at most ${Math.round(ctx.prefs.windfallFreeMaxPct * 100)}%` },
   };

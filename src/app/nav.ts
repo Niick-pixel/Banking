@@ -1,15 +1,16 @@
 /**
- * Five sections instead of fifteen pages. Each section groups related pages as
+ * Six sections instead of fifteen pages. Each section groups related pages as
  * tabs; Settings lives on its own at the bottom left. URLs stay the same, so old
  * links, the command palette and the guided tour keep working.
  */
-import { ArrowLeftRight, CreditCard, LayoutDashboard, PieChart, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Compass, CreditCard, LayoutDashboard, PieChart, TrendingUp, type LucideIcon } from 'lucide-react';
 
 export interface Page { to: string; label: string }
 export interface Section { id: string; label: string; icon: LucideIcon; pages: Page[]; blurb: string }
 
 export const SECTIONS: Section[] = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, blurb: 'Your month at a glance', pages: [{ to: '/', label: 'Overview' }] },
+  { id: 'coach', label: 'Coach', icon: Compass, blurb: 'Alerts, safe-to-spend, forecast', pages: [{ to: '/coach', label: 'Inbox' }, { to: '/coach/forecast', label: 'Forecast' }, { to: '/coach/wants', label: 'Cooling-off' }, { to: '/coach/reports', label: 'Reports' }, { to: '/coach/history', label: 'History replay' }] },
   { id: 'activity', label: 'Activity', icon: ArrowLeftRight, blurb: 'Every movement, bills and the calendar', pages: [{ to: '/transactions', label: 'Transactions' }, { to: '/bills', label: 'Bills & calendar' }] },
   { id: 'budget', label: 'Budget', icon: PieChart, blurb: 'Budget vs actual and reports', pages: [{ to: '/tracker', label: 'Tracker' }, { to: '/reports', label: 'Reports' }] },
   { id: 'debts', label: 'Debts & cards', icon: CreditCard, blurb: 'Loans, Tasa Cero and money set aside', pages: [{ to: '/debts', label: 'Debts' }, { to: '/tasa-cero', label: 'Tasa Cero' }, { to: '/pots', label: 'Pots' }] },

@@ -1,3 +1,6 @@
+import { COACH_DEFAULTS, EMPTY_STATE } from '../coach/prefs';
+import type { CoachPrefs, CoachState } from '../coach/types';
+
 /** Preference defaults. Everything here is user-editable; nothing is a fact about a bank. */
 export interface Payroll {
   mySavingsPerQuincena: number;      // e.g. automatic transfer to savings
@@ -21,6 +24,9 @@ export const PREF_DEFAULTS = {
   /** Budget alert: warn when a category reaches this share of its budget. */
   budgetWarnPct: 0.8,
   fx: { source: 'auto', side: 'sell', bccrName: '', bccrEmail: '', bccrToken: '' } as FxPrefs,
+  /** Money Coach settings (spec §10.10) and its memory (dismissed, snoozed, votes, wants list…). */
+  coach: COACH_DEFAULTS as CoachPrefs,
+  coachState: EMPTY_STATE as CoachState,
 };
 
 export interface FxPrefs {
@@ -32,6 +38,8 @@ export interface FxPrefs {
 }
 
 export const DASH_CARDS: { id: string; label: string }[] = [
+  { id: 'safe', label: 'Safe to spend (Coach)' },
+  { id: 'coach', label: 'Coach: top 3 alerts' },
   { id: 'insights', label: 'What happened' },
   { id: 'upcoming', label: 'Coming up (30 days)' },
   { id: 'waterfall', label: 'Where the month’s money went (waterfall)' },

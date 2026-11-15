@@ -184,3 +184,17 @@ describe('unknown balance', () => {
     expect(fired(input(history(H), '2026-11-21', { snapshots: [{ id: 'x', accountId: 'chk', date: '2026-11-19', balance: 1, source: 'manual', createdAt: 0, updatedAt: 0 }] }), 'A1')).toHaveLength(0);
   });
 });
+
+describe('automations', () => {
+  it('A2 pay yourself first right after payday, not once moved', () => {
+    const base = history(H);
+    expect(fired(input([...base, inc('2026-11-15', 'sal1', 330_000)], '2026-11-16'), 'A2').map((i) => i.title).join()).toMatch(/Savings - Mine/);
+    const moved = [...base, save('2026-11-15', 'smine', 70_000, 'deposit', 'mine'), save('2026-11-15', 'shers', 45_000, 'deposit', 'hers')];
+    expect(fired(input(moved, '2026-11-16'), 'A2')).toHaveLength(0);
+    expect(fired(input(base, '2026-11-25'), 'A2')).toHaveLength(0);
+  });
+  it('A3 month-end sweep only with leftover free cash', () => {
+    expect(fired(input(history(H), '2026-10-31'), 'A3')).toHaveLength(1);
+    expect(fired(input([...history(H), ex('2026-10-30', 'pers', 500_000)], '2026-10-31'), 'A3')).toHaveLength(0);
+  });
+});
