@@ -16,5 +16,30 @@ export const PREF_DEFAULTS = {
   payroll: { mySavingsPerQuincena: 7_000_000, associationPerQuincena: 3_500_000, aporteObreroMonthly: 1_600_000, aportePatronalMonthly: 1_600_000 } as Payroll,
   calcRates: { cdpAnnualRatePct: 0, programmedAnnualRatePct: 0, withholdingPct: 15 } as CalcRates,
   notifyBills: false,
+  /** Dashboard cards you've hidden (ids from DASH_CARDS). */
+  dashHidden: [] as string[],
+  /** Budget alert: warn when a category reaches this share of its budget. */
+  budgetWarnPct: 0.8,
+  fx: { source: 'auto', side: 'sell', bccrName: '', bccrEmail: '', bccrToken: '' } as FxPrefs,
 };
+
+export interface FxPrefs {
+  /** auto = BCCR when a token is set, then the free market rate; manual = always type it. */
+  source: 'auto' | 'bccr' | 'market' | 'manual';
+  /** BCCR reference rate: sell (venta, what a card charge uses) or buy (compra). */
+  side: 'sell' | 'buy';
+  bccrName: string; bccrEmail: string; bccrToken: string;
+}
+
+export const DASH_CARDS: { id: string; label: string }[] = [
+  { id: 'insights', label: 'What happened' },
+  { id: 'upcoming', label: 'Coming up (30 days)' },
+  { id: 'flow', label: 'Income vs expenses' },
+  { id: 'groups', label: 'Spending by group' },
+  { id: 'where', label: 'Where it went' },
+  { id: 'budget', label: 'Budget health' },
+  { id: 'freecash', label: 'Free cash by month' },
+  { id: 'networth', label: 'Net worth' },
+  { id: 'debts', label: 'Debts' },
+];
 export type PrefKey = keyof typeof PREF_DEFAULTS;

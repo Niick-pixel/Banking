@@ -6,7 +6,7 @@ import { PREF_DEFAULTS, type PrefKey } from '../domain/prefs';
 export function usePref<K extends PrefKey>(key: K): [(typeof PREF_DEFAULTS)[K], (v: (typeof PREF_DEFAULTS)[K]) => Promise<void>] {
   const rec = useLiveQuery(() => db.prefs.get(key), [key]);
   const def = PREF_DEFAULTS[key];
-  const value = (rec?.value === undefined ? def : typeof def === 'object' ? { ...(def as object), ...(rec.value as object) } : rec.value) as (typeof PREF_DEFAULTS)[K];
+  const value = (rec?.value === undefined ? def : typeof def === 'object' && !Array.isArray(def) ? { ...(def as object), ...(rec.value as object) } : rec.value) as (typeof PREF_DEFAULTS)[K];
   const set = async (v: (typeof PREF_DEFAULTS)[K]) => { await db.prefs.put({ id: key, value: v, updatedAt: Date.now() }); };
   return [value, set];
 }

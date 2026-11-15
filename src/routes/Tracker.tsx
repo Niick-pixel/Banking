@@ -6,6 +6,7 @@ import { budgetAlerts, computeTracker, type TrackerRow } from '../domain/tracker
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { todayISO } from '../lib/dates';
 import { saveBudget } from '../db/repo';
+import { usePref } from '../app/prefs';
 
 const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const GROUP_LABEL: Record<string, string> = { Income: 'Income', Fixed: 'Fixed costs', Living: 'Living / variable', Discretionary: 'Discretionary', 'Debt Service': 'Debt service', Savings: 'Savings' };
@@ -15,9 +16,10 @@ export default function Tracker() {
   const l = useLedger();
   const today = todayISO();
   const years = useMemo(() => [...new Set(l.transactions.map((t) => Number(t.date.slice(0, 4))))].sort(), [l.transactions]);
+  const [warnAt] = usePref('budgetWarnPct');
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const t = useMemo(() => computeTracker(year, l.transactions.filter((x) => x.currency === 'CRC'), l.categories, l.budgets, { accountType: (id) => l.account.get(id)?.type }), [year, l]);
-  const alerts = budgetAlerts(t, today);
+  const alerts = budgetAlerts(t, today, warnAt);
   const curMonth = year === Number(today.slice(0, 4)) ? Number(today.slice(5, 7)) - 1 : -1;
   const savingsRate = t.ytd.income ? t.ytd.saved / t.ytd.income : 0;
 

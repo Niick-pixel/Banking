@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import './design/tokens.css';
 import './app/shell.css';
+import './design/themes.css';
 import { ThemeProvider } from './app/theme';
 import Shell from './app/Shell';
 import DesignPage from './routes/DesignPage';

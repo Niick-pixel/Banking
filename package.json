@@ -17,6 +17,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-notification": "^2.8.1",
     "@tauri-apps/plugin-opener": "^2.7.3",
     "@tauri-apps/plugin-process": "^2.4.0",
@@ -24,6 +25,7 @@
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^1.1.7",
     "exceljs": "^4.4.0",
+    "lucide-react": "^0.577.0",
     "motion": "^12.43.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

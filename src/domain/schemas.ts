@@ -271,7 +271,7 @@ export const ExchangeRateSchema = z.object({
   id: Id, date: ISODateSchema,
   /** CRC céntimos per 1 USD. */
   buy: z.number().int().positive(), sell: z.number().int().positive(),
-  source: z.enum(['BCCR', 'manual']), ...Timestamps,
+  source: z.enum(['BCCR', 'market', 'manual']), ...Timestamps,
 });
 export type ExchangeRate = z.infer<typeof ExchangeRateSchema>;
 

@@ -3,7 +3,7 @@ import { useEffect, useState, type ComponentPropsWithoutRef, type ReactNode } fr
 import { formatMoney, type Currency, type FormatOptions, type Minor } from '../../lib/money';
 
 export function Aurora() {
-  return <div className="aurora" aria-hidden="true"><span /><span /><span /><span /></div>;
+  return <div className="aurora" aria-hidden="true"><span /><span /><span /><span /><span /></div>;
 }
 
 /** SVG lens filter for hero glass. Only applied via .glass-lens; looks fine without it. */
@@ -24,7 +24,7 @@ export function Glass({ strong, pad = 24, lens, className = '', style, ...rest }
   return (
     <div
       className={`glass ${strong ? 'glass-strong' : ''} ${lens ? 'glass-lens' : ''} ${className}`}
-      style={{ padding: pad, ...style }}
+      style={{ padding: `calc(${pad}px * var(--d, 1))`, ...style }}
       {...rest}
     />
   );

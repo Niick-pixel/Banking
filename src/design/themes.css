@@ -1,0 +1,125 @@
+/* ═══════════════════════════ Aufwind v0.4 themes ═══════════════════════════
+   html[data-theme] = resolved light/dark (set by ThemeProvider)
+   html[data-palette] = one of 3 light (aurora, dune, glacier) or 3 dark (midnight, ember, updraft)
+   Chart series colours stay per mode (they are CVD-validated); palettes change
+   background, accent, glass tint and ink warmth. */
+
+/* ── Light palettes ─────────────────────────────────────────────────────── */
+:root[data-palette="aurora"] {
+  --bg: #eef1f6;
+  --aurora-1: #8fd3ff; --aurora-2: #b9a8ff; --aurora-3: #7fe3c9; --aurora-4: #ffc9a8; --aurora-5: #c3d4ff;
+  --aurora-opacity: 0.6;
+  --accent: #2f5bea; --accent-soft: rgba(47, 91, 234, 0.12); --focus: #2f5bea;
+  --glass-tint: rgba(255, 255, 255, 0.56); --glass-tint-strong: rgba(255, 255, 255, 0.74);
+}
+:root[data-palette="dune"] {
+  --bg: #f6efe5;
+  --aurora-1: #f3c69b; --aurora-2: #e9b3c2; --aurora-3: #f1dfa3; --aurora-4: #c9d6e6; --aurora-5: #f7d8c4;
+  --aurora-opacity: 0.66;
+  --text: #1f1611; --text-2: #4b3d33; --text-3: #6b5a4d;
+  --accent: #a8471f; --accent-soft: rgba(168, 71, 31, 0.12); --focus: #a8471f;
+  --glass-tint: rgba(255, 251, 246, 0.58); --glass-tint-strong: rgba(255, 251, 246, 0.78);
+  --solid-surface: #fffaf3;
+  --income: #2f7a3a;
+}
+:root[data-palette="glacier"] {
+  --bg: #edf6f7;
+  --aurora-1: #9fe1ee; --aurora-2: #b9d3ff; --aurora-3: #c9f1e2; --aurora-4: #e2e6ff; --aurora-5: #a7f0dc;
+  --aurora-opacity: 0.62;
+  --text: #0c1a1f; --text-2: #34474d; --text-3: #52666c;
+  --accent: #0e7490; --accent-soft: rgba(14, 116, 144, 0.12); --focus: #0e7490;
+  --glass-tint: rgba(250, 255, 255, 0.56); --glass-tint-strong: rgba(250, 255, 255, 0.76);
+  --solid-surface: #fbffff;
+}
+
+/* ── Dark palettes ──────────────────────────────────────────────────────── */
+:root[data-palette="midnight"] {
+  --bg: #0b0d12;
+  --aurora-1: #1d4ed8; --aurora-2: #6d28d9; --aurora-3: #0f766e; --aurora-4: #9a3412; --aurora-5: #312e81;
+  --aurora-opacity: 0.46;
+  --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, 0.16); --focus: #9db4ff;
+  --glass-tint: rgba(24, 26, 34, 0.56); --glass-tint-strong: rgba(24, 26, 34, 0.76);
+  --solid-surface: #171a22;
+}
+:root[data-palette="ember"] {
+  --bg: #110c0b;
+  --aurora-1: #9a3412; --aurora-2: #9f1239; --aurora-3: #a16207; --aurora-4: #4c1d95; --aurora-5: #7c2d12;
+  --aurora-opacity: 0.42;
+  --text: #f8efe9; --text-2: #d8c7bd; --text-3: #ab988c;
+  --accent: #fb923c; --accent-soft: rgba(251, 146, 60, 0.16); --focus: #fdba74; --text-on-accent: #1a0f0a;
+  --glass-tint: rgba(34, 24, 21, 0.56); --glass-tint-strong: rgba(34, 24, 21, 0.78);
+  --solid-surface: #1e1613;
+}
+:root[data-palette="updraft"] {
+  --bg: #07111f;
+  --aurora-1: #1e3a8a; --aurora-2: #0e7490; --aurora-3: #b45309; --aurora-4: #1e40af; --aurora-5: #0c4a6e;
+  --aurora-opacity: 0.5;
+  --text: #eef4ff; --text-2: #c2cfe3; --text-3: #93a3bd;
+  --accent: #fbbf24; --accent-soft: rgba(251, 191, 36, 0.15); --focus: #fcd34d; --text-on-accent: #0b1220;
+  --glass-tint: rgba(13, 26, 46, 0.56); --glass-tint-strong: rgba(13, 26, 46, 0.78);
+  --solid-surface: #0f1b2e;
+}
+
+/* ── Background: slow aurora, soft vignette, fine grain ─────────────────── */
+body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
+.aurora { transition: opacity calc(1s * var(--motion, 1)) ease; }
+.aurora span { filter: blur(110px); transition: background-color calc(1.2s * var(--motion, 1)) ease; }
+.aurora span:nth-child(5) { background: var(--aurora-5); width: 45vmax; height: 45vmax; top: 30%; left: 35%; opacity: .55; animation: drift2 70s ease-in-out infinite alternate-reverse; }
+.aurora::before { /* vignette keeps edges calm and text readable */
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, color-mix(in srgb, var(--bg) 70%, transparent) 100%);
+}
+.aurora::after { /* film grain: makes the glass read as a material */
+  content: ""; position: absolute; inset: 0; z-index: 2; opacity: .06; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:root[data-motion="off"] .aurora span { animation: none; }
+:root[data-motion="quick"] .aurora span { animation-duration: 30s; }
+
+/* ── Glass: layered tint, gradient hairline, deeper soft shadow ────────── */
+.glass {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--glass-tint-strong) 55%, var(--glass-tint)) 0%, var(--glass-tint) 60%);
+  border: 1px solid transparent;
+  box-shadow: var(--glass-highlight), 0 1px 1px rgba(0,0,0,.03), 0 10px 30px -8px rgba(15, 23, 42, .14), 0 30px 80px -24px rgba(15, 23, 42, .18);
+  transition: background calc(.6s * var(--motion, 1)) ease, box-shadow calc(.35s * var(--motion, 1)) ease, transform calc(.35s * var(--motion, 1)) cubic-bezier(.2,.8,.2,1);
+}
+:root[data-theme="dark"] .glass { box-shadow: var(--glass-highlight), 0 1px 1px rgba(0,0,0,.2), 0 14px 40px -10px rgba(0,0,0,.5), 0 40px 90px -30px rgba(0,0,0,.55); }
+.glass::after { /* gradient hairline border: bright at the top edge, fading down */
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.18) 40%, rgba(255,255,255,.08));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+:root[data-theme="dark"] .glass::after { background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.06) 40%, rgba(255,255,255,.03)); }
+.glass.lift:hover { transform: translateY(-2px); }
+:root[data-transparency="reduced"] .glass::after, :root[data-transparency="reduced"] .aurora::after { display: none; }
+
+/* ── Layout: fill big screens, density, width options ──────────────────── */
+#root { zoom: var(--ui-scale, 1); }
+.shell { max-width: none; grid-template-columns: var(--sidebar-w, 248px) minmax(0, 1fr); padding: 22px 28px; gap: 28px; }
+:root[data-width="wide"] .shell { max-width: 1960px; }
+:root[data-width="centered"] .shell { max-width: 1480px; }
+.content { container-type: inline-size; padding: 4px 4px 40px; }
+:root[data-density="compact"] { --d: .72; }
+:root[data-density="compact"] .kpis, :root[data-density="compact"] .dash-grid { gap: 10px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+@container (min-width: 1500px) {
+  .dash-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+  .dash-grid .span-2 { grid-column: span 2; }
+  .dash-grid .span-wide { grid-column: span 4; }
+  .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+}
+@container (max-width: 1499px) { .dash-grid .span-wide { grid-column: 1 / -1; } }
+
+/* ── Motion: staggered entrance for cards ──────────────────────────────── */
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: rise calc(.6s * var(--motion, 1)) cubic-bezier(.2,.8,.2,1) both; }
+.stagger > *:nth-child(2) { animation-delay: calc(60ms * var(--motion, 1)); }
+.stagger > *:nth-child(3) { animation-delay: calc(120ms * var(--motion, 1)); }
+.stagger > *:nth-child(4) { animation-delay: calc(180ms * var(--motion, 1)); }
+.stagger > *:nth-child(5) { animation-delay: calc(240ms * var(--motion, 1)); }
+.stagger > *:nth-child(6) { animation-delay: calc(300ms * var(--motion, 1)); }
+.stagger > *:nth-child(7) { animation-delay: calc(360ms * var(--motion, 1)); }
+.stagger > *:nth-child(8) { animation-delay: calc(420ms * var(--motion, 1)); }
+.stagger > *:nth-child(n+9) { animation-delay: calc(480ms * var(--motion, 1)); }
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
+.btn, .chip, .nav-item, .tab, .input, .segmented button { transition-duration: calc(.25s * var(--motion, 1)); }
