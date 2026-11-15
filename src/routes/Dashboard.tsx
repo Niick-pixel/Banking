@@ -16,6 +16,10 @@ import { formatMoney } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
+import { useCoach } from '../app/coach';
+import { CoachTop, SafeToSpendCard } from './Coach';
+import { MonthWaterfall, SpendingCalendar, SpendingPace } from '../design/components/insightCharts';
+import { SPEND_GROUPS, cumulative, dailySpending, monthWaterfall } from '../domain/spending';
 
 const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
@@ -26,11 +30,14 @@ const shift = (mk: string, d: number) => { const [y, m] = mk.split('-').map(Numb
 export default function Dashboard() {
   const l = useLedger();
   const qa = useQuickAdd();
+  const coach = useCoach();
   const health = useHealth();
   const today = todayISO();
   const [mk, setMk] = useState(today.slice(0, 7));
   const [target] = usePref('savingsRateTarget');
   const [efTarget] = usePref('efTargetMonths');
+  const [hidden] = usePref('dashHidden');
+  const show = (id: string) => !hidden.includes(id);
   const year = Number(mk.slice(0, 4)), month = Number(mk.slice(5, 7));
   const f = l.flows.get(mk);
   const sum = monthSummary(f, l.flows.get(shift(mk, -1)), l.categories, l.budgets, target);
@@ -45,11 +52,18 @@ export default function Dashboard() {
     return (<><PageHeader title="Aufwind" sub="Rise on what you already have." /><Empty title="Welcome"><p className="muted" style={{ margin: 0 }}>Import your workbook to see your month at a glance.</p><Link className="btn btn-primary" to="/import">Import workbook</Link></Empty></>);
   }
 
+  // Insight charts: daily spending for the calendar (30 weeks) and the pace lines (this + last month).
+  const daysIn = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+  const dim = daysIn(mk);
+  const paceDay = mk === today.slice(0, 7) ? Number(today.slice(8, 10)) : mk < today.slice(0, 7) ? dim : 0;
+  const daily = dailySpending(l.transactions, `${shift(today.slice(0, 7), -13)}-01`, today);
+  const spendBudget = l.categories.filter((c) => SPEND_GROUPS.includes(c.group as (typeof SPEND_GROUPS)[number])).reduce((s, c) => s + budgetFor(l.budgets, c.id, mk), 0);
+
   // Last 6 months with any data, ending at the selected month.
   const months = Array.from({ length: 6 }, (_, i) => shift(mk, i - 5)).filter((m) => l.flows.has(m));
   const flowData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, income: l.flows.get(m)!.income, expenses: l.flows.get(m)!.expenses }));
   const netData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, net: l.flows.get(m)!.freeCash }));
-  const groups = (['Fixed', 'Living', 'Discretionary', 'Debt Service'] as const).map((g) => ({ name: g, value: [...(f?.byCategory ?? [])].filter(([id]) => l.category.get(id)?.group === g).reduce((s, [, v]) => s + Math.max(0, v), 0) })).filter((x) => x.value > 0);
+  const groups = (['Fixed', 'Living', 'Discretionary', 'Debt Service'] as const).map((g, slot) => ({ name: g, slot, value: [...(f?.byCategory ?? [])].filter(([id]) => l.category.get(id)?.group === g).reduce((s, [, v]) => s + Math.max(0, v), 0) })).filter((x) => x.value > 0);
   const ranking = [...(f?.byCategory ?? [])].map(([id, v]) => ({ c: l.category.get(id)!, v })).filter((x) => x.c && !['Income', 'Savings'].includes(x.c.group) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
   const maxRank = Math.max(1, ...ranking.map((x) => x.v));
   const budgetRows = tracker.sections.filter((s) => !['Income', 'Savings'].includes(s.group)).flatMap((s) => s.rows).map((r) => ({ r, b: budgetFor(l.budgets, r.category.id, mk), spent: r.months[month - 1]! })).filter((x) => x.b > 0 && x.spent > 0).map((x) => ({ ...x, pct: x.spent / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 6);
@@ -72,7 +86,7 @@ export default function Dashboard() {
         <button className="btn btn-primary btn-sm" onClick={() => qa.open()}>+ Add</button>
       </PageHeader>
 
-      <div className="kpis">
+      <div className="kpis stagger" data-tour="kpis">
         <Kpi label="Income" value={f?.income ?? 0} tone="income" />
         <Kpi label="Expenses" value={f?.expenses ?? 0} tone="expense" sub={f?.debtService ? `incl. ${formatMoney(f.debtService, 'CRC')} debt` : undefined} />
         <Kpi label="Net" value={f?.net ?? 0} tone="auto" />
@@ -80,17 +94,19 @@ export default function Dashboard() {
         <Kpi label="Free cash after saving" value={f?.freeCash ?? 0} tone="auto" />
       </div>
 
-      <div className="dash-grid">
-        <Glass strong className="span-2" style={{ display: 'grid', gap: 8 }}>
+      <div className="dash-grid stagger">
+        {show('safe') && coach.run && (<Glass strong className="span-2" data-tour="safe"><SafeToSpendCard /></Glass>)}
+        {show('coach') && coach.run && (<Glass strong className="span-2"><CoachTop /></Glass>)}
+        {show('insights') && (<Glass strong className="span-2" style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">What happened</h2>
           {sum.insights.length === 0 ? <p className="muted" style={{ margin: 0 }}>No movements yet this month.</p> : (
             <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
               {sum.insights.map((i, k) => <li key={k} style={{ display: 'flex', gap: 8 }}><span aria-hidden style={{ color: i.tone === 'good' ? 'var(--income)' : i.tone === 'bad' ? 'var(--expense)' : 'var(--text-3)' }}>●</span><span>{i.text}</span></li>)}
             </ul>
           )}
-        </Glass>
+        </Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('upcoming') && (<Glass strong className="span-2-wide" style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Coming up (30 days)</h2>
           {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> waiting for you to confirm</Link>}
           {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (
@@ -99,12 +115,14 @@ export default function Dashboard() {
             </ul>
           )}
           <Link to="/bills" className="small">Calendar →</Link>
-        </Glass>
+        </Glass>)}
 
-        <Glass strong className="span-2"><IncomeExpenseChart title="Income vs expenses" data={flowData} /></Glass>
-        <Glass strong><GroupDonut title="Spending by group" data={groups} /></Glass>
+        {show('waterfall') && f && (<Glass strong className="span-2"><MonthWaterfall steps={monthWaterfall(f, l.category)} month={mk} /></Glass>)}
+        {show('pace') && (<Glass strong className="span-2"><SpendingPace month={mk} days={dim} today={paceDay} thisMonth={cumulative(daily.byDay, mk, dim, paceDay)} lastMonth={cumulative(daily.byDay, shift(mk, -1), daysIn(shift(mk, -1)))} budget={spendBudget} label="All spending this month" /></Glass>)}
+        {show('flow') && (<Glass strong className="span-2"><IncomeExpenseChart title="Income vs expenses" data={flowData} /></Glass>)}
+        {show('groups') && (<Glass strong><GroupDonut title="Spending by group" data={groups} /></Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('where') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Where it went</h2>
           {ranking.length === 0 ? <p className="muted small" style={{ margin: 0 }}>No spending yet.</p> : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }} aria-label="Top categories this month">
@@ -116,9 +134,9 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-        </Glass>
+        </Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('budget') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Budget health</h2>
           {budgetRows.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Set budgets in the Tracker.</p> : budgetRows.map((x) => (
             <div key={x.r.category.id} style={{ display: 'grid', gap: 3 }}>
@@ -127,9 +145,9 @@ export default function Dashboard() {
             </div>
           ))}
           <Link to="/tracker" className="small">Full tracker →</Link>
-        </Glass>
+        </Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('freecash') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Free cash by month</h2>
           <div style={{ height: 170 }} role="img" aria-label={`Free cash after saving: ${netData.map((d) => `${d.month} ${formatMoney(d.net, 'CRC')}`).join(', ')}`}>
             <ResponsiveContainer>
@@ -143,9 +161,9 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Glass>
+        </Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('networth') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Net worth</h2>
           {current ? <>
             <Money amount={current.netWorth} size={26} weight={800} tone="auto" />
@@ -155,9 +173,9 @@ export default function Dashboard() {
             {ef && essentials > 0 && <div className="small">Emergency fund <b>{ef.liquidMonths.toFixed(1)}</b> / {efTarget} months liquid · {ef.totalMonths.toFixed(1)} incl. cesantía</div>}
             <Link to="/net-worth" className="small">Balance sheet →</Link>
           </> : <p className="muted small">No data.</p>}
-        </Glass>
+        </Glass>)}
 
-        <Glass strong style={{ display: 'grid', gap: 10 }}>
+        {show('debts') && (<Glass strong style={{ display: 'grid', gap: 10 }}>
           <h2 className="card-h">Debts</h2>
           {activeDebts.length === 0 ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
             const st = debtStatus(d, l.transactions);
@@ -170,7 +188,8 @@ export default function Dashboard() {
             );
           })}
           <Link to="/debts" className="small">Payoff plans →</Link>
-        </Glass>
+        </Glass>)}
+        {show('calendar') && (<Glass strong className="span-wide"><SpendingCalendar byDay={daily.byDay} to={today} estimated={daily.estimated} weeks={52} /></Glass>)}
       </div>
     </>
   );

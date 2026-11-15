@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { rateForDay } from '../app/fx';
 import { usePref } from '../app/prefs';
 import { Glass, Money, Pill, Segmented } from '../design/components';
 import { PageHeader } from '../ui/Sheet';
 import { cdp, futureValue, monthsToTarget, programmedSavings, type Frequency } from '../domain/calculators';
 import { amortize, accelerate } from '../domain/debts';
 import { cuotaDate } from '../domain/installments';
-import { formatMoney, parseAmountInput } from '../lib/money';
+import { convert, formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { useAvgIncome } from './Debts';
 
-type Tab = 'cdp' | 'programmed' | 'loan' | 'whatif';
+type Tab = 'cdp' | 'programmed' | 'loan' | 'whatif' | 'fx';
 const amt = (s: string) => parseAmountInput(s, 'CRC') ?? 0;
 const num = (s: string) => { const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 
@@ -74,7 +75,7 @@ export default function Calculators() {
     <>
       <PageHeader title="Calculators" sub="Costa Rica money math. Rates are yours to enter and verify. Nothing here is a bank's official rate." />
       <div style={{ marginBottom: 16 }}>
-        <Segmented<Tab> label="Calculator" value={tab} onChange={setTab} options={[{ value: 'cdp', label: 'CDP' }, { value: 'programmed', label: 'Ahorro programado' }, { value: 'loan', label: 'Loan payoff' }, { value: 'whatif', label: 'What if I save more' }]} />
+        <Segmented<Tab> label="Calculator" value={tab} onChange={setTab} options={[{ value: 'cdp', label: 'CDP' }, { value: 'programmed', label: 'Ahorro programado' }, { value: 'loan', label: 'Loan payoff' }, { value: 'whatif', label: 'What if I save more' }, { value: 'fx', label: 'Dollars ↔ colones' }]} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: 16, alignItems: 'start' }}>
         {tab === 'cdp' && <>
@@ -159,7 +160,45 @@ export default function Calculators() {
             {toTarget !== null && <Row k="Months to reach the target" v={toTarget === Infinity ? 'never' : `${toTarget} (${formatDateCR(cuotaDate(today, toTarget + 1))})`} strong />}
           </Glass>
         </>}
+
+        {tab === 'fx' && <FxCalculator />}
       </div>
+    </>
+  );
+}
+
+/** Convert any amount at the rate of any day (BCCR → market → your own). */
+function FxCalculator() {
+  const [date, setDate] = useState(todayISO());
+  const [dir, setDir] = useState<'USD' | 'CRC'>('USD');
+  const [raw, setRaw] = useState('100');
+  const [rateRaw, setRateRaw] = useState('');
+  const [info, setInfo] = useState('');
+  useEffect(() => {
+    let off = false;
+    setInfo('Getting the rate…');
+    void rateForDay(date).then((q) => { if (off) return; if (q) { setRateRaw(String(q.rate / 100)); setInfo(`${q.source === 'BCCR' ? `BCCR ${q.side}` : 'Market'} rate of ${formatDateCR(q.rateDate)}`); } else setInfo('No rate available: type one.'); }).catch(() => !off && setInfo('No rate available: type one.'));
+    return () => { off = true; };
+  }, [date]);
+  const rate = parseAmountInput(rateRaw, 'CRC');
+  const v = parseAmountInput(raw, dir);
+  const out = v && rate ? convert(v, dir, dir === 'USD' ? 'CRC' : 'USD', rate) : null;
+  return (
+    <>
+      <Glass strong style={{ display: 'grid', gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Dollars ↔ colones</h2>
+        <Segmented<'USD' | 'CRC'> label="Direction" value={dir} onChange={setDir} options={[{ value: 'USD', label: '$ → ₡' }, { value: 'CRC', label: '₡ → $' }]} />
+        <Field id="fx-amt" label={dir === 'USD' ? 'Dollars' : 'Colones'} value={raw} onChange={setRaw} />
+        <div className="grid2">
+          <Field id="fx-date" type="date" label="On the day" value={date} onChange={setDate} />
+          <Field id="fx-rate" label="Rate (₡ per $1)" value={rateRaw} onChange={(x) => { setRateRaw(x); setInfo('Your rate'); }} hint={info} />
+        </div>
+      </Glass>
+      <Glass strong style={{ display: 'grid', gap: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Result</h2>
+        <b className="money" style={{ fontSize: 34 }}>{out ? formatMoney(out, dir === 'USD' ? 'CRC' : 'USD', { decimals: 2 }) : '—'}</b>
+        <span className="small muted">Set the rate source and your BCCR token in Settings → Exchange rates.</span>
+      </Glass>
     </>
   );
 }

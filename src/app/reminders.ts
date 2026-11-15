@@ -19,7 +19,7 @@ export async function notificationsAllowed(ask = false): Promise<boolean> {
   return ask ? (await Notification.requestPermission()) === 'granted' : false;
 }
 
-async function send(title: string, body: string) {
+export async function send(title: string, body: string) {
   if (isTauri()) { const n = await import('@tauri-apps/plugin-notification'); n.sendNotification({ title, body }); }
   else new Notification(title, { body, icon: `${import.meta.env.BASE_URL}icon.png` });
 }

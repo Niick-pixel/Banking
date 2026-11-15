@@ -1,6 +1,6 @@
 # Aufwind: build plan, decisions, workbook findings, open questions
 
-Status: **All 9 phases are done, plus Tasa Cero and the Windows desktop track (D1–D3).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
+Status: **All phases are done, plus Tasa Cero, the Windows desktop track (D1–D3) and, in v0.4, the Money Coach (spec §10, see [`COACH.md`](COACH.md)).** The desktop/OTA track is planned in [`DESKTOP_PLAN.md`](DESKTOP_PLAN.md).
 
 ## Stack (confirmed)
 
@@ -37,7 +37,8 @@ I'm not recommending native SwiftUI. You live on Windows, and the web version ca
    - **Command palette:** Ctrl/⌘ K.
    - **Installable web app:** manifest, offline service worker, iPhone home-screen support, published to GitHub Pages by `pages.yml`.
    - **Accessibility:** axe-core audit of all 15 screens in light and dark finds 0 violations.
-10. **Windows desktop**: Tauri installer, signed OTA updates, data vault in a cloud-synced folder. See `DESKTOP_PLAN.md` (D1–D6).
+10. ✅ **v0.4: layout, themes, Coach**: six sections with tabs (Settings at the bottom left, in categories), 2K layout with native zoom, 6 themes (3 light, 3 dark), smooth transitions with a speed setting, first-launch guided tour, dollar expenses converted at the day's BCCR/market rate, waterfall/pace/daily-spending charts with click-through, and the Money Coach ([`COACH.md`](COACH.md)).
+11. **Windows desktop**: Tauri installer, signed OTA updates, data vault in a cloud-synced folder. See `DESKTOP_PLAN.md` (D1–D6).
 
 ## Workbook findings & open questions
 

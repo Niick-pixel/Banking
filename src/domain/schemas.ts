@@ -87,6 +87,20 @@ export type Side = z.infer<typeof Side>;
 
 export const SplitSchema = z.object({ categoryId: Id, amount: PositiveMinor, note: z.string().optional() });
 
+/** The original foreign-currency amount of a movement saved in colones, and the rate used. */
+export const FxInfoSchema = z.object({
+  currency: z.literal('USD'),
+  /** USD cents. */
+  amount: PositiveMinor,
+  /** CRC céntimos per 1 USD. */
+  rate: z.number().int().positive(),
+  /** The day the rate is from (may be before the movement's date on weekends/holidays). */
+  rateDate: ISODateSchema,
+  source: z.enum(['BCCR', 'market', 'manual']),
+  side: z.enum(['sell', 'buy']).default('sell'),
+});
+export type FxInfo = z.infer<typeof FxInfoSchema>;
+
 const TxBase = {
   id: Id,
   date: ISODateSchema,
@@ -101,6 +115,8 @@ const TxBase = {
   importBatchId: Id.optional(),
   /** Groups records created by one user action (e.g. pay-from-pot + debt repayment). */
   linkId: Id.optional(),
+  /** Set when you entered the amount in dollars: `amount` is the colón conversion. */
+  fx: FxInfoSchema.optional(),
   ...Timestamps,
 };
 
@@ -271,7 +287,7 @@ export const ExchangeRateSchema = z.object({
   id: Id, date: ISODateSchema,
   /** CRC céntimos per 1 USD. */
   buy: z.number().int().positive(), sell: z.number().int().positive(),
-  source: z.enum(['BCCR', 'manual']), ...Timestamps,
+  source: z.enum(['BCCR', 'market', 'manual']), ...Timestamps,
 });
 export type ExchangeRate = z.infer<typeof ExchangeRateSchema>;
 

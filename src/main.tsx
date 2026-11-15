@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import './design/tokens.css';
 import './app/shell.css';
+import './design/themes.css';
 import { ThemeProvider } from './app/theme';
 import Shell from './app/Shell';
 import DesignPage from './routes/DesignPage';
@@ -21,16 +22,20 @@ import Calculators from './routes/Calculators';
 import Dashboard from './routes/Dashboard';
 import Reports from './routes/Reports';
 import Bills from './routes/Bills';
+import Coach from './routes/Coach';
+import { CoachProvider } from './app/coach';
 import { bootSync } from './sync';
 import { LockGate } from './app/LockGate';
 
 const router = createBrowserRouter([
   {
-    element: <QuickAddProvider><Shell /></QuickAddProvider>,
+    element: <CoachProvider><QuickAddProvider><Shell /></QuickAddProvider></CoachProvider>,
     children: [
       { path: '/', element: <Dashboard /> },
       { path: '/reports', element: <Reports /> },
       { path: '/bills', element: <Bills /> },
+      { path: '/coach', element: <Coach /> },
+      { path: '/coach/:page', element: <Coach /> },
       { path: '/design', element: <DesignPage /> },
       { path: '/transactions', element: <Transactions /> },
       { path: '/accounts', element: <Accounts /> },
