@@ -129,7 +129,7 @@ function AppearancePanel() {
         <Row label="Density" hint="Compact fits more on screen.">
           <Segmented<Appearance['density']> label="Density" value={a.density} onChange={(density) => set({ density })} options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]} />
         </Row>
-        <Row label="Text & control size" hint="Auto makes everything a little larger on 2K and 4K monitors.">
+        <Row label="Text & control size" hint={isTauri() ? 'Auto makes everything a little larger on 2K and 4K monitors.' : 'Applies in the Windows app. In a browser, use Ctrl + and Ctrl −.'}>
           <Segmented label="Size" value={String(a.uiScale)} onChange={(v) => set({ uiScale: Number(v) })} options={[{ value: '0', label: 'Auto' }, { value: '0.9', label: 'S' }, { value: '1', label: 'M' }, { value: '1.12', label: 'L' }, { value: '1.25', label: 'XL' }]} />
         </Row>
       </Section>

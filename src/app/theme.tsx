@@ -58,17 +58,30 @@ interface ThemeCtx {
 }
 const Ctx = createContext<ThemeCtx | null>(null);
 
+const isDesktop = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+async function logicalWidth(): Promise<number> {
+  if (!isDesktop()) return window.innerWidth;
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const w = getCurrentWindow();
+    const [size, f] = await Promise.all([w.innerSize(), w.scaleFactor()]);
+    return size.width / f;
+  } catch { return window.innerWidth; }
+}
+
 const prefersDark = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 const prefersReduced = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [a, setA] = useState<Appearance>(load);
   const [sysDark, setSysDark] = useState(prefersDark());
+  // Logical window width in the desktop app (independent of the webview zoom we set), else CSS px.
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1440);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const on = () => setSysDark(mq.matches);
-    const onResize = () => setVw(window.innerWidth);
+    const onResize = () => void logicalWidth().then(setVw);
+    onResize();
     mq.addEventListener('change', on); window.addEventListener('resize', onResize);
     return () => { mq.removeEventListener('change', on); window.removeEventListener('resize', onResize); };
   }, []);
@@ -86,6 +99,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     el.setAttribute('data-motion', motion);
     if (a.transparency === 'reduced') el.setAttribute('data-transparency', 'reduced'); else el.removeAttribute('data-transparency');
     el.style.setProperty('--ui-scale', String(scale));
+    // Size: native webview zoom in the desktop app (keeps charts, hit-testing and layout exact).
+    // In a browser, Ctrl +/- already does this, so we leave it alone.
+    if (isDesktop()) void import('@tauri-apps/api/webview').then(({ getCurrentWebview }) => getCurrentWebview().setZoom(scale)).catch(() => {});
     el.style.setProperty('--motion', motion === 'off' ? '0' : motion === 'quick' ? '0.55' : '1');
     try { localStorage.setItem(KEY, JSON.stringify(a)); } catch { /* private mode */ }
   }, [a, resolved, motion, scale]);

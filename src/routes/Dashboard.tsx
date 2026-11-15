@@ -92,7 +92,7 @@ export default function Dashboard() {
           )}
         </Glass>)}
 
-        {show('upcoming') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
+        {show('upcoming') && (<Glass strong className="span-2-wide" style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Coming up (30 days)</h2>
           {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> waiting for you to confirm</Link>}
           {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (

@@ -94,7 +94,6 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
 :root[data-transparency="reduced"] .glass::after, :root[data-transparency="reduced"] .aurora::after { display: none; }
 
 /* ── Layout: fill big screens, density, width options ──────────────────── */
-#root { zoom: var(--ui-scale, 1); }
 .shell { max-width: none; grid-template-columns: var(--sidebar-w, 248px) minmax(0, 1fr); padding: 22px 28px; gap: 28px; }
 :root[data-width="wide"] .shell { max-width: 1960px; }
 :root[data-width="centered"] .shell { max-width: 1480px; }
@@ -106,6 +105,7 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
   .dash-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
   .dash-grid .span-2 { grid-column: span 2; }
   .dash-grid .span-wide { grid-column: span 4; }
+  .dash-grid .span-2-wide { grid-column: span 2; }
   .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
 }
 @container (max-width: 1499px) { .dash-grid .span-wide { grid-column: 1 / -1; } }

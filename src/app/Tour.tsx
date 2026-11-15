@@ -74,8 +74,7 @@ export function GuidedTour() {
   }, [i, go, finish]);
 
   if (i === null || !step) return null;
-  // The page is zoomed by --ui-scale; getBoundingClientRect is in screen pixels, fixed positioning in zoomed ones.
-  const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+  const z = 1;
   const pad = 8;
   const r = rect ? { x: rect.x / z - pad, y: rect.y / z - pad, w: rect.width / z + pad * 2, h: rect.height / z + pad * 2 } : null;
   const vw = window.innerWidth / z, vh = window.innerHeight / z;

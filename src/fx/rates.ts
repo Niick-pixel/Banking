@@ -54,7 +54,7 @@ async function defaultFetcher(): Promise<Fetcher> {
     const { fetch: tfetch } = await import('@tauri-apps/plugin-http');
     return (url) => tfetch(url, { method: 'GET', connectTimeout: 8000 });
   }
-  return (url) => fetch(url);
+  return (url) => fetch(url, { signal: AbortSignal.timeout(8000) });
 }
 
 const BCCR_URL = 'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML';

@@ -7,6 +7,7 @@ import { Empty, PageHeader, Toast } from '../ui/Sheet';
 import { formatDateCR, monthKey } from '../lib/dates';
 import { deleteTransaction, lastAuditId, saveTransaction, undoAudit } from '../db/repo';
 import type { Transaction } from '../domain/schemas';
+import { formatMoney, type Minor } from '../lib/money';
 import { StartFresh } from './Accounts';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -146,6 +147,7 @@ export default function Transactions() {
                             {formatDateCR(t.date)}{t.dateEstimated && <span title="No date in the workbook: placed on the last day of the month"> · est.</span>}
                             {' · '}{c?.name ?? KIND_LABEL[t.kind]}{' · '}{where}
                             {t.kind === 'debt_payment' && <> · {l.debts.find((d) => d.id === t.debtId)?.creditor}</>}
+                            {t.fx && <> · <span title={`${t.fx.source === 'BCCR' ? 'BCCR' : t.fx.source === 'market' ? 'Market' : 'Your'} rate of ${formatDateCR(t.fx.rateDate)}`}>{formatMoney(t.fx.amount as Minor, 'USD')} @ ₡{(t.fx.rate / 100).toFixed(2)}</span></>}
                           </span>
                         </button>
                         {t.tags.includes('tasa-cero') && <Pill tone="debt">Tasa 0</Pill>}
