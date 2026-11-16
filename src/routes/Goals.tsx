@@ -10,6 +10,7 @@ import type { Goal } from '../domain/schemas';
 import type { Payroll } from '../domain/prefs';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
+import { AutoSavings } from './AutoSavings';
 
 export default function Goals() {
   const l = useLedger();
@@ -38,6 +39,7 @@ export default function Goals() {
       </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 16, marginBottom: 16 }}>
+        <AutoSavings />
         <Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Savings rate</h2>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>

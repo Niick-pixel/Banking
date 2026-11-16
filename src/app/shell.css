@@ -218,3 +218,23 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .rule-row { border: 1px solid var(--glass-hairline); border-radius: 14px; padding: 10px 14px; }
 .rule-row summary { display: flex; gap: 12px; align-items: center; cursor: pointer; list-style: none; }
 .rule-row summary::-webkit-details-marker { display: none; }
+
+/* ── Chip menus (single / multi select) ───────────────────────────────── */
+.chipgroup { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
+.chipgroup-head { display: flex; align-items: center; gap: 6px; padding: 0 4px; width: 100%; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); font-weight: 650; }
+.chipgroup-label { color: var(--text-2); }
+.chipgroup-note { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.chipgroup-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.chipgroup-dot.missing { box-shadow: 0 0 0 3px var(--accent-soft); }
+.chipgroup-info { display: inline-flex; color: var(--text-3); cursor: help; }
+.chipgroup-aside { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 11.5px; padding: 2px 8px; border-radius: 8px; border: 1px solid var(--glass-hairline); }
+.chipgroup-tray { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-radius: 22px; background: var(--input-bg); border: 1px solid var(--glass-hairline); box-shadow: inset 0 1px 2px rgba(0,0,0,.03); }
+.chipgroup-tray.spread > .chipopt { flex: 1 1 auto; }
+.chipopt { position: relative; isolation: isolate; border: 1px solid transparent; background: transparent; color: var(--text); font: inherit; font-size: 14px; font-weight: 550; padding: 9px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; transition: color calc(.2s * var(--motion, 1)), background-color calc(.2s * var(--motion, 1)); }
+.chipgroup-sm .chipopt { padding: 6px 12px; font-size: 13px; }
+.chipopt:hover:not(:disabled):not(.on) { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.chipopt:disabled { opacity: .4; cursor: not-allowed; }
+.chipopt.on { color: color-mix(in srgb, var(--accent) 70%, var(--text)); }
+.chipopt-bg { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, var(--solid-surface, #fff)); border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.chipopt-label { position: relative; }
+.chipopt:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }

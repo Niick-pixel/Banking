@@ -75,3 +75,16 @@ describe.runIf(existsSync(REAL))('real workbook into the DB (local only)', () =>
     expect((await d.importBatches.get(batch.id))!.status).toBe('undone');
   });
 });
+
+describe('automatic savings (Ahorro Objetivo)', () => {
+  it('posts a savings transfer on the 1st and 16th, once each, from the start date on', async () => {
+    await d.accounts.add(account('c', 'checking'));
+    await d.accounts.add(account('s', 'goal_savings'));
+    await saveRecurring({ id: 'ao', name: 'Ahorro Objetivo', mode: 'auto_post', schedule: { type: 'days', days: [1, 16] }, startDate: '2026-11-10', skipped: [], informational: false, active: true, createdAt: 0, updatedAt: 0,
+      template: { kind: 'savings', direction: 'deposit', from: { accountId: 'c' }, to: { accountId: 's' }, amount: crc(35_000), categoryId: 'smine', description: 'Ahorro Objetivo', tags: ['auto-savings'] } }, d);
+    expect(await postDueRecurring('2026-12-02', d)).toBe(2); // 16 Nov + 1 Dec (1 Nov is before the start)
+    expect(await postDueRecurring('2026-12-02', d)).toBe(0);
+    const posted = (await d.transactions.toArray()).map((t) => t.date).sort();
+    expect(posted).toEqual(['2026-11-16', '2026-12-01']);
+  });
+});

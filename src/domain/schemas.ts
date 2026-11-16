@@ -239,6 +239,8 @@ export const ScheduleSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('monthly'), day: z.number().int().min(1).max(31) }), // clamps to month end
   z.object({ type: z.literal('weekly'), weekday: z.number().int().min(0).max(6) }),
   z.object({ type: z.literal('yearly'), month: z.number().int().min(1).max(12), day: z.number().int().min(1).max(31) }),
+  /** Specific days every month, e.g. [1, 16] for BAC Ahorro Objetivo deductions. 31 = last day. */
+  z.object({ type: z.literal('days'), days: z.array(z.number().int().min(1).max(31)).min(1).max(8) }),
 ]);
 
 export const RecurringRuleSchema = z.object({

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { describeSchedule, templateAmount } from '../domain/recurring';
 import { Link } from 'react-router-dom';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
@@ -105,6 +106,9 @@ export default function Accounts() {
                         </div>
                       )}
                       {noOpening && <Pill tone="debt">Set the real opening balance</Pill>}
+                      {l.recurring.filter((r) => r.active && (r.template as { kind?: string; to?: { accountId: string } }).kind === 'savings' && (r.template as { to?: { accountId: string } }).to?.accountId === a.id).map((r) => (
+                        <Link key={r.id} to="/goals" className="small" style={{ display: 'block' }}>↻ Auto-saves {formatMoney(templateAmount(r), 'CRC', { decimals: 0 })} · {describeSchedule(r.schedule).replace('Every month on the ', '')}</Link>
+                      ))}
                       <div><button className="btn btn-sm" onClick={() => setPotFor(a)}>+ Fund</button></div>
                     </Glass>
                   );

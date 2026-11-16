@@ -5,6 +5,7 @@ import { usePendingReminders, useCalendar } from '../app/useRecurring';
 import { places } from '../app/QuickAdd';
 import { Glass, Pill, Segmented } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { describeSchedule, occurrences, suggestRecurring, templateAmount, type CalendarEvent, type Schedule } from '../domain/recurring';
 import { confirmOccurrence, newId, saveRecurring, skipOccurrence } from '../db/repo';
 import { usePref } from '../app/prefs';
@@ -239,8 +240,9 @@ function RecurringForm({ rule, onDone }: { rule?: RecurringRule; onDone: () => v
         {kind === 'debt_payment' && <div className="field"><label htmlFor="rf-d">Debt</label><select id="rf-d" className="input" value={debtId} onChange={(e) => setDebtId(e.target.value)}><option value="">Choose…</option>{l.debts.map((d) => <option key={d.id} value={d.id}>{d.creditor}</option>)}</select></div>}
       </div>
       <div className="field"><span className="small" style={{ fontWeight: 600, color: 'var(--text-2)' }}>How often</span>
-        <Segmented<Schedule['type']> label="Frequency" value={sched.type} onChange={(v) => setSched(v === 'quincena' ? { type: v } : v === 'monthly' ? { type: v, day: 1 } : v === 'weekly' ? { type: v, weekday: 1 } : { type: v, month: 12, day: 15 })}
-          options={[{ value: 'quincena', label: 'Quincena' }, { value: 'monthly', label: 'Monthly' }, { value: 'weekly', label: 'Weekly' }, { value: 'yearly', label: 'Yearly' }]} />
+        <Segmented<Schedule['type']> label="Frequency" value={sched.type} onChange={(v) => setSched(v === 'quincena' ? { type: v } : v === 'monthly' ? { type: v, day: 1 } : v === 'days' ? { type: v, days: [1, 16] } : v === 'weekly' ? { type: v, weekday: 1 } : { type: v, month: 12, day: 15 })}
+          options={[{ value: 'quincena', label: 'Quincena' }, { value: 'monthly', label: 'Monthly' }, { value: 'days', label: 'Specific days' }, { value: 'weekly', label: 'Weekly' }, { value: 'yearly', label: 'Yearly' }]} />
+        {sched.type === 'days' && <DaysPicker value={sched.days} onChange={(days) => setSched({ type: 'days', days })} />}
         {sched.type === 'monthly' && <label className="small">Day of month <input className="input" style={{ width: 80, height: 34 }} type="number" min={1} max={31} value={sched.day} onChange={(e) => setSched({ type: 'monthly', day: Math.min(31, Math.max(1, Number(e.target.value) || 1)) })} /> <span className="muted">(31 = last day)</span></label>}
         {sched.type === 'weekly' && <select className="input" style={{ maxWidth: 200 }} aria-label="Weekday" value={sched.weekday} onChange={(e) => setSched({ type: 'weekly', weekday: Number(e.target.value) })}>{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => <option key={d} value={i}>{d}</option>)}</select>}
         {sched.type === 'yearly' && <div style={{ display: 'flex', gap: 8 }}><select className="input" aria-label="Month" value={sched.month} onChange={(e) => setSched({ ...sched, month: Number(e.target.value) })}>{MN.map((mm, i) => <option key={mm} value={i + 1}>{mm}</option>)}</select><input className="input" style={{ width: 80 }} aria-label="Day" type="number" min={1} max={31} value={sched.day} onChange={(e) => setSched({ ...sched, day: Math.min(31, Math.max(1, Number(e.target.value) || 1)) })} /></div>}
@@ -257,4 +259,10 @@ function RecurringForm({ rule, onDone }: { rule?: RecurringRule; onDone: () => v
       </div>
     </form>
   );
+}
+
+/** Days of the month as a chip menu (31 = last day). */
+export function DaysPicker({ value, onChange, label = 'Days of the month' }: { value: number[]; onChange: (d: number[]) => void; label?: string }) {
+  return <ChipGroup<number> multi label={label} required max={8} size="sm" spread={false} value={value} onChange={(d) => onChange([...d].sort((a, b) => a - b))}
+    options={Array.from({ length: 31 }, (_, i) => ({ value: i + 1, label: i === 30 ? 'Last' : String(i + 1) }))} />;
 }

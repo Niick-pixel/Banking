@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildOccurrence, calendarEvents, dueOccurrences, occurrences, recurringTxId, suggestRecurring } from './recurring';
+import { buildOccurrence, calendarEvents, describeSchedule, dueOccurrences, occurrences, recurringTxId, suggestRecurring } from './recurring';
 import { PREF_DEFAULTS } from './prefs';
 import { account, crc, debt, tx } from '../test/factories';
 import { accountBalances, monthlyFlows } from './ledger';
@@ -104,5 +104,13 @@ describe.runIf(existsSync(REAL))('suggestions from the real workbook (local only
     const s = suggestRecurring(p.transactions, p.categories, p.accounts, PREF_DEFAULTS.payroll, '2026-11-14', []);
     console.log(s.map((x) => `${x.key} | ${x.name} | ${x.rule.mode} | ${JSON.stringify(x.rule.schedule)} | ${(x.rule.template as { amount?: number; signedAmount?: number }).amount ?? (x.rule.template as { signedAmount?: number }).signedAmount} | ${x.reason}`).join('\n'));
     expect(s.length).toBeGreaterThan(3);
+  });
+});
+
+describe('specific-days schedule', () => {
+  it('posts on each listed day, clamping 31 to the month end', () => {
+    expect(occurrences({ type: 'days', days: [1, 16] }, '2026-01-01', '2026-11-01', '2026-12-31')).toEqual(['2026-11-01', '2026-11-16', '2026-12-01', '2026-12-16']);
+    expect(occurrences({ type: 'days', days: [31] }, '2026-01-01', '2027-02-01', '2027-02-28')).toEqual(['2027-02-28']);
+    expect(describeSchedule({ type: 'days', days: [16, 1] })).toBe('Every month on the 1st and 16th');
   });
 });
