@@ -22,6 +22,8 @@ import { CATEGORY_GROUPS, type Category } from '../domain/schemas';
 import { saveCategory } from '../db/repo';
 import { rateForDay } from '../app/fx';
 import { startTour } from '../app/Tour';
+import { ChipGroup } from '../design/components/ChipGroup';
+import { readPersisted, writePersisted } from '../app/persist';
 import { RULES } from '../coach/rules';
 import { COACH_DEFAULTS } from '../coach/prefs';
 import type { CoachPrefs, WindfallTarget } from '../coach/types';
@@ -154,14 +156,9 @@ function DashboardPanel() {
   const [hidden, setHidden] = usePref('dashHidden');
   return (
     <Section title="Dashboard cards" sub="Turn off the cards you don't use. The month figures at the top always show.">
-      <div className="check-grid">
-        {DASH_CARDS.map((c) => (
-          <label key={c.id} className="check-card">
-            <input type="checkbox" checked={!hidden.includes(c.id)} onChange={(e) => void setHidden(e.target.checked ? hidden.filter((h) => h !== c.id) : [...hidden, c.id])} />
-            {c.label}
-          </label>
-        ))}
-      </div>
+      <ChipGroup<string> multi label="Show on the dashboard" aside={`${DASH_CARDS.length - hidden.length} of ${DASH_CARDS.length}`}
+        value={DASH_CARDS.map((c) => c.id).filter((id) => !hidden.includes(id))} onChange={(on) => void setHidden(DASH_CARDS.map((c) => c.id).filter((id) => !on.includes(id)))}
+        options={DASH_CARDS.map((c) => ({ value: c.id, label: c.label }))} spread={false} />
     </Section>
   );
 }
@@ -419,7 +416,7 @@ function DataPanel({ run }: { run: (label: string, fn: () => Promise<unknown>) =
       </Section>
 
       <Section title="Data health" id="health">
-        {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, pots, debts and statements agree.</Pill> : (
+        {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, funds, debts and statements agree.</Pill> : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
             {health.map((h) => (
               <li key={h.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
@@ -490,7 +487,9 @@ export default function Settings() {
   const { dur } = useTheme();
   const cats = CATS.filter((c) => !c.desktopOnly || isTauri());
   const fromUrl = new URLSearchParams(loc.search).get('c') as CatId | null;
-  const cat: CatId = loc.hash === '#health' ? 'data' : fromUrl && cats.some((c) => c.id === fromUrl) ? fromUrl : 'appearance';
+  const lastCat = readPersisted<CatId>('settings.cat', 'appearance');
+  const cat: CatId = loc.hash === '#health' ? 'data' : fromUrl && cats.some((c) => c.id === fromUrl) ? fromUrl : cats.some((c) => c.id === lastCat) ? lastCat : 'appearance';
+  useEffect(() => writePersisted('settings.cat', cat), [cat]);
   const [msg, setMsg] = useState('');
   const current = cats.find((c) => c.id === cat)!;
 

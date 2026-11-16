@@ -7,6 +7,7 @@ import { newId, saveAccount, saveInstallmentPlan } from '../db/repo';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, parseISO, todayISO, cuotaFirstDefault } from '../lib/dates';
 import type { InstallmentPlan } from '../domain/schemas';
+import { usePersisted } from '../app/persist';
 
 const TERMS = [3, 6, 10, 12, 18, 24, 36];
 
@@ -14,7 +15,7 @@ export default function TasaCero() {
   const l = useLedger();
   const today = todayISO();
   const [raw, setRaw] = useState('');
-  const [months, setMonths] = useState(6);
+  const [months, setMonths] = usePersisted('tasa.months', 6);
   const [first, setFirst] = useState(cuotaFirstDefault(today));
   const [showSchedule, setShowSchedule] = useState(false);
   const [adding, setAdding] = useState<InstallmentPlan | null>(null);

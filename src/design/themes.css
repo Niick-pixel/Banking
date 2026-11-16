@@ -1,63 +1,79 @@
-/* ═══════════════════════════ Aufwind v0.4 themes ═══════════════════════════
+/* ═══════════════════════════ Aufwind themes (v0.5) ═══════════════════════════
    html[data-theme] = resolved light/dark (set by ThemeProvider)
-   html[data-palette] = one of 3 light (aurora, dune, glacier) or 3 dark (midnight, ember, updraft)
+   html[data-palette] = one of 3 light (latte, paper, sage) or 3 dark (graphite, espresso, ocean)
    Chart series colours stay per mode (they are CVD-validated); palettes change
    background, accent, glass tint and ink warmth. */
 
-/* ── Light palettes ─────────────────────────────────────────────────────── */
-:root[data-palette="aurora"] {
-  --bg: #eef1f6;
-  --aurora-1: #8fd3ff; --aurora-2: #b9a8ff; --aurora-3: #7fe3c9; --aurora-4: #ffc9a8; --aurora-5: #c3d4ff;
-  --aurora-opacity: 0.6;
-  --accent: #2f5bea; --accent-soft: rgba(47, 91, 234, 0.12); --focus: #2f5bea;
-  --glass-tint: rgba(255, 255, 255, 0.56); --glass-tint-strong: rgba(255, 255, 255, 0.74);
+/* ── Light palettes ─────────────────────────────────────────────────────
+   Calm tinted bases with a faint glow (not saturated blobs), and cleaner,
+   more opaque panels so text stays crisp. */
+:root[data-palette="latte"] { /* light brown */
+  --bg: #eadccb;
+  --aurora-1: #d9b99a; --aurora-2: #f1e2cf; --aurora-3: #c9a27e; --aurora-4: #f6ebdd; --aurora-5: #dcc3a5;
+  --aurora-opacity: 0.55; --glass-saturate: 120%;
+  --text: #2b1e16; --text-2: #574234; --text-3: #6c5545;
+  --accent: #8b5a36; --accent-soft: rgba(139, 90, 54, 0.14); --focus: #8b5a36; --text-on-accent: #ffffff;
+  --glass-tint: rgba(252, 247, 240, 0.68); --glass-tint-strong: rgba(253, 249, 243, 0.86);
+  --glass-hairline: rgba(70, 40, 15, 0.10); --glass-highlight: inset 0 1px 0 rgba(255, 252, 246, 0.85);
+  --input-bg: rgba(255, 252, 247, 0.78); --input-border: rgba(70, 40, 15, 0.16);
+  --solid-surface: #fbf6ef; --chart-grid: rgba(70, 40, 15, 0.08);
 }
-:root[data-palette="dune"] {
-  --bg: #f6efe5;
-  --aurora-1: #f3c69b; --aurora-2: #e9b3c2; --aurora-3: #f1dfa3; --aurora-4: #c9d6e6; --aurora-5: #f7d8c4;
-  --aurora-opacity: 0.66;
-  --text: #1f1611; --text-2: #4b3d33; --text-3: #6b5a4d;
-  --accent: #a8471f; --accent-soft: rgba(168, 71, 31, 0.12); --focus: #a8471f;
-  --glass-tint: rgba(255, 251, 246, 0.58); --glass-tint-strong: rgba(255, 251, 246, 0.78);
-  --solid-surface: #fffaf3;
-  --income: #2f7a3a;
+:root[data-palette="paper"] { /* crisp neutral white */
+  --bg: #edf0f4;
+  --aurora-1: #dde5f0; --aurora-2: #f4f6f9; --aurora-3: #d6dfeb; --aurora-4: #f7f8fa; --aurora-5: #e2e8f1;
+  --aurora-opacity: 0.6; --glass-saturate: 110%;
+  --text: #111827; --text-2: #3d4757; --text-3: #586373;
+  --accent: #3a5a8c; --accent-soft: rgba(58, 90, 140, 0.12); --focus: #3a5a8c; --text-on-accent: #ffffff;
+  --glass-tint: rgba(255, 255, 255, 0.74); --glass-tint-strong: rgba(255, 255, 255, 0.9);
+  --glass-hairline: rgba(15, 23, 42, 0.08);
+  --input-bg: rgba(246, 248, 251, 0.95); --input-border: rgba(15, 23, 42, 0.12);
+  --solid-surface: #ffffff;
 }
-:root[data-palette="glacier"] {
-  --bg: #edf6f7;
-  --aurora-1: #9fe1ee; --aurora-2: #b9d3ff; --aurora-3: #c9f1e2; --aurora-4: #e2e6ff; --aurora-5: #a7f0dc;
-  --aurora-opacity: 0.62;
-  --text: #0c1a1f; --text-2: #34474d; --text-3: #52666c;
-  --accent: #0e7490; --accent-soft: rgba(14, 116, 144, 0.12); --focus: #0e7490;
-  --glass-tint: rgba(250, 255, 255, 0.56); --glass-tint-strong: rgba(250, 255, 255, 0.76);
-  --solid-surface: #fbffff;
+:root[data-palette="sage"] { /* soft green-grey */
+  --bg: #e3eae2;
+  --aurora-1: #c6dac8; --aurora-2: #e9efe2; --aurora-3: #b5cebd; --aurora-4: #f1f4ea; --aurora-5: #d1e1d3;
+  --aurora-opacity: 0.55; --glass-saturate: 115%;
+  --text: #13201a; --text-2: #3a4b41; --text-3: #536359;
+  --accent: #2e6a4e; --accent-soft: rgba(46, 106, 78, 0.13); --focus: #2e6a4e; --text-on-accent: #ffffff;
+  --glass-tint: rgba(250, 252, 248, 0.7); --glass-tint-strong: rgba(251, 253, 249, 0.87);
+  --glass-hairline: rgba(20, 45, 30, 0.09);
+  --input-bg: rgba(252, 253, 250, 0.85); --input-border: rgba(20, 45, 30, 0.14);
+  --solid-surface: #f8fbf6;
 }
 
 /* ── Dark palettes ──────────────────────────────────────────────────────── */
-:root[data-palette="midnight"] {
-  --bg: #0b0d12;
-  --aurora-1: #1d4ed8; --aurora-2: #6d28d9; --aurora-3: #0f766e; --aurora-4: #9a3412; --aurora-5: #312e81;
-  --aurora-opacity: 0.46;
-  --accent: #7c9cff; --accent-soft: rgba(124, 156, 255, 0.16); --focus: #9db4ff;
-  --glass-tint: rgba(24, 26, 34, 0.56); --glass-tint-strong: rgba(24, 26, 34, 0.76);
-  --solid-surface: #171a22;
+:root[data-palette="graphite"] { /* neutral charcoal */
+  --bg: #121316;
+  --aurora-1: #2b2f38; --aurora-2: #1d2026; --aurora-3: #323745; --aurora-4: #191b20; --aurora-5: #262a34;
+  --aurora-opacity: 0.75; --glass-saturate: 110%;
+  --text: #eceef2; --text-2: #c3c8d1; --text-3: #9aa1ad;
+  --accent: #8ab4ff; --accent-soft: rgba(138, 180, 255, 0.15); --focus: #a9c6ff; --text-on-accent: #0b1220;
+  --glass-tint: rgba(31, 33, 39, 0.64); --glass-tint-strong: rgba(33, 35, 42, 0.84);
+  --glass-hairline: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.06); --input-border: rgba(255, 255, 255, 0.12);
+  --solid-surface: #1b1d22;
 }
-:root[data-palette="ember"] {
-  --bg: #110c0b;
-  --aurora-1: #9a3412; --aurora-2: #9f1239; --aurora-3: #a16207; --aurora-4: #4c1d95; --aurora-5: #7c2d12;
-  --aurora-opacity: 0.42;
-  --text: #f8efe9; --text-2: #d8c7bd; --text-3: #ab988c;
-  --accent: #fb923c; --accent-soft: rgba(251, 146, 60, 0.16); --focus: #fdba74; --text-on-accent: #1a0f0a;
-  --glass-tint: rgba(34, 24, 21, 0.56); --glass-tint-strong: rgba(34, 24, 21, 0.78);
-  --solid-surface: #1e1613;
+:root[data-palette="espresso"] { /* dark brown, Latte's night twin */
+  --bg: #16100c;
+  --aurora-1: #3b2718; --aurora-2: #24180f; --aurora-3: #4a3020; --aurora-4: #1d140d; --aurora-5: #3a291b;
+  --aurora-opacity: 0.75; --glass-saturate: 115%;
+  --text: #f4ebe1; --text-2: #d6c5b5; --text-3: #af9a89;
+  --accent: #dba56c; --accent-soft: rgba(219, 165, 108, 0.16); --focus: #e9bd8c; --text-on-accent: #1d130b;
+  --glass-tint: rgba(37, 27, 20, 0.66); --glass-tint-strong: rgba(39, 29, 21, 0.86);
+  --glass-hairline: rgba(255, 235, 215, 0.08);
+  --input-bg: rgba(255, 240, 225, 0.06); --input-border: rgba(255, 235, 215, 0.13);
+  --solid-surface: #21170f;
 }
-:root[data-palette="updraft"] {
-  --bg: #07111f;
-  --aurora-1: #1e3a8a; --aurora-2: #0e7490; --aurora-3: #b45309; --aurora-4: #1e40af; --aurora-5: #0c4a6e;
-  --aurora-opacity: 0.5;
-  --text: #eef4ff; --text-2: #c2cfe3; --text-3: #93a3bd;
-  --accent: #fbbf24; --accent-soft: rgba(251, 191, 36, 0.15); --focus: #fcd34d; --text-on-accent: #0b1220;
-  --glass-tint: rgba(13, 26, 46, 0.56); --glass-tint-strong: rgba(13, 26, 46, 0.78);
-  --solid-surface: #0f1b2e;
+:root[data-palette="ocean"] { /* deep teal night */
+  --bg: #0a1417;
+  --aurora-1: #0f3a40; --aurora-2: #0b252c; --aurora-3: #12494a; --aurora-4: #081c21; --aurora-5: #103440;
+  --aurora-opacity: 0.7; --glass-saturate: 120%;
+  --text: #e7f3f3; --text-2: #bad2d3; --text-3: #8eafb1;
+  --accent: #4fd1c5; --accent-soft: rgba(79, 209, 197, 0.15); --focus: #7fe0d6; --text-on-accent: #04201d;
+  --glass-tint: rgba(14, 31, 35, 0.64); --glass-tint-strong: rgba(15, 34, 39, 0.84);
+  --glass-hairline: rgba(200, 255, 250, 0.08);
+  --input-bg: rgba(200, 255, 250, 0.06); --input-border: rgba(200, 255, 250, 0.12);
+  --solid-surface: #102226;
 }
 
 /* ── Background: slow aurora, soft vignette, fine grain ─────────────────── */
@@ -67,10 +83,10 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
 .aurora span:nth-child(5) { background: var(--aurora-5); width: 45vmax; height: 45vmax; top: 30%; left: 35%; opacity: .55; animation: drift2 70s ease-in-out infinite alternate-reverse; }
 .aurora::before { /* vignette keeps edges calm and text readable */
   content: ""; position: absolute; inset: 0; z-index: 1;
-  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, color-mix(in srgb, var(--bg) 70%, transparent) 100%);
+  background: radial-gradient(130% 100% at 50% 35%, transparent 60%, color-mix(in srgb, var(--bg) 55%, transparent) 100%);
 }
 .aurora::after { /* film grain: makes the glass read as a material */
-  content: ""; position: absolute; inset: 0; z-index: 2; opacity: .06; mix-blend-mode: overlay;
+  content: ""; position: absolute; inset: 0; z-index: 2; opacity: .035; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 :root[data-motion="off"] .aurora span { animation: none; }
@@ -81,7 +97,8 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
   background: linear-gradient(160deg, color-mix(in srgb, var(--glass-tint-strong) 55%, var(--glass-tint)) 0%, var(--glass-tint) 60%);
   border: 1px solid transparent;
   box-shadow: var(--glass-highlight), 0 1px 1px rgba(0,0,0,.03), 0 10px 30px -8px rgba(15, 23, 42, .14), 0 30px 80px -24px rgba(15, 23, 42, .18);
-  transition: background calc(.6s * var(--motion, 1)) ease, box-shadow calc(.35s * var(--motion, 1)) ease, transform calc(.35s * var(--motion, 1)) cubic-bezier(.2,.8,.2,1);
+  /* No transform transition here: animated panels (sheets, toasts, cards) are moved by Motion, and a CSS transform transition fights it and flickers. */
+  transition: background calc(.6s * var(--motion, 1)) ease, box-shadow calc(.35s * var(--motion, 1)) ease;
 }
 :root[data-theme="dark"] .glass { box-shadow: var(--glass-highlight), 0 1px 1px rgba(0,0,0,.2), 0 14px 40px -10px rgba(0,0,0,.5), 0 40px 90px -30px rgba(0,0,0,.55); }
 .glass::after { /* gradient hairline border: bright at the top edge, fading down */
@@ -90,6 +107,7 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 :root[data-theme="dark"] .glass::after { background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.06) 40%, rgba(255,255,255,.03)); }
+.glass.lift { transition: transform calc(.35s * var(--motion, 1)) cubic-bezier(.2,.8,.2,1), box-shadow calc(.35s * var(--motion, 1)) ease; }
 .glass.lift:hover { transform: translateY(-2px); }
 :root[data-transparency="reduced"] .glass::after, :root[data-transparency="reduced"] .aurora::after { display: none; }
 
@@ -123,3 +141,12 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
 .stagger > *:nth-child(n+9) { animation-delay: calc(480ms * var(--motion, 1)); }
 :root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
 .btn, .chip, .nav-item, .tab, .input, .segmented button { transition-duration: calc(.25s * var(--motion, 1)); }
+
+/* ── Scrollbars: thin and themed (Windows' default ones look out of place on glass) ── */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 20%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text) 35%, transparent); }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+::-webkit-scrollbar-corner { background: transparent; }

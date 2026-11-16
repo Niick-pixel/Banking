@@ -29,6 +29,7 @@ export function occurrences(s: Schedule, start: ISODate, from: ISODate, to: ISOD
   switch (s.type) {
     case 'quincena': for (const [y, m] of months) out.push(toISO(y, m, 15), lastDayOfMonth(y, m)); break;
     case 'monthly': for (const [y, m] of months) out.push(toISO(y, m, Math.min(s.day, daysInMonth(y, m)))); break;
+    case 'days': for (const [y, m] of months) for (const d of new Set(s.days.map((x) => Math.min(x, daysInMonth(y, m))))) out.push(toISO(y, m, d)); break;
     case 'yearly': for (let y = y0; y <= y1; y++) out.push(toISO(y, s.month, Math.min(s.day, daysInMonth(y, s.month)))); break;
     case 'weekly': for (let d = lo; d <= to; d = addDays(d, 1)) if (weekday(d) === s.weekday) out.push(d); break;
   }
@@ -208,6 +209,8 @@ export function suggestRecurring(txs: Transaction[], categories: Category[], acc
   return out;
 }
 
+export const ordinal = (d: number) => (d === 31 ? 'last day' : `${d}${d % 10 === 1 && d !== 11 ? 'st' : d % 10 === 2 && d !== 12 ? 'nd' : d % 10 === 3 && d !== 13 ? 'rd' : 'th'}`);
+
 export function describeSchedule(s: Schedule): string {
   const MS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const DW = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
@@ -216,6 +219,7 @@ export function describeSchedule(s: Schedule): string {
     case 'monthly': return s.day >= 28 ? (s.day === 31 ? 'Monthly, last day' : `Monthly on the ${s.day}th (or last day)`) : `Monthly on day ${s.day}`;
     case 'weekly': return `Weekly on ${DW[s.weekday]}`;
     case 'yearly': return `Every year on ${s.day} ${MS[s.month - 1]}`;
+    case 'days': return `Every month on the ${[...s.days].sort((a, b) => a - b).map(ordinal).join(' and ').replace(/ and (?=.* and )/g, ', ')}`;
   }
 }
 

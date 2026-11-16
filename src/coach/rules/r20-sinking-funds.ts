@@ -3,7 +3,7 @@ import type { Insight } from '../types';
 
 /** R20 Year-end sinking funds: from October, marchamo and December goals vs what's set aside. */
 export const R20 = rule({
-  id: 'R20', name: 'Year-end funds', trigger: 'From October: marchamo and December expenses vs. their pot/goal balance',
+  id: 'R20', name: 'Year-end funds', trigger: 'From October: marchamo and December expenses vs. their fund/goal balance',
   defaults: { fromMonth: 10, marchamo: 0, december: 0 }, labels: { fromMonth: 'Start in month', marchamo: 'Marchamo estimate (₡, céntimos)', december: 'December spending estimate (₡, céntimos)' },
   evaluate(ctx, p) {
     const m = Number(ctx.month.slice(5, 7));

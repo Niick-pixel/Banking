@@ -9,6 +9,7 @@ import { cuotaDate } from '../domain/installments';
 import { convert, formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { useAvgIncome } from './Debts';
+import { usePersisted } from '../app/persist';
 
 type Tab = 'cdp' | 'programmed' | 'loan' | 'whatif' | 'fx';
 const amt = (s: string) => parseAmountInput(s, 'CRC') ?? 0;
@@ -39,35 +40,35 @@ const Row = ({ k, v, strong }: { k: string; v: React.ReactNode; strong?: boolean
 );
 
 export default function Calculators() {
-  const [tab, setTab] = useState<Tab>('cdp');
+  const [tab, setTab] = usePersisted<Tab>('calc.tab', 'cdp');
   const [rates, setRates] = usePref('calcRates');
   const avgIncome = useAvgIncome();
   const today = todayISO();
 
   // CDP
-  const [cdpAmt, setCdpAmt] = useState('1m');
-  const [cdpDays, setCdpDays] = useState('180');
+  const [cdpAmt, setCdpAmt] = usePersisted('calc.cdpAmt', '1m');
+  const [cdpDays, setCdpDays] = usePersisted('calc.cdpDays', '180');
   const c = cdp(amt(cdpAmt), num(cdpDays), rates.cdpAnnualRatePct, rates.withholdingPct);
   // Programmed savings
-  const [pMonthly, setPMonthly] = useState('70k');
-  const [pMonths, setPMonths] = useState('12');
+  const [pMonthly, setPMonthly] = usePersisted('calc.pMonthly', '70k');
+  const [pMonths, setPMonths] = usePersisted('calc.pMonths', '12');
   const [pTax, setPTax] = useState(false);
   const start = { year: Number(today.slice(0, 4)) + (today.slice(5, 7) === '12' ? 1 : 0), month: today.slice(5, 7) === '12' ? 1 : Number(today.slice(5, 7)) + 1 };
   const freqs: Frequency[] = ['monthly', 'quincenal', 'weekly'];
   const prog = freqs.map((f) => programmedSavings(amt(pMonthly), Math.max(1, Math.min(120, num(pMonths))), rates.programmedAnnualRatePct, f, start, pTax ? rates.withholdingPct : 0));
   // Loan
-  const [lBal, setLBal] = useState('500k');
-  const [lRate, setLRate] = useState('8');
-  const [lPay, setLPay] = useState('90k');
-  const [lExtra, setLExtra] = useState('');
+  const [lBal, setLBal] = usePersisted('calc.lBal', '500k');
+  const [lRate, setLRate] = usePersisted('calc.lRate', '8');
+  const [lPay, setLPay] = usePersisted('calc.lPay', '90k');
+  const [lExtra, setLExtra] = usePersisted('calc.lExtra', '');
   const first = cuotaDate(today, 2);
   const loan = amortize(amt(lBal), Math.round(num(lRate) * 100), amt(lPay), first);
   const acc = amt(lExtra) ? accelerate(amt(lBal), Math.round(num(lRate) * 100), amt(lPay), amt(lExtra), first) : null;
   // What if
-  const [wExtra, setWExtra] = useState('20k');
-  const [wMonths, setWMonths] = useState('12');
-  const [wRate, setWRate] = useState('0');
-  const [wTarget, setWTarget] = useState('');
+  const [wExtra, setWExtra] = usePersisted('calc.wExtra', '20k');
+  const [wMonths, setWMonths] = usePersisted('calc.wMonths', '12');
+  const [wRate, setWRate] = usePersisted('calc.wRate', '0');
+  const [wTarget, setWTarget] = usePersisted('calc.wTarget', '');
   const fv = futureValue(amt(wExtra), Math.max(1, num(wMonths)), num(wRate));
   const toTarget = amt(wTarget) ? monthsToTarget(amt(wTarget), amt(wExtra), num(wRate)) : null;
 
@@ -170,8 +171,8 @@ export default function Calculators() {
 /** Convert any amount at the rate of any day (BCCR → market → your own). */
 function FxCalculator() {
   const [date, setDate] = useState(todayISO());
-  const [dir, setDir] = useState<'USD' | 'CRC'>('USD');
-  const [raw, setRaw] = useState('100');
+  const [dir, setDir] = usePersisted<'USD' | 'CRC'>('calc.fxDir', 'USD');
+  const [raw, setRaw] = usePersisted('calc.fxAmount', '100');
   const [rateRaw, setRateRaw] = useState('');
   const [info, setInfo] = useState('');
   useEffect(() => {

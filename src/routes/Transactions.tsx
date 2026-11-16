@@ -9,6 +9,8 @@ import { deleteTransaction, lastAuditId, saveTransaction, undoAudit } from '../d
 import type { Transaction } from '../domain/schemas';
 import { formatMoney, type Minor } from '../lib/money';
 import { StartFresh } from './Accounts';
+import { usePersisted, usePersistedSet } from '../app/persist';
+import { ChipGroup } from '../design/components/ChipGroup';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const monthLabel = (mk: string) => `${MONTH_NAMES[Number(mk.slice(5)) - 1]} ${mk.slice(0, 4)}`;
@@ -23,21 +25,27 @@ export default function Transactions() {
   // Filters can arrive in the URL from a chart click: ?month=2026-11&group=Living, ?date=2026-11-03, ?kind=income
   const [params, setParams] = useSearchParams();
   const pMonth = params.get('month') ?? '', pDate = params.get('date') ?? '', pGroup = params.get('group') ?? '', pUncat = params.get('uncat') === '1';
-  const [q, setQ] = useState('');
-  const [kind, setKind] = useState(params.get('kind') ?? '');
-  const [acc, setAcc] = useState('');
-  const [cat, setCat] = useState(params.get('cat') ?? '');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [q, setQ] = usePersisted('tx.q', '');
+  // Multi-select chip filters (remembered); a ?kind= from a chart click overrides them.
+  const [kindsSaved, setKinds] = usePersisted<string[]>('tx.kinds', []);
+  const kinds = params.get('kind') ? [params.get('kind')!] : kindsSaved;
+  const setKind = (k: string) => setKinds(k ? [k] : []);
+  const [accs, setAccs] = usePersisted<string[]>('tx.accs', []);
+  const [groups, setGroups] = usePersisted<string[]>('tx.groups', []);
+  const [catSaved, setCat] = usePersisted('tx.cat', '');
+  const cat = params.get('cat') ?? catSaved;
+  const [collapsed, toggleMonth] = usePersistedSet('tx.collapsed');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
 
   const filtered = useMemo(() => l.transactions.filter((t) => {
-    if (kind && t.kind !== kind) return false;
+    if (kinds.length && !kinds.includes(t.kind)) return false;
     if (pDate && t.date !== pDate) return false;
     if (pUncat && !(t.kind === 'expense' && !t.categoryId && !t.splits?.length)) return false;
     if (pMonth && !t.date.startsWith(pMonth)) return false;
     if (pGroup && !('categoryId' in t && t.categoryId && l.category.get(t.categoryId)?.group === pGroup)) return false;
-    if (acc && !(('from' in t && t.from.accountId === acc) || ('to' in t && t.to.accountId === acc) || (t.kind === 'adjustment' && t.side.accountId === acc))) return false;
+    if (accs.length && !accs.some((acc) => ('from' in t && t.from.accountId === acc) || ('to' in t && t.to.accountId === acc) || (t.kind === 'adjustment' && t.side.accountId === acc))) return false;
+    if (groups.length && !('categoryId' in t && t.categoryId && groups.includes(l.category.get(t.categoryId)?.group ?? ''))) return false;
     if (cat && !('categoryId' in t && t.categoryId === cat) && !(t.kind === 'expense' && t.splits?.some((s) => s.categoryId === cat))) return false;
     if (q) {
       const s = q.toLowerCase();
@@ -45,7 +53,7 @@ export default function Transactions() {
       if (!`${t.description} ${t.notes} ${c} ${t.tags.join(' ')}`.toLowerCase().includes(s)) return false;
     }
     return true;
-  }), [l, q, kind, acc, cat, pDate, pMonth, pGroup, pUncat]);
+  }), [l, q, kinds, accs, groups, cat, pDate, pMonth, pGroup, pUncat]);
 
   const months = useMemo(() => {
     const m = new Map<string, Transaction[]>();
@@ -65,7 +73,6 @@ export default function Transactions() {
     );
   }
 
-  const toggleMonth = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   async function del(t: Transaction) {
@@ -106,17 +113,22 @@ export default function Transactions() {
         </div>
       )}
 
-      <div className="glass" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 16 }}>
-        <input className="input" type="search" placeholder="Search description, notes, category…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input" aria-label="Kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="">All kinds</option>{Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select className="input" aria-label="Account" value={acc} onChange={(e) => setAcc(e.target.value)}>
-          <option value="">All accounts</option>{l.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <select className="input" aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
-          <option value="">All categories</option>{l.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+      <div className="glass tx-filters" style={{ padding: 16, display: 'grid', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(200px, 1fr) auto', gap: 10, alignItems: 'center' }}>
+          <input className="input" type="search" placeholder="Search description, notes, category…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="input" aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
+            <option value="">All categories</option>{l.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button className="btn btn-ghost btn-sm" disabled={!q && !kinds.length && !accs.length && !groups.length && !cat} onClick={() => { setQ(''); setKinds([]); setAccs([]); setGroups([]); setCat(''); }}>Clear filters</button>
+        </div>
+        <div className="tx-chip-row">
+          <ChipGroup<Transaction['kind']> multi size="sm" label="Kind" note="any" value={kinds as Transaction['kind'][]} onChange={setKinds}
+            options={(Object.entries(KIND_LABEL) as [Transaction['kind'], string][]).map(([k, v]) => ({ value: k, label: v }))} />
+          <ChipGroup<string> multi size="sm" label="Spending group" note="any" value={groups} onChange={setGroups}
+            options={['Income', 'Fixed', 'Living', 'Discretionary', 'Debt Service', 'Savings'].map((g) => ({ value: g, label: g }))} />
+          <ChipGroup<string> multi size="sm" label="Accounts" note="any" value={accs} onChange={setAccs}
+            options={l.accounts.filter((a) => !a.archived).map((a) => ({ value: a.id, label: a.name.replace(/\s*\(.*\)$/, '') }))} />
+        </div>
       </div>
 
       {selected.size > 0 && (

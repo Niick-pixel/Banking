@@ -125,7 +125,7 @@ export default function Import() {
           </Glass>
 
           <Glass strong style={{ display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>Will create <b>{plan.transactions.length}</b> movements, <b>{plan.accounts.length}</b> accounts, <b>{plan.pots.length}</b> pots, <b>{plan.categories.length}</b> categories, <b>{plan.budgets.length}</b> budgets, <b>{plan.debts.length}</b> debts, <b>{plan.snapshots.length}</b> statement balances.</span>
+            <span>Will create <b>{plan.transactions.length}</b> movements, <b>{plan.accounts.length}</b> accounts, <b>{plan.pots.length}</b> funds, <b>{plan.categories.length}</b> categories, <b>{plan.budgets.length}</b> budgets, <b>{plan.debts.length}</b> debts, <b>{plan.snapshots.length}</b> statement balances.</span>
             <span style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-ghost" onClick={() => { setPlan(null); setStep('pick'); }}>Cancel</button>
               <button className="btn btn-primary" disabled={busy || errors.length > 0} onClick={() => void confirm()}>{errors.length ? `Fix ${errors.length} error(s) first` : 'Import'}</button>

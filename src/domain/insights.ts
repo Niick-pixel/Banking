@@ -43,6 +43,6 @@ export function monthSummary(month: MonthFlow | undefined, prev: MonthFlow | und
   if (avoidable > 0) insights.push({ tone: avoidableShare > 0.1 ? 'bad' : 'neutral', text: `Avoidable spending: ${fmt(avoidable)} (${pct(avoidableShare)} of spending).` });
   if (overBudget.length) insights.push({ tone: 'bad', text: `Over budget: ${overBudget.slice(0, 3).map((o) => `${o.category.name} by ${fmt(o.amount - o.budget)}`).join(', ')}${overBudget.length > 3 ? ` and ${overBudget.length - 3} more` : ''}.` });
   if (f.income && f.freeCash < 0) insights.push({ tone: 'bad', text: `You spent and saved ${fmt(-f.freeCash)} more than you earned this month. That came from existing money or credit.` });
-  if (f.paidFromSavings > 0) insights.push({ tone: 'neutral', text: `${fmt(f.paidFromSavings)} was paid from savings or pots (counted once, not as new spending on top of what you saved).` });
+  if (f.paidFromSavings > 0) insights.push({ tone: 'neutral', text: `${fmt(f.paidFromSavings)} was paid from savings or funds (counted once, not as new spending on top of what you saved).` });
   return { savingsRate, prevSavingsRate, top, avoidable, avoidableShare, expenseChange, overBudget, insights };
 }

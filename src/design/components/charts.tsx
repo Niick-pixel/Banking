@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { usePersisted } from '../../app/persist';
 import { useReducedMotion } from 'motion/react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useCssVar } from '../../app/theme';
@@ -43,7 +43,7 @@ export function DataTable({ caption, columns, rows }: { caption: string; columns
 export interface MonthFlow { month: string; income: number; expenses: number }
 
 export function IncomeExpenseChart({ data, title }: { data: MonthFlow[]; title: string }) {
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>(`view.${title}`, 'chart');
   const reduce = useReducedMotion();
   const [inc, exp, grid, axis] = useCssVar(['--chart-income', '--chart-expense', '--chart-grid', '--chart-axis']);
   return (
@@ -76,7 +76,7 @@ export function IncomeExpenseChart({ data, title }: { data: MonthFlow[]; title: 
 export interface Slice { name: string; value: number; /** Fixed categorical slot, so a group keeps its color when others are empty. */ slot?: number }
 
 export function GroupDonut({ data, title }: { data: Slice[]; title: string }) {
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>(`view.${title}`, 'chart');
   // Fixed categorical order — group N always gets slot N.
   const colors = useCssVar(['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5']);
   const [surface] = useCssVar(['--solid-surface']);

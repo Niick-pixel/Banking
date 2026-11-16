@@ -7,8 +7,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 export type ThemePref = 'auto' | 'light' | 'dark';
 export type TransparencyPref = 'auto' | 'reduced';
-export type LightPalette = 'aurora' | 'dune' | 'glacier';
-export type DarkPalette = 'midnight' | 'ember' | 'updraft';
+export type LightPalette = 'latte' | 'paper' | 'sage';
+export type DarkPalette = 'graphite' | 'espresso' | 'ocean';
 export type Density = 'comfortable' | 'compact';
 export type ContentWidth = 'full' | 'wide' | 'centered';
 export type MotionPref = 'smooth' | 'quick' | 'off';
@@ -26,15 +26,15 @@ export interface Appearance {
 }
 
 export const PALETTES: { id: LightPalette | DarkPalette; mode: 'light' | 'dark'; name: string; blurb: string; swatch: string[] }[] = [
-  { id: 'aurora', mode: 'light', name: 'Aurora', blurb: 'Cool sky blues and soft violet', swatch: ['#eef1f6', '#8fd3ff', '#b9a8ff', '#7fe3c9'] },
-  { id: 'dune', mode: 'light', name: 'Dune', blurb: 'Warm sand, clay and peach', swatch: ['#f6efe5', '#f3c69b', '#e9b3c2', '#f1dfa3'] },
-  { id: 'glacier', mode: 'light', name: 'Glacier', blurb: 'Crisp ice, teal and mint', swatch: ['#edf6f7', '#9fe1ee', '#b9d3ff', '#c9f1e2'] },
-  { id: 'midnight', mode: 'dark', name: 'Midnight', blurb: 'Deep blue with violet light', swatch: ['#0b0d12', '#1d4ed8', '#6d28d9', '#0f766e'] },
-  { id: 'ember', mode: 'dark', name: 'Ember', blurb: 'Charcoal with warm glowing coals', swatch: ['#110c0b', '#9a3412', '#9f1239', '#a16207'] },
-  { id: 'updraft', mode: 'dark', name: 'Updraft', blurb: 'Night navy and gold, like the logo', swatch: ['#07111f', '#1e3a8a', '#0e7490', '#b45309'] },
+  { id: 'latte', mode: 'light', name: 'Latte', blurb: 'Light brown: cream, sand and coffee', swatch: ['#eadccb', '#d9b99a', '#f1e2cf', '#8b5a36'] },
+  { id: 'paper', mode: 'light', name: 'Paper', blurb: 'Crisp white with slate blue', swatch: ['#edf0f4', '#dde5f0', '#ffffff', '#3a5a8c'] },
+  { id: 'sage', mode: 'light', name: 'Sage', blurb: 'Soft green-grey, calm and natural', swatch: ['#e3eae2', '#c6dac8', '#f1f4ea', '#2e6a4e'] },
+  { id: 'graphite', mode: 'dark', name: 'Graphite', blurb: 'Neutral charcoal with a cool blue accent', swatch: ['#121316', '#2b2f38', '#323745', '#8ab4ff'] },
+  { id: 'espresso', mode: 'dark', name: 'Espresso', blurb: 'Dark roast brown with caramel', swatch: ['#16100c', '#3b2718', '#4a3020', '#dba56c'] },
+  { id: 'ocean', mode: 'dark', name: 'Ocean', blurb: 'Deep teal night with aqua', swatch: ['#0a1417', '#0f3a40', '#12494a', '#4fd1c5'] },
 ];
 
-const DEFAULTS: Appearance = { mode: 'auto', light: 'aurora', dark: 'midnight', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth' };
+const DEFAULTS: Appearance = { mode: 'auto', light: 'latte', dark: 'graphite', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth' };
 const KEY = 'aufwind.appearance';
 
 function load(): Appearance {
@@ -42,7 +42,12 @@ function load(): Appearance {
     const raw = localStorage.getItem(KEY);
     const legacyMode = localStorage.getItem('aufwind.theme') as ThemePref | null;
     const legacyTr = localStorage.getItem('aufwind.transparency') as TransparencyPref | null;
-    return { ...DEFAULTS, ...(legacyMode ? { mode: legacyMode } : {}), ...(legacyTr ? { transparency: legacyTr } : {}), ...(raw ? JSON.parse(raw) : {}) };
+    const a: Appearance = { ...DEFAULTS, ...(legacyMode ? { mode: legacyMode } : {}), ...(legacyTr ? { transparency: legacyTr } : {}), ...(raw ? JSON.parse(raw) : {}) };
+    // v0.4 theme ids → their v0.5 counterparts.
+    const MAP: Record<string, LightPalette | DarkPalette> = { aurora: 'paper', dune: 'latte', glacier: 'sage', midnight: 'graphite', ember: 'espresso', updraft: 'ocean' };
+    if (MAP[a.light]) a.light = MAP[a.light] as LightPalette;
+    if (MAP[a.dark]) a.dark = MAP[a.dark] as DarkPalette;
+    return a;
   } catch { return DEFAULTS; }
 }
 

@@ -13,6 +13,7 @@ import { saveFile, XLSX_MIME } from '../export/download';
 import { backupFileText } from '../sync/backup';
 import { formatMoney } from '../lib/money';
 import { formatDateCR, lastDayOfMonth, todayISO } from '../lib/dates';
+import { usePersisted } from '../app/persist';
 
 type Tab = 'pnl' | 'cash' | 'year' | 'trend' | 'where';
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -22,10 +23,10 @@ const fm = (n: number) => formatMoney(n, 'CRC', { parens: true });
 export default function Reports() {
   const l = useLedger();
   const today = todayISO();
-  const [tab, setTab] = useState<Tab>('pnl');
+  const [tab, setTab] = usePersisted<Tab>('reports.tab', 'pnl');
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const [month, setMonth] = useState(Number(today.slice(5, 7)));
-  const [scope, setScope] = useState<'month' | 'year'>('month');
+  const [scope, setScope] = usePersisted<'month' | 'year'>('reports.scope', 'month');
   const [catId, setCatId] = useState('');
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState('');

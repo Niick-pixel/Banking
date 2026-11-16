@@ -13,7 +13,7 @@ export const SECTIONS: Section[] = [
   { id: 'coach', label: 'Coach', icon: Compass, blurb: 'Alerts, safe-to-spend, forecast', pages: [{ to: '/coach', label: 'Inbox' }, { to: '/coach/forecast', label: 'Forecast' }, { to: '/coach/wants', label: 'Cooling-off' }, { to: '/coach/reports', label: 'Reports' }, { to: '/coach/history', label: 'History replay' }] },
   { id: 'activity', label: 'Activity', icon: ArrowLeftRight, blurb: 'Every movement, bills and the calendar', pages: [{ to: '/transactions', label: 'Transactions' }, { to: '/bills', label: 'Bills & calendar' }] },
   { id: 'budget', label: 'Budget', icon: PieChart, blurb: 'Budget vs actual and reports', pages: [{ to: '/tracker', label: 'Tracker' }, { to: '/reports', label: 'Reports' }] },
-  { id: 'debts', label: 'Debts & cards', icon: CreditCard, blurb: 'Loans, Tasa Cero and money set aside', pages: [{ to: '/debts', label: 'Debts' }, { to: '/tasa-cero', label: 'Tasa Cero' }, { to: '/pots', label: 'Pots' }] },
+  { id: 'debts', label: 'Debts & cards', icon: CreditCard, blurb: 'Loans, Tasa Cero and money set aside', pages: [{ to: '/debts', label: 'Debts' }, { to: '/tasa-cero', label: 'Tasa Cero' }, { to: '/funds', label: 'Funds' }] },
   { id: 'wealth', label: 'Wealth', icon: TrendingUp, blurb: 'Net worth, accounts, goals and calculators', pages: [{ to: '/net-worth', label: 'Net worth' }, { to: '/accounts', label: 'Accounts' }, { to: '/goals', label: 'Savings & goals' }, { to: '/calculators', label: 'Calculators' }] },
 ];
 

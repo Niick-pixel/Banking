@@ -57,7 +57,7 @@ export function PayDebtForm({ debt, defaultAmount, onDone }: { debt: Debt; defau
           <select id="pd-from" className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{plc.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</select></div>
         <div className="field"><label htmlFor="pd-date">Date</label><input id="pd-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
       </div>
-      {potBal !== null && amount !== null && amount > potBal && <p role="alert" style={{ margin: 0, color: 'var(--debt)' }}>The pot only has {formatMoney(potBal, 'CRC')}. It will go negative.</p>}
+      {potBal !== null && amount !== null && amount > potBal && <p role="alert" style={{ margin: 0, color: 'var(--debt)' }}>The fund only has {formatMoney(potBal, 'CRC')}. It will go negative.</p>}
       {debt.annualRateBps > 0 && (
         <div className="field"><label htmlFor="pd-int">Of which interest</label>
           <input id="pd-int" className="input" inputMode="decimal" placeholder={formatMoney(suggestedInterest, 'CRC')} value={interestRaw} onChange={(e) => setInterestRaw(e.target.value)} />
@@ -65,7 +65,7 @@ export function PayDebtForm({ debt, defaultAmount, onDone }: { debt: Debt; defau
       )}
       <div className="field"><label htmlFor="pd-cat">Category</label>
         <select id="pd-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Choose…</option>{debtCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-      {fromPot && <p className="small muted" style={{ margin: 0 }}>Paying from a pot: the money leaves the pot and the debt drops in one step. It shows as debt service once, and your free cash isn't hit again (it was counted when you set it aside).</p>}
+      {fromPot && <p className="small muted" style={{ margin: 0 }}>Paying from a fund: the money leaves the fund and the debt drops in one step. It shows as debt service once, and your free cash isn't hit again (it was counted when you set it aside).</p>}
       {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Record payment</button></div>
     </form>

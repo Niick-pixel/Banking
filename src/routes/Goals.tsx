@@ -10,6 +10,7 @@ import type { Goal } from '../domain/schemas';
 import type { Payroll } from '../domain/prefs';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
+import { AutoSavings } from './AutoSavings';
 
 export default function Goals() {
   const l = useLedger();
@@ -38,6 +39,7 @@ export default function Goals() {
       </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 16, marginBottom: 16 }}>
+        <AutoSavings />
         <Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Savings rate</h2>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -68,7 +70,7 @@ export default function Goals() {
       </div>
 
       <h2 style={{ fontSize: 15, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Goals</h2>
-      {l.goals.filter((g) => !g.archived).length === 0 ? <Glass><p className="muted" style={{ margin: 0 }}>No goals yet. Link a goal to a pot (e.g. Marchamo, Emergency fund) and its progress updates by itself.</p></Glass> : (
+      {l.goals.filter((g) => !g.archived).length === 0 ? <Glass><p className="muted" style={{ margin: 0 }}>No goals yet. Link a goal to a fund (e.g. Marchamo, Emergency fund) and its progress updates by itself.</p></Glass> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: 14 }}>
           {l.goals.filter((g) => !g.archived).map((g) => {
             const p = goalProgress(g, current(g), today);
@@ -131,7 +133,7 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
         <div className="field"><label htmlFor="g-l">Progress comes from</label>
           <select id="g-l" className="input" value={link} onChange={(e) => { const [k, id] = e.target.value.split(':'); setG({ ...g, potId: k === 'pot' ? id : undefined, accountId: k === 'acc' ? id : undefined }); }}>
             <option value="">Not linked</option>
-            <optgroup label="Pots">{l.pots.map((p) => <option key={p.id} value={`pot:${p.id}`}>{l.account.get(p.accountId)?.name} · {p.name}</option>)}</optgroup>
+            <optgroup label="Funds">{l.pots.map((p) => <option key={p.id} value={`pot:${p.id}`}>{l.account.get(p.accountId)?.name} · {p.name}</option>)}</optgroup>
             <optgroup label="Accounts">{l.accounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}</option>)}</optgroup>
           </select></div>
         <div className="field"><label htmlFor="g-m">I'll put in per month</label><input id="g-m" className="input" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} /></div>
