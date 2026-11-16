@@ -49,6 +49,7 @@ export const DASH_CARDS: { id: string; label: string }[] = [
   { id: 'budget', label: 'Budget health' },
   { id: 'freecash', label: 'Free cash by month' },
   { id: 'networth', label: 'Net worth' },
+  { id: 'cards', label: 'Credit cards' },
   { id: 'debts', label: 'Debts' },
   { id: 'calendar', label: 'Daily spending calendar' },
 ];

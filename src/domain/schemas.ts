@@ -47,6 +47,9 @@ export const AccountSchema = z.object({
   /** Credit cards: day the statement closes and day payment is due. */
   cardStatementDay: z.number().int().min(1).max(31).optional(),
   cardDueDay: z.number().int().min(1).max(31).optional(),
+  /** Credit cards: credit limit (in the account currency) and yearly interest rate, both optional. */
+  cardLimit: z.number().int().positive().optional(),
+  cardAnnualRateBps: z.number().int().nonnegative().optional(),
   ...Timestamps,
 });
 export type Account = z.infer<typeof AccountSchema>;

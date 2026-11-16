@@ -74,7 +74,7 @@ export function computeTracker(year: number, txs: Transaction[], categories: Cat
   };
 }
 
-export interface BudgetAlert { category: Category; spent: number; budget: number; pct: number; projected: number; level: 'warn' | 'over' }
+export interface BudgetAlert { category: Category; spent: number; budget: number; pct: number; projected: number; level: 'warn' | 'full' | 'over' }
 
 /** Current-month pace: "at this pace you'll spend ₡X". Alerts at `warnAt` (default 80%) and 100%. */
 export function budgetAlerts(t: Tracker, today: ISODate, warnAt = 0.8): BudgetAlert[] {
@@ -90,7 +90,7 @@ export function budgetAlerts(t: Tracker, today: ISODate, warnAt = 0.8): BudgetAl
       const pct = spent / r.budget;
       // Fixed costs are lumpy (rent lands once), so only project living/discretionary.
       const projected = ['Living', 'Discretionary'].includes(s.group) ? Math.round((spent / d) * dim) : spent;
-      if (pct >= warnAt) out.push({ category: r.category, spent, budget: r.budget, pct, projected, level: pct >= 1 ? 'over' : 'warn' });
+      if (pct >= warnAt) out.push({ category: r.category, spent, budget: r.budget, pct, projected, level: pct > 1 ? 'over' : pct === 1 ? 'full' : 'warn' });
     }
   }
   return out.sort((a, b) => b.pct - a.pct);

@@ -94,6 +94,34 @@ export default function Transactions() {
     setToast({ msg: `${n} movement(s) moved to ${target.name}` });
   }
 
+  const selectedTx = l.transactions.filter((t) => selected.has(t.id));
+  const selectedTotal = selectedTx.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'adjustment' ? t.signedAmount : t.kind === 'expense' || t.kind === 'debt_payment' ? -t.amount : 0), 0);
+  async function bulkAccount(accountId: string) {
+    let n = 0;
+    for (const t of selectedTx) {
+      // Moves the spending side: where an expense or payment came from, where income landed.
+      if (t.kind === 'expense' || t.kind === 'debt_payment') await saveTransaction({ ...t, from: { accountId } });
+      else if (t.kind === 'income') await saveTransaction({ ...t, to: { accountId } });
+      else continue;
+      n++;
+    }
+    setSelected(new Set());
+    setToast({ msg: `${n} movement(s) moved to ${l.account.get(accountId)?.name}` });
+  }
+  async function bulkDate(date: string) {
+    if (!date) return;
+    for (const t of selectedTx) await saveTransaction({ ...t, date, dateEstimated: false });
+    setSelected(new Set());
+    setToast({ msg: `${selectedTx.length} movement(s) now dated ${formatDateCR(date)}` });
+  }
+  async function bulkDelete() {
+    if (!window.confirm(`Delete ${selectedTx.length} movement(s)? You can undo it right after.`)) return;
+    const ids: number[] = [];
+    for (const t of selectedTx) { await deleteTransaction(t.id); const id = await lastAuditId(); if (id) ids.push(id); }
+    setSelected(new Set());
+    setToast({ msg: `${selectedTx.length} movement(s) deleted`, undo: () => void (async () => { for (const id of ids.reverse()) await undoAudit(id); })() });
+  }
+
   const placeName = (s: { accountId: string; potId?: string }) => `${l.account.get(s.accountId)?.name ?? '?'}${s.potId ? ` · ${l.pot.get(s.potId)?.name ?? ''}` : ''}`;
 
   return (
@@ -134,10 +162,16 @@ export default function Transactions() {
       {selected.size > 0 && (
         <div className="glass glass-strong" style={{ padding: 12, display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, position: 'sticky', top: 12, zIndex: 5, flexWrap: 'wrap' }}>
           <b>{selected.size} selected</b>
-          <select className="input" style={{ maxWidth: 280 }} aria-label="Move selected to category" defaultValue="" onChange={(e) => e.target.value && void bulkRecategorize(e.target.value)}>
-            <option value="">Change category to…</option>{l.categories.map((c) => <option key={c.id} value={c.id}>{c.group} · {c.name}</option>)}
+          <span className="small muted">net <Money amount={selectedTotal} tone="auto" /></span>
+          <select className="input" style={{ maxWidth: 240, height: 38 }} aria-label="Change category of the selected movements" value="" onChange={(e) => e.target.value && void bulkRecategorize(e.target.value)}>
+            <option value="">Category…</option>{l.categories.filter((c) => !c.archived).map((c) => <option key={c.id} value={c.id}>{c.group} · {c.name}</option>)}
           </select>
-          <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+          <select className="input" style={{ maxWidth: 220, height: 38 }} aria-label="Move the selected movements to another account" value="" onChange={(e) => e.target.value && void bulkAccount(e.target.value)}>
+            <option value="">Account…</option>{l.accounts.filter((a) => !a.archived).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>Date <input type="date" className="input" style={{ height: 38, width: 160 }} aria-label="Set the date of the selected movements" onChange={(e) => void bulkDate(e.target.value)} /></label>
+          <button className="btn btn-sm" style={{ color: 'var(--expense)' }} onClick={() => void bulkDelete()}>Delete</button>
+          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelected(new Set())}>Clear selection</button>
         </div>
       )}
 
@@ -147,6 +181,9 @@ export default function Transactions() {
           const open = !collapsed.has(mk);
           return (
             <section key={mk} className="glass" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="month-head-row">
+              <input type="checkbox" className="month-check" aria-label={`Select all of ${monthLabel(mk)}`} checked={txs.length > 0 && txs.every((t) => selected.has(t.id))}
+                onChange={(e) => setSelected((s0) => { const n = new Set(s0); for (const t of txs) { if (e.target.checked) n.add(t.id); else n.delete(t.id); } return n; })} />
               <button className="month-head" aria-expanded={open} onClick={() => toggleMonth(mk)}>
                 <span className="chev" aria-hidden>{open ? '▾' : '▸'}</span>
                 <span style={{ fontWeight: 700, fontSize: 17 }}>{monthLabel(mk)}</span>
@@ -160,6 +197,7 @@ export default function Transactions() {
                   </span>
                 )}
               </button>
+              </div>
               {open && (
                 <ul className="tx-list">
                   {txs.map((t) => {

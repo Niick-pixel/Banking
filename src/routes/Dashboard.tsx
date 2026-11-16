@@ -18,6 +18,9 @@ import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
 import { useCoach } from '../app/coach';
 import { CoachTop } from './Coach';
+import { CardsWidget } from './CardsWidget';
+import { SetupChecklist, useSetup } from './Setup';
+import { InfoTip } from '../design/components/InfoTip';
 import { Deck, type DeckView } from '../design/components/Deck';
 import { MonthWaterfall, SpendingCalendar, SpendingPace } from '../design/components/insightCharts';
 import { SPEND_GROUPS, cumulative, dailySpending, monthWaterfall } from '../domain/spending';
@@ -92,6 +95,7 @@ export default function Dashboard() {
   const ef = current ? emergencyFund(current, l.accounts, l.pots, potBal, essentials) : null;
   const activeDebts = l.debts.filter((d) => d.status !== 'paid');
   const errors = health.filter((h) => h.level !== 'info').length;
+  const setup = useSetup();
   // Views you've hidden in Settings → Dashboard drop out of their stack.
   const views = (list: [string, string, () => React.ReactNode][]): DeckView[] => list.filter(([id]) => show(id)).map(([key, label, render]) => ({ key, label, render }));
 
@@ -114,6 +118,7 @@ export default function Dashboard() {
 
       <div ref={fitRef} className="dash-decks" style={fitH ? { height: fitH } : undefined}>
         <Deck id="coach" label="Coach" className="d-coach" views={views([
+          ...(setup.done < setup.total ? [['setup', 'Get set up', () => <SetupChecklist />] as [string, string, () => React.ReactNode]] : []),
           ['coach', 'Coach: top alerts', () => coach.run ? <CoachTop /> : <p className="muted">The Coach starts once you have accounts.</p>],
           ['insights', 'What happened', () => (<div style={{ display: 'grid', gap: 8 }}>
             <h2 className="card-h">What happened</h2>
@@ -158,6 +163,7 @@ export default function Dashboard() {
             )}
             <Link to="/bills" className="small">Calendar →</Link>
           </div>)],
+          ['cards', 'Credit cards', () => <CardsWidget compact />],
           ['debts', 'Debts', () => (<div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
             <h2 className="card-h">Debts</h2>
             {activeDebts.length === 0 ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
@@ -219,10 +225,17 @@ export default function Dashboard() {
   );
 }
 
+const KPI_HELP: Record<string, string> = {
+  Income: 'Salary and any other money that came in this month.',
+  Expenses: 'Everything you paid this month, including debt and card payments counted as spending. Moving money to savings is not an expense.',
+  Net: 'Income minus expenses: what was left before saving.',
+  Saved: 'Money you moved into savings this month, minus what you took out of savings.',
+  'Free cash after saving': 'Net minus saved. Negative means you spent or saved more than you earned this month, so it came from money you already had or from credit.',
+};
 function Kpi({ label, value, tone, sub }: { label: string; value: number; tone: 'income' | 'expense' | 'savings' | 'auto'; sub?: React.ReactNode }) {
   return (
     <Glass pad={16} style={{ display: 'grid', gap: 2 }}>
-      <span className="small muted">{label}</span>
+      <span className="small muted">{label}{KPI_HELP[label] && <InfoTip text={KPI_HELP[label]!} label={`About ${label}`} />}</span>
       <Money amount={value} size={24} weight={800} tone={tone} />
       {sub && <span className="small muted">{sub}</span>}
     </Glass>

@@ -12,7 +12,7 @@ import { AlertTriangle, Bell, CalendarClock, CheckCheck, CircleAlert, Info, Land
 import { useHealth, useLedger } from './data';
 import { useCalendar, usePendingReminders } from './useRecurring';
 import { useCoach } from './coach';
-import { usePersisted } from './persist';
+import { readPersisted, usePersisted } from './persist';
 import { useTheme } from './theme';
 import { checkInStatus, quincenaStart } from '../domain/checkin';
 import { useFundMoves } from '../routes/FundMovesFix';
@@ -57,6 +57,9 @@ export function useNotifications(): Note[] {
     // Quincena balance check-in.
     const due = checkInStatus(l.accounts, l.snapshots, today).filter((s) => s.due);
     if (due.length) out.push({ id: `checkin:${quincenaStart(today)}`, level: 'info', icon: 'bank', title: `Balance check-in: ${due.length} account${due.length > 1 ? 's' : ''} to check`, body: `Type what your bank shows for ${due.slice(0, 3).map((d) => d.account.name).join(', ')}${due.length > 3 ? '…' : ''}, so everything matches your statement.`, primary: { label: 'Check in now', to: '/check-in' } });
+    // The quincena review, until you mark it done.
+    if (readPersisted<string>('review.doneFor', '') !== quincenaStart(today) && Number(today.slice(8, 10)) - Number(quincenaStart(today).slice(8, 10)) < 5)
+      out.push({ id: `review:${quincenaStart(today)}`, level: 'info', icon: 'info', title: 'Time for your quincena review', body: 'Five minutes: balances, bills to confirm, anything over budget.', primary: { label: 'Start review', to: '/review' } });
     // Moves into funds that the budget can't see.
     if (moves.items.length) out.push({ id: `fundmoves:${moves.items.map((i) => i.tx.id).join(',')}`, level: 'warning', icon: 'savings', title: `${moves.items.length} move${moves.items.length > 1 ? 's' : ''} into savings ${moves.items.length > 1 ? 'are' : 'is'} missing from your budget`, body: moves.items.slice(0, 2).map((i) => `${formatMoney(i.tx.amount, 'CRC')} on ${formatDateCR(i.tx.date)}`).join(', '), primary: { label: 'Count as savings', run: () => moves.fix() } });
     // Data health (errors and warnings; the fund-move one is above).

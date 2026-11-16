@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import './design/tokens.css';
@@ -6,53 +6,58 @@ import './app/shell.css';
 import './design/themes.css';
 import { ThemeProvider } from './app/theme';
 import Shell from './app/Shell';
-import DesignPage from './routes/DesignPage';
-import Transactions from './routes/Transactions';
-import Accounts from './routes/Accounts';
-import Import from './routes/Import';
-import TasaCero from './routes/TasaCero';
 import { QuickAddProvider } from './app/QuickAdd';
-import Settings from './routes/Settings';
-import Tracker from './routes/Tracker';
-import Debts from './routes/Debts';
-import Pots from './routes/Pots';
-import CheckIn from './routes/CheckIn';
-import Categories from './routes/Categories';
-import NetWorth from './routes/NetWorth';
-import Goals from './routes/Goals';
-import Calculators from './routes/Calculators';
 import Dashboard from './routes/Dashboard';
-import Reports from './routes/Reports';
-import Bills from './routes/Bills';
-import Coach from './routes/Coach';
 import { CoachProvider } from './app/coach';
 import { bootSync } from './sync';
 import { LockGate } from './app/LockGate';
+
+// Pages load the first time you open them, so the app starts faster.
+const DesignPage = lazy(() => import('./routes/DesignPage'));
+const Transactions = lazy(() => import('./routes/Transactions'));
+const Accounts = lazy(() => import('./routes/Accounts'));
+const Import = lazy(() => import('./routes/Import'));
+const TasaCero = lazy(() => import('./routes/TasaCero'));
+const Settings = lazy(() => import('./routes/Settings'));
+const Tracker = lazy(() => import('./routes/Tracker'));
+const Debts = lazy(() => import('./routes/Debts'));
+const Pots = lazy(() => import('./routes/Pots'));
+const CheckIn = lazy(() => import('./routes/CheckIn'));
+const Categories = lazy(() => import('./routes/Categories'));
+const NetWorth = lazy(() => import('./routes/NetWorth'));
+const Goals = lazy(() => import('./routes/Goals'));
+const Calculators = lazy(() => import('./routes/Calculators'));
+const Reports = lazy(() => import('./routes/Reports'));
+const Bills = lazy(() => import('./routes/Bills'));
+const Coach = lazy(() => import('./routes/Coach'));
+const Review = lazy(() => import('./routes/Review'));
+const page = (C: LazyExoticComponent<ComponentType>) => <Suspense fallback={<div className="page-loading" aria-busy="true" />}><C /></Suspense>;
 
 const router = createBrowserRouter([
   {
     element: <CoachProvider><QuickAddProvider><Shell /></QuickAddProvider></CoachProvider>,
     children: [
       { path: '/', element: <Dashboard /> },
-      { path: '/reports', element: <Reports /> },
-      { path: '/bills', element: <Bills /> },
-      { path: '/coach', element: <Coach /> },
-      { path: '/coach/:page', element: <Coach /> },
-      { path: '/design', element: <DesignPage /> },
-      { path: '/transactions', element: <Transactions /> },
-      { path: '/accounts', element: <Accounts /> },
-      { path: '/import', element: <Import /> },
-      { path: '/tasa-cero', element: <TasaCero /> },
-      { path: '/settings', element: <Settings /> },
-      { path: '/tracker', element: <Tracker /> },
-      { path: '/debts', element: <Debts /> },
-      { path: '/funds', element: <Pots /> },
-      { path: '/check-in', element: <CheckIn /> },
-      { path: '/categories', element: <Categories /> },
+      { path: '/reports', element: page(Reports) },
+      { path: '/review', element: page(Review) },
+      { path: '/bills', element: page(Bills) },
+      { path: '/coach', element: page(Coach) },
+      { path: '/coach/:page', element: page(Coach) },
+      { path: '/design', element: page(DesignPage) },
+      { path: '/transactions', element: page(Transactions) },
+      { path: '/accounts', element: page(Accounts) },
+      { path: '/import', element: page(Import) },
+      { path: '/tasa-cero', element: page(TasaCero) },
+      { path: '/settings', element: page(Settings) },
+      { path: '/tracker', element: page(Tracker) },
+      { path: '/debts', element: page(Debts) },
+      { path: '/funds', element: page(Pots) },
+      { path: '/check-in', element: page(CheckIn) },
+      { path: '/categories', element: page(Categories) },
       { path: '/pots', element: <Navigate to="/funds" replace /> },
-      { path: '/net-worth', element: <NetWorth /> },
-      { path: '/goals', element: <Goals /> },
-      { path: '/calculators', element: <Calculators /> },
+      { path: '/net-worth', element: page(NetWorth) },
+      { path: '/goals', element: page(Goals) },
+      { path: '/calculators', element: page(Calculators) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
