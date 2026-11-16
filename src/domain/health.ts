@@ -5,6 +5,7 @@
 import type { Account, BalanceSnapshot, Budget, Category, Debt, Pot, SelfLoan, Transaction } from './schemas';
 import { accountBalances, debtStatus, monthlyFlows } from './ledger';
 import { selfLoanProgress } from './debts';
+import { uncountedFundMoves } from './fundmoves';
 import { daysBetween, monthKey, type ISODate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 
@@ -100,7 +101,11 @@ export function dataHealth(inp: HealthInput, today: ISODate): HealthIssue[] {
     if (!p.done && p.loan.plannedDate && p.loan.plannedDate < today) issues.push({ id: `sl-${p.loan.id}`, level: 'info', title: `Self-loan "${p.loan.description}" was planned to be put back by ${p.loan.plannedDate}`, detail: `${fmt(p.remaining)} still to replenish.`, to: '/debts' });
   }
 
-  // 8. Estimated dates (informational)
+  // 8. Spending money moved into/out of a fund as a plain transfer: invisible to the budget.
+  const moves = uncountedFundMoves(inp.transactions, { accountType: (id) => accType.get(id) });
+  if (moves.length) issues.push({ id: 'fund-moves', level: 'warn', title: `${moves.length} move(s) into or out of savings don't count in your budget`, detail: `Recorded as transfers, so they're neither saving nor spending: ${moves.slice(0, 3).map((t) => `${fmt(t.amount)} on ${t.date}`).join(', ')}. Record them as savings.`, to: '/funds' });
+
+  // 9. Estimated dates (informational)
   const est = inp.transactions.filter((t) => t.dateEstimated).length;
   if (est) issues.push({ id: 'estimated', level: 'info', title: `${est} movement(s) have an estimated date`, detail: 'They came from the workbook without a DATE and sit on the last day of their month. Month totals are still right.', to: '/transactions' });
 

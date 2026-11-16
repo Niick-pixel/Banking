@@ -6,7 +6,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type ThemePref = 'auto' | 'light' | 'dark';
-export type TransparencyPref = 'auto' | 'reduced';
+export type TransparencyPref = 'auto' | 'frosted' | 'reduced';
 export type LightPalette = 'latte' | 'paper' | 'sage';
 export type DarkPalette = 'graphite' | 'espresso' | 'ocean';
 export type Density = 'comfortable' | 'compact';
@@ -102,7 +102,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     el.setAttribute('data-density', a.density);
     el.setAttribute('data-width', a.width);
     el.setAttribute('data-motion', motion);
-    if (a.transparency === 'reduced') el.setAttribute('data-transparency', 'reduced'); else el.removeAttribute('data-transparency');
+    if (a.transparency !== 'auto') el.setAttribute('data-transparency', a.transparency); else el.removeAttribute('data-transparency');
     el.style.setProperty('--ui-scale', String(scale));
     // Size: native webview zoom in the desktop app (keeps charts, hit-testing and layout exact).
     // In a browser, Ctrl +/- already does this, so we leave it alone.

@@ -24,17 +24,21 @@ export async function send(title: string, body: string) {
   else new Notification(title, { body, icon: `${import.meta.env.BASE_URL}icon.png` });
 }
 
-/** Notify about events due today or tomorrow, plus reminders waiting for confirmation. */
+/** Notify about bills a week ahead (once), again the day before and on the day, plus reminders waiting for confirmation. */
 export async function notifyDue(events: CalendarEvent[], pendingCount: number, today: string, tomorrow: string) {
   if (!(await notificationsAllowed())) return;
   const seen = new Set<string>(JSON.parse(localKV.get('aufwind.notified') ?? '[]'));
   const fresh: string[] = [];
   for (const e of events) {
     if (e.status === 'posted' || e.status === 'skipped' || e.tone === 'info') continue;
-    if (e.date !== today && e.date !== tomorrow) continue;
-    const key = `${e.date}|${e.title}`;
+    if (e.tone === 'income') continue;
+    const near = e.date === today || e.date === tomorrow;
+    // Near: the day before and on the day. Further out (up to a week): one heads-up per bill.
+    const key = near ? `${e.date}|${e.title}` : `week|${e.date}|${e.title}`;
     if (seen.has(key)) continue;
-    await send(`${e.date === today ? 'Today' : 'Tomorrow'}: ${e.title}`, e.amount ? formatMoney(e.amount, 'CRC') : 'Open Aufwind for details');
+    const days = Math.round((Date.parse(e.date) - Date.parse(today)) / 86_400_000);
+    const when = e.date === today ? 'Today' : e.date === tomorrow ? 'Tomorrow' : `In ${days} days`;
+    await send(`${when}: ${e.title}`, e.amount ? formatMoney(e.amount, 'CRC') : 'Open Aufwind for details');
     fresh.push(key);
   }
   const pk = `${today}|pending|${pendingCount}`;

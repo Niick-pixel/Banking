@@ -16,6 +16,8 @@ import Settings from './routes/Settings';
 import Tracker from './routes/Tracker';
 import Debts from './routes/Debts';
 import Pots from './routes/Pots';
+import CheckIn from './routes/CheckIn';
+import Categories from './routes/Categories';
 import NetWorth from './routes/NetWorth';
 import Goals from './routes/Goals';
 import Calculators from './routes/Calculators';
@@ -45,6 +47,8 @@ const router = createBrowserRouter([
       { path: '/tracker', element: <Tracker /> },
       { path: '/debts', element: <Debts /> },
       { path: '/funds', element: <Pots /> },
+      { path: '/check-in', element: <CheckIn /> },
+      { path: '/categories', element: <Categories /> },
       { path: '/pots', element: <Navigate to="/funds" replace /> },
       { path: '/net-worth', element: <NetWorth /> },
       { path: '/goals', element: <Goals /> },

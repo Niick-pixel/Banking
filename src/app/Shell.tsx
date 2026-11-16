@@ -18,6 +18,7 @@ import { Aurora, GlassDefs } from '../design/components';
 import { ALL_PAGES, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
 import { useTheme } from './theme';
 import { GuidedTour } from './Tour';
+import { NotificationBell } from './Notifications';
 import { readPersisted, writePersisted } from './persist';
 
 /** Page content fades and rises in; the old page fades out first. */
@@ -69,7 +70,8 @@ export default function Shell() {
   const [notify] = usePref('notifyBills');
   const today = todayISO();
   const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
-  const soon = useCalendar(today, tomorrow);
+  const weekOut = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
+  const soon = useCalendar(today, weekOut);
   const pending = usePendingReminders();
   useEffect(() => { if (notify) void notifyDue(soon, pending.length, today, tomorrow); }, [notify, soon, pending.length, today, tomorrow]);
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function Shell() {
               <button className="btn btn-ghost btn-sm" onClick={() => setDismissed(true)}>Later</button>
             </div>
           )}
-          <SectionTabs />
+          <div className="topbar"><SectionTabs /><NotificationBell /></div>
           <AnimatedOutlet />
         </main>
       </div>

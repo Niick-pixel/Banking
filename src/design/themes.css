@@ -150,3 +150,23 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
 ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text) 35%, transparent); }
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Crisp text (default) ────────────────────────────────────────────────
+   Windows only draws text with ClearType when it is painted straight onto the
+   page. A backdrop blur, `will-change`, or a background that moves forever each
+   lift things onto separate GPU layers, and text on those layers falls back to
+   grey anti-aliasing. That's why it looked soft next to a normal web page.
+   Default: none of that. A still background and slightly more opaque panels.
+   Settings → Appearance → Transparency → "Frosted" brings the blur back. */
+:root:not([data-transparency="frosted"]) .aurora span,
+:root:not([data-transparency="frosted"]) .aurora span:nth-child(5) { animation: none !important; will-change: auto; }
+:root:not([data-transparency="frosted"]) .aurora::after { display: none; }
+:root:not([data-transparency="frosted"]) .glass,
+:root:not([data-transparency="frosted"]) .btn,
+:root:not([data-transparency="frosted"]) .section-tabs,
+:root:not([data-transparency="frosted"]) .sheet-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root:not([data-transparency="frosted"]) .glass {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--glass-tint-strong) 55%, var(--solid-surface)) 0%, color-mix(in srgb, var(--glass-tint) 60%, var(--solid-surface)) 60%);
+}
+:root:not([data-transparency="frosted"]) .glass-strong { background: color-mix(in srgb, var(--glass-tint-strong) 45%, var(--solid-surface)); }
+:root:not([data-transparency="frosted"]) .glass-lens::after { filter: none; }
