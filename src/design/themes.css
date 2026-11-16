@@ -112,7 +112,7 @@ body { transition: background-color calc(0.8s * var(--motion, 1)) ease; }
 :root[data-transparency="reduced"] .glass::after, :root[data-transparency="reduced"] .aurora::after { display: none; }
 
 /* ── Layout: fill big screens, density, width options ──────────────────── */
-.shell { max-width: none; grid-template-columns: var(--sidebar-w, 248px) minmax(0, 1fr); padding: 22px 28px; gap: 28px; }
+.shell { max-width: none; grid-template-columns: var(--sidebar-w, 200px) minmax(0, 1fr); padding: 22px 28px; gap: 28px; }
 :root[data-width="wide"] .shell { max-width: 1960px; }
 :root[data-width="centered"] .shell { max-width: 1480px; }
 .content { container-type: inline-size; padding: 4px 4px 40px; }

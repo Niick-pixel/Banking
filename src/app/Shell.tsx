@@ -113,7 +113,7 @@ export default function Shell() {
               const Icon = s.icon;
               return (
                 <li key={s.id}>
-                  <NavLink to={entry(s)} end className={`nav-item ${active ? 'active' : ''}`} data-tour={`nav-${s.id}`} aria-current={active ? 'page' : undefined}>
+                  <NavLink to={entry(s)} end title={s.blurb} className={`nav-item ${active ? 'active' : ''}`} data-tour={`nav-${s.id}`} aria-current={active ? 'page' : undefined}>
                     {active && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 360, damping: 34, duration: dur(0.5) }} />}
                     <Icon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
                     <span style={{ position: 'relative', display: 'grid' }}>{s.label}<small className="nav-blurb">{s.blurb}</small></span>
@@ -124,12 +124,13 @@ export default function Shell() {
           </ul>
           <div className="sidebar-bottom">
             <button className="nav-item nav-search" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))} data-tour="search">
-              <Search size={18} aria-hidden /> <span>Search & commands</span> <kbd>Ctrl K</kbd>
+              <Search size={18} aria-hidden /> <span>Search</span> <kbd>Ctrl K</kbd>
             </button>
-            <Link to="/settings" className={`nav-item ${inSettings ? 'active' : ''}`} data-tour="settings" aria-current={inSettings ? 'page' : undefined}>
+            <Link to="/settings" title={syncText} className={`nav-item ${inSettings ? 'active' : ''}`} data-tour="settings" aria-current={inSettings ? 'page' : undefined}>
               {inSettings && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 360, damping: 34, duration: dur(0.5) }} />}
               <SettingsIcon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
-              <span style={{ position: 'relative', display: 'grid' }}>Settings<small className="nav-blurb"><span className="dot" style={{ background: syncDot, display: 'inline-block', marginRight: 6 }} />{syncText}</small></span>
+              <span style={{ position: 'relative', display: 'grid' }}>Settings</span>
+              <span className="sync-dot" style={{ background: syncDot }} title={syncText} role="img" aria-label={syncText} />
             </Link>
           </div>
         </nav>

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
+import { CardsWidget, useCards } from './CardsWidget';
+import { InfoTip } from '../design/components/InfoTip';
 import { debtStatus } from '../domain/ledger';
 import { accelerate, amortize, debtServiceRatio, nextPaymentDate, payoffStrategy, scenarios, selfLoanProgress } from '../domain/debts';
 import { commitmentForMonth } from '../domain/installments';
@@ -32,6 +34,7 @@ export default function Debts() {
   const [sheet, setSheet] = useState<SheetState>(null);
   const [budgetRaw, setBudgetRaw] = useState('');
 
+  const cards = useCards();
   const active = l.debts.filter((d) => d.status !== 'paid');
   const status = new Map(l.debts.map((d) => [d.id, debtStatus(d, l.transactions)]));
   const totalOwed = active.reduce((s, d) => s + Math.max(0, status.get(d.id)!.balance), 0);
@@ -47,18 +50,23 @@ export default function Debts() {
   });
   const debtFreeBy = payoffs.every((p) => !p || !p.never) ? payoffs.map((p) => p?.payoffDate).filter(Boolean).sort().at(-1) : undefined;
   const loans = selfLoanProgress(l.selfLoans ?? [], l.transactions, l.categories);
-  const strategyDebts = active.filter((d) => status.get(d.id)!.balance > 0).map((d) => ({ id: d.id, balance: status.get(d.id)!.balance, annualRateBps: d.annualRateBps, minPayment: d.plannedMonthlyPayment ?? 0 }));
-  const stratBudget = parseAmountInput(budgetRaw, 'CRC') ?? planned;
+  // Cards join the plan with their rate (if set) and an estimated minimum payment: 5% of the balance, at least ₡10,000.
+  const cardMin = (owed: number) => Math.min(owed, Math.max(Math.round(owed * 0.05), 1_000_000));
+  const cardDebts = cards.cards.filter((c) => c.owed > 0 && c.account.currency === 'CRC').map((c) => ({ id: c.account.id, balance: c.owed, annualRateBps: c.account.cardAnnualRateBps ?? 0, minPayment: cardMin(c.owed) }));
+  const strategyDebts = [...active.filter((d) => status.get(d.id)!.balance > 0).map((d) => ({ id: d.id, balance: status.get(d.id)!.balance, annualRateBps: d.annualRateBps, minPayment: d.plannedMonthlyPayment ?? 0 })), ...cardDebts];
+  const nameOf = (id: string) => l.debts.find((d) => d.id === id)?.creditor ?? l.account.get(id)?.name ?? '';
+  const stratBudget = parseAmountInput(budgetRaw, 'CRC') ?? planned + cardDebts.reduce((s, c) => s + c.minPayment, 0);
 
   return (
     <>
-      <PageHeader title="Debts" sub="Balances come from your payments. Nothing is typed by hand.">
+      <PageHeader title="Debts" sub="Loans and credit cards. Balances follow your payments and check-ins.">
         <button className="btn" onClick={() => setSheet({ kind: 'loan' })}>+ Self-loan</button>
         <button className="btn btn-primary" onClick={() => setSheet({ kind: 'edit' })}>+ Debt</button>
       </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <Glass pad={16}><div className="small muted">Total owed</div><Money amount={totalOwed} size={26} weight={750} tone="debt" /></Glass>
+        <Glass pad={16}><div className="small muted">Total owed <InfoTip text="Your loans plus everything owed on your credit cards." /></div><Money amount={totalOwed + cards.totalOwed} size={26} weight={750} tone="debt" />
+          {cards.totalOwed > 0 && <div className="small muted">{formatMoney(totalOwed, 'CRC')} loans + {formatMoney(cards.totalOwed, 'CRC')} cards</div>}</Glass>
         <Glass pad={16}><div className="small muted">Monthly debt service</div><Money amount={planned + cuotas} size={26} weight={750} />
           <div className="small muted">{formatMoney(planned, 'CRC')} planned{cuotas ? ` + ${formatMoney(cuotas, 'CRC')} Tasa Cero` : ''}</div></Glass>
         <Glass pad={16}><div className="small muted">Of your income</div>
@@ -69,6 +77,7 @@ export default function Debts() {
       </div>
 
       <div style={{ display: 'grid', gap: 16 }}>
+        <CardsWidget />
         {active.map((d, i) => <DebtCard key={d.id} debt={d} payoff={payoffs[i] ?? null} avgIncome={avgIncome} onSheet={setSheet} />)}
         {active.length === 0 && <Glass><p className="muted" style={{ margin: 0 }}>No active debts.</p></Glass>}
 
@@ -80,9 +89,9 @@ export default function Debts() {
             <table className="table"><thead><tr><th>Strategy</th><th>Pays first</th><th className="num">Months</th><th className="num">Total interest</th></tr></thead>
               <tbody>{(['avalanche', 'snowball'] as const).map((k) => { const r = payoffStrategy(strategyDebts, stratBudget, k); return (
                 <tr key={k}><td>{k === 'avalanche' ? 'Avalanche (highest rate first)' : 'Snowball (smallest balance first)'}</td>
-                  <td>{l.debts.find((d) => d.id === r.order[0])?.creditor}</td>
+                  <td>{nameOf(r.order[0] ?? '')}</td>
                   <td className="num">{r.never ? 'never' : r.months}</td><td className="num">{r.never ? '—' : formatMoney(r.totalInterest, 'CRC')}</td></tr>); })}</tbody></table>
-            <p className="small muted" style={{ margin: 0 }}>Avalanche always costs the least interest. Snowball clears a debt sooner, which some people find motivating.</p>
+            <p className="small muted" style={{ margin: 0 }}>Avalanche always costs the least interest. Snowball clears a debt sooner, which some people find motivating.{cardDebts.length ? ` Credit cards are included with an estimated minimum payment (5% of the balance, at least ₡10,000)${cards.cards.some((c) => c.owed > 0 && c.account.cardAnnualRateBps === undefined) ? '; add each card\'s interest rate (Edit on the card) for a real comparison' : ''}.` : ''}</p>
           </Glass>
         )}
 
