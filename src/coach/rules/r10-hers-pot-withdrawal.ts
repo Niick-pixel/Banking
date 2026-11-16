@@ -7,7 +7,7 @@ import type { Transaction } from '../../domain/schemas';
  * Paying her debt from her fund is what the fund is for, so that never fires.
  */
 export const R10 = rule({
-  id: 'R10', name: 'Withdrawal from her pot', trigger: 'Any withdrawal from a pot owned by someone else',
+  id: 'R10', name: 'Withdrawal from her fund', trigger: 'Any withdrawal from a fund owned by someone else',
   defaults: { lookbackDays: 30 }, labels: { lookbackDays: 'Look back (days)' },
   evaluate(ctx, p) {
     const hers = new Map(ctx.pots.filter((x) => x.owner === 'hers').map((x) => [x.id, x]));
@@ -35,9 +35,9 @@ export const R10 = rule({
         body: reason ? `Reason given: “${reason}”. ${pot.name} now holds ${crc(bal)}.`
           : ctx.say(`That's her money. Say why, and it's logged as borrowing. ${pot.name} now holds ${crc(bal)}${months ? `; at ${crc(monthlyPlan)}/month it takes ${months} more month${months > 1 ? 's' : ''} to refill` : ''}.`,
             `This money is set aside for her. Add a short reason so it's tracked as a loan from her fund${months ? `; it will take about ${months} month${months > 1 ? 's' : ''} to put back` : ''}.`),
-        why: { formula: 'withdrawal from a pot with owner = hers (paying her debt from it excluded)', inputs: { pot: pot.name, amount: crc(t.amount), balanceNow: crc(bal), monthlyPlan: crc(monthlyPlan) }, threshold: 'any amount' },
+        why: { formula: 'withdrawal from a fund with owner = hers (paying her debt from it excluded)', inputs: { pot: pot.name, amount: crc(t.amount), balanceNow: crc(bal), monthlyPlan: crc(monthlyPlan) }, threshold: 'any amount' },
         impactCRC: t.amount, actWithinDays: 1, confidence: 1,
-        action: { label: reason ? 'Open her pot' : 'Give a reason (log as borrowing)', kind: reason ? 'open' : 'log_reason', payload: { transactionId: t.id, to: '/pots', amount: t.amount } },
+        action: { label: reason ? 'Open her fund' : 'Give a reason (log as borrowing)', kind: reason ? 'open' : 'log_reason', payload: { transactionId: t.id, to: '/funds', amount: t.amount } },
         dedupeKey: `R10:${t.id}`,
       })];
     });

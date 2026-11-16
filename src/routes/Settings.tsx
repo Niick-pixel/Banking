@@ -419,7 +419,7 @@ function DataPanel({ run }: { run: (label: string, fn: () => Promise<unknown>) =
       </Section>
 
       <Section title="Data health" id="health">
-        {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, pots, debts and statements agree.</Pill> : (
+        {health.length === 0 ? <Pill tone="income">✓ Nothing to check. Totals, funds, debts and statements agree.</Pill> : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
             {health.map((h) => (
               <li key={h.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>

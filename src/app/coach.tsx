@@ -115,7 +115,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
       const pot = l.pots.find((p) => p.id === potId);
       const to = pot ? { accountId: pot.accountId, potId: pot.id } : accountId ? { accountId } : undefined;
       const cat = savingsCategory(target, potId);
-      if (!to || !cat || !spending) throw new Error('Set up a savings pot first.');
+      if (!to || !cat || !spending) throw new Error('Set up a savings fund first.');
       const now = Date.now();
       const tx = TransactionSchema.parse({
         id: newId(), date: today, dateEstimated: false, currency: 'CRC', description: note ?? 'Coach: saved', tags: ['coach'], notes: '',

@@ -238,7 +238,7 @@ function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) {
         <div className="field"><label htmlFor="df-day">Fixed payment day</label><input id="df-day" className="input" type="number" min={1} max={31} value={d.checklist?.fixedPaymentDay ?? ''} onChange={(e) => setD({ ...d, checklist: { ...d.checklist, fixedPaymentDay: e.target.value ? Number(e.target.value) : undefined } })} /></div>
       </div>
       <div className="field"><label htmlFor="df-f">Money set aside for it in</label>
-        <select id="df-f" className="input" value={d.fundPotId ?? ''} onChange={(e) => setD({ ...d, fundPotId: e.target.value || undefined })}><option value="">No pot</option>{l.pots.map((p) => <option key={p.id} value={p.id}>{l.account.get(p.accountId)?.name} · {p.name}</option>)}</select></div>
+        <select id="df-f" className="input" value={d.fundPotId ?? ''} onChange={(e) => setD({ ...d, fundPotId: e.target.value || undefined })}><option value="">No fund</option>{l.pots.map((p) => <option key={p.id} value={p.id}>{l.account.get(p.accountId)?.name} · {p.name}</option>)}</select></div>
       <div className="field"><label htmlFor="df-cat">Payment category</label>
         <select id="df-cat" className="input" value={d.categoryId ?? ''} onChange={(e) => setD({ ...d, categoryId: e.target.value || undefined })}><option value="">Default</option>{l.categories.filter((c) => c.group === 'Debt Service').map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
       <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={d.status === 'paid'} onChange={(e) => setD({ ...d, status: e.target.checked ? 'paid' : 'active' })} /> Paid off (hide from active debts)</label>

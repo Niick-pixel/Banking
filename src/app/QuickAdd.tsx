@@ -274,7 +274,7 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
             <option value="">Choose…</option>
             {l.debts.filter((d) => d.status !== 'paid').map((d) => <option key={d.id} value={d.id}>{d.creditor}</option>)}
           </select>
-          <span className="small muted">Paying from a pot (e.g. Hers) takes it out of the pot and lowers the debt in one step. It's counted once.</span>
+          <span className="small muted">Paying from a fund (e.g. Hers) takes it out of the fund and lowers the debt in one step. It's counted once.</span>
         </div>
       )}
       <div className="grid2">

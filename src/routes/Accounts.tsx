@@ -43,7 +43,7 @@ export default function Accounts() {
   }
   for (const p of l.pots) {
     const b = l.balances.get(p.accountId)?.pots.get(p.id) ?? 0;
-    if (b < 0) health.push({ level: 'warn', msg: `Pot "${p.name}" is negative (${formatMoney(b, 'CRC')}).` });
+    if (b < 0) health.push({ level: 'warn', msg: `Fund "${p.name}" is negative (${formatMoney(b, 'CRC')}).` });
   }
 
   return (
@@ -105,7 +105,7 @@ export default function Accounts() {
                         </div>
                       )}
                       {noOpening && <Pill tone="debt">Set the real opening balance</Pill>}
-                      <div><button className="btn btn-sm" onClick={() => setPotFor(a)}>+ Pot</button></div>
+                      <div><button className="btn btn-sm" onClick={() => setPotFor(a)}>+ Fund</button></div>
                     </Glass>
                   );
                 })}
@@ -120,7 +120,7 @@ export default function Accounts() {
       <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit === 'new' ? 'New account' : 'Edit account'}>
         {edit && <AccountForm account={edit === 'new' ? undefined : edit} onDone={() => setEdit(null)} />}
       </Sheet>
-      <Sheet open={!!potFor} onClose={() => setPotFor(null)} title={`New pot in ${potFor?.name ?? ''}`}>
+      <Sheet open={!!potFor} onClose={() => setPotFor(null)} title={`New fund in ${potFor?.name ?? ''}`}>
         {potFor && <PotForm account={potFor} onDone={() => setPotFor(null)} />}
       </Sheet>
       <p className="small muted" style={{ marginTop: 24 }}>Opening balance is the balance at the start of the opening date. Movements before that date don't change the balance but still count in monthly reports.</p>
@@ -182,7 +182,7 @@ function PotForm({ account, onDone }: { account: Account; onDone: () => void }) 
       <div className="field"><label htmlFor="pot-owner">Whose money</label>
         <select id="pot-owner" className="input" value={p.owner} onChange={(e) => setP({ ...p, owner: e.target.value as Pot['owner'] })}><option value="mine">Mine</option><option value="hers">Hers</option><option value="shared">Shared</option></select></div>
       <div className="field"><label htmlFor="pot-purpose">Purpose</label><input id="pot-purpose" className="input" value={p.purpose} onChange={(e) => setP({ ...p, purpose: e.target.value })} /></div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Create pot</button></div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Create fund</button></div>
     </form>
   );
 }

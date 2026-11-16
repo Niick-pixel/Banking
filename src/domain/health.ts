@@ -61,7 +61,7 @@ export function dataHealth(inp: HealthInput, today: ISODate): HealthIssue[] {
   const bal = accountBalances(inp.accounts, inp.transactions);
   for (const p of inp.pots) {
     const b = bal.get(p.accountId)?.pots.get(p.id) ?? 0;
-    if (b < 0) issues.push({ id: `pot-${p.id}`, level: 'error', title: `Pot "${p.name}" is negative (${fmt(b)})`, detail: 'More was taken out than was put in. Check the movements into this pot.', to: '/pots' });
+    if (b < 0) issues.push({ id: `pot-${p.id}`, level: 'error', title: `Fund "${p.name}" is negative (${fmt(b)})`, detail: 'More was taken out than was put in. Check the movements into this fund.', to: '/funds' });
   }
   for (const a of inp.accounts) {
     if (a.archived || a.type === 'credit_card') continue;

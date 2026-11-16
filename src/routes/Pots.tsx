@@ -36,13 +36,13 @@ export default function Pots() {
   const fmtShort = (v: number) => `₡${Math.round(v / 100_000)}k`;
 
   if (!l.pots.length) {
-    return (<><PageHeader title="Pots" /><Glass><p className="muted" style={{ margin: 0 }}>No pots yet. Create one from Accounts (+ Pot) to split an account into Her money / My money.</p></Glass></>);
+    return (<><PageHeader title="Funds" /><Glass><p className="muted" style={{ margin: 0 }}>No funds yet. Create one from Accounts (+ Fund) to split an account into Her money / My money.</p></Glass></>);
   }
 
   return (
     <>
-      <PageHeader title="Pots" sub="Money set aside inside your accounts, by whose it is. Fully automatic from your movements.">
-        <button className="btn" onClick={() => setMove(true)}>Move between pots</button>
+      <PageHeader title="Funds" sub="Money set aside inside your accounts, by whose it is. Fully automatic from your movements.">
+        <button className="btn" onClick={() => setMove(true)}>Move between funds</button>
       </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
@@ -78,7 +78,7 @@ export default function Pots() {
               <div><div className="muted">Can pay in full by</div><b style={{ fontSize: 18 }}>{f.payInFullBy ? formatDateCR(f.payInFullBy) : '—'}</b></div>
             </div>
             <div className="bar" style={{ height: 12 }} role="img" aria-label={`${Math.round(f.covered * 100)}% covered`}><span style={{ width: `${f.covered * 100}%`, background: `var(--chart-${pot.owner === 'hers' ? 'hers' : 'mine'})` }} /></div>
-            <div className="small muted">{Math.round(f.covered * 100)}% covered. Paying from the pot lowers both the pot and the debt in one step, so it's never counted as spending twice.</div>
+            <div className="small muted">{Math.round(f.covered * 100)}% covered. Paying from the fund lowers both the fund and the debt in one step, so it's never counted as spending twice.</div>
           </Glass>
         );
       })}
@@ -94,7 +94,7 @@ export default function Pots() {
           </div>
         </div>
         {view === 'chart' ? (
-          <div style={{ height: 280 }} role="img" aria-label="Money added to pots each month, Hers and Mine stacked. Switch to Table for exact values.">
+          <div style={{ height: 280 }} role="img" aria-label="Money added to funds each month, Hers and Mine stacked. Switch to Table for exact values.">
             <ResponsiveContainer>
               <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} stackOffset="sign">
                 <CartesianGrid vertical={false} stroke={grid} />
@@ -124,7 +124,7 @@ export default function Pots() {
       <Sheet open={!!pay} onClose={() => setPay(null)} title={pay ? `Pay ${pay.creditor}` : ''}>
         {pay && <PayDebtForm debt={pay} onDone={() => setPay(null)} />}
       </Sheet>
-      <Sheet open={move} onClose={() => setMove(false)} title="Move money between pots">
+      <Sheet open={move} onClose={() => setMove(false)} title="Move money between funds">
         {move && <MoveForm onDone={() => setMove(false)} />}
       </Sheet>
     </>
@@ -147,7 +147,7 @@ function MoveForm({ onDone }: { onDone: () => void }) {
     if (fa !== ta) return setErr('Both sides must be in the same account (use a transfer for different accounts)');
     if (from === to) return setErr('Pick two different places');
     const now = Date.now();
-    await saveTransaction({ id: newId(), kind: 'transfer', date: todayISO(), dateEstimated: false, currency: 'CRC', from: fp ? { accountId: fa!, potId: fp } : { accountId: fa! }, to: tp ? { accountId: ta!, potId: tp } : { accountId: ta! }, amount, description: 'Move between pots', tags: [], notes: '', createdAt: now, updatedAt: now });
+    await saveTransaction({ id: newId(), kind: 'transfer', date: todayISO(), dateEstimated: false, currency: 'CRC', from: fp ? { accountId: fa!, potId: fp } : { accountId: fa! }, to: tp ? { accountId: ta!, potId: tp } : { accountId: ta! }, amount, description: 'Move between funds', tags: [], notes: '', createdAt: now, updatedAt: now });
     onDone();
   }
   return (
@@ -157,7 +157,7 @@ function MoveForm({ onDone }: { onDone: () => void }) {
         <div className="field"><label htmlFor="mv-f">From</label><select id="mv-f" className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{opts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></div>
         <div className="field"><label htmlFor="mv-t">To</label><select id="mv-t" className="input" value={to} onChange={(e) => setTo(e.target.value)}>{opts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></div>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>Use this to assign the unassigned part of an account to a pot, e.g. money that was already in savings before you started tracking.</p>
+      <p className="small muted" style={{ margin: 0 }}>Use this to assign the unassigned part of an account to a fund, e.g. money that was already in savings before you started tracking.</p>
       {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Move</button></div>
       <Pill tone="neutral">Not income or spending</Pill>
