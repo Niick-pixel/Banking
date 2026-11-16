@@ -221,8 +221,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* ── Chip menus (single / multi select) ───────────────────────────────── */
 .chipgroup { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
-.chipgroup-head { display: flex; align-items: center; gap: 6px; padding: 0 4px; width: 100%; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); font-weight: 650; }
-.chipgroup-label { color: var(--text-2); }
+.chipgroup-head { display: flex; align-items: center; gap: 6px; padding: 0 4px; width: 100%; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); font-weight: 650; }
+.chipgroup-label { color: var(--text); }
 .chipgroup-note { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .chipgroup-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
 .chipgroup-dot.missing { box-shadow: 0 0 0 3px var(--accent-soft); }
