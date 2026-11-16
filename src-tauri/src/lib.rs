@@ -173,6 +173,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_http::init())
+        // Remembers size, position (and which monitor), and maximized state between launches.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             vault_read,
             vault_write_atomic,

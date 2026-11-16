@@ -22,6 +22,7 @@ import { CATEGORY_GROUPS, type Category } from '../domain/schemas';
 import { saveCategory } from '../db/repo';
 import { rateForDay } from '../app/fx';
 import { startTour } from '../app/Tour';
+import { readPersisted, writePersisted } from '../app/persist';
 import { RULES } from '../coach/rules';
 import { COACH_DEFAULTS } from '../coach/prefs';
 import type { CoachPrefs, WindfallTarget } from '../coach/types';
@@ -490,7 +491,9 @@ export default function Settings() {
   const { dur } = useTheme();
   const cats = CATS.filter((c) => !c.desktopOnly || isTauri());
   const fromUrl = new URLSearchParams(loc.search).get('c') as CatId | null;
-  const cat: CatId = loc.hash === '#health' ? 'data' : fromUrl && cats.some((c) => c.id === fromUrl) ? fromUrl : 'appearance';
+  const lastCat = readPersisted<CatId>('settings.cat', 'appearance');
+  const cat: CatId = loc.hash === '#health' ? 'data' : fromUrl && cats.some((c) => c.id === fromUrl) ? fromUrl : cats.some((c) => c.id === lastCat) ? lastCat : 'appearance';
+  useEffect(() => writePersisted('settings.cat', cat), [cat]);
   const [msg, setMsg] = useState('');
   const current = cats.find((c) => c.id === cat)!;
 

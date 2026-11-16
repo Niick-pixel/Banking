@@ -12,6 +12,7 @@ import type { Debt, Pot } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { PayDebtForm } from './PayDebt';
+import { usePersisted } from '../app/persist';
 
 const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const OWNER_LABEL = { hers: 'Her money', mine: 'My money', shared: 'Shared' } as const;
@@ -22,7 +23,7 @@ export default function Pots() {
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const [pay, setPay] = useState<Debt | null>(null);
   const [move, setMove] = useState(false);
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>('view.funds', 'chart');
   const [hersC, mineC, grid, axis] = useCssVar(['--chart-hers', '--chart-mine', '--chart-grid', '--chart-axis']);
 
   const potBal = (p: Pot) => l.balances.get(p.accountId)?.pots.get(p.id) ?? 0;

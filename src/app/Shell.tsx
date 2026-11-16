@@ -18,6 +18,7 @@ import { Aurora, GlassDefs } from '../design/components';
 import { ALL_PAGES, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
 import { useTheme } from './theme';
 import { GuidedTour } from './Tour';
+import { readPersisted, writePersisted } from './persist';
 
 /** Page content fades and rises in; the old page fades out first. */
 function AnimatedOutlet() {
@@ -85,6 +86,9 @@ export default function Shell() {
     return () => { clearTimeout(first); clearInterval(every); };
   }, []);
   const current = sectionFor(loc.pathname);
+  // Each section reopens on the tab you used last (e.g. Activity → Bills & calendar).
+  useEffect(() => { if (current && current.pages.some((p) => p.to === loc.pathname)) writePersisted(`lastPage.${current.id}`, loc.pathname); }, [current, loc.pathname]);
+  const entry = (s: (typeof SECTIONS)[number]) => { const last = readPersisted<string>(`lastPage.${s.id}`, s.pages[0]!.to); return s.pages.some((p) => p.to === last) ? last : s.pages[0]!.to; };
   const inSettings = SETTINGS_PATHS.includes(loc.pathname);
   const syncDot = !status ? 'var(--text-3)' : status.phase === 'locked' || status.phase === 'syncing' || status.dirty ? 'var(--debt)' : status.phase === 'error' ? 'var(--expense)' : 'var(--income)';
   const syncText = !status ? 'Not saving to a folder' : status.phase === 'locked' ? 'Data file locked' : status.phase === 'error' ? 'Sync problem' : status.phase === 'syncing' || status.dirty ? 'Saving…' : `Saved ${ago(status.lastSyncedAt)}`;
@@ -106,7 +110,7 @@ export default function Shell() {
               const Icon = s.icon;
               return (
                 <li key={s.id}>
-                  <NavLink to={s.pages[0]!.to} end className={`nav-item ${active ? 'active' : ''}`} data-tour={`nav-${s.id}`} aria-current={active ? 'page' : undefined}>
+                  <NavLink to={entry(s)} end className={`nav-item ${active ? 'active' : ''}`} data-tour={`nav-${s.id}`} aria-current={active ? 'page' : undefined}>
                     {active && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 360, damping: 34, duration: dur(0.5) }} />}
                     <Icon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
                     <span style={{ position: 'relative', display: 'grid' }}>{s.label}<small className="nav-blurb">{s.blurb}</small></span>
@@ -140,7 +144,7 @@ export default function Shell() {
         </main>
       </div>
       <nav className="glass tabbar" aria-label="Main (mobile)">
-        {SECTIONS.map((s) => { const Icon = s.icon; return <NavLink key={s.id} to={s.pages[0]!.to} end className={`tab ${current?.id === s.id ? 'active' : ''}`}><Icon size={18} aria-hidden />{s.label.split(' ')[0]}</NavLink>; })}
+        {SECTIONS.map((s) => { const Icon = s.icon; return <NavLink key={s.id} to={entry(s)} end className={`tab ${current?.id === s.id ? 'active' : ''}`}><Icon size={18} aria-hidden />{s.label.split(' ')[0]}</NavLink>; })}
         <NavLink to="/settings" className="tab"><SettingsIcon size={18} aria-hidden />Settings</NavLink>
       </nav>
       {update && <Toast message={`Update ${update.version} is ready`} action="Install & restart" onAction={() => void update.install()} onDone={() => setUpdate(null)} />}

@@ -10,9 +10,10 @@ import { useCssVar, useTheme } from '../../app/theme';
 import { DataTable, fmt, fmtShort } from './charts';
 import { Segmented } from '.';
 import type { WaterStep } from '../../domain/spending';
+import { usePersisted } from '../../app/persist';
 
 function Frame({ title, sub, children, table }: { title: string; sub?: ReactNode; children: ReactNode; table: ReactNode }) {
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>(`view.${title}`, 'chart');
   return (
     <figure style={{ margin: 0 }}>
       <figcaption style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>

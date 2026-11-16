@@ -9,6 +9,7 @@ import { deleteTransaction, lastAuditId, saveTransaction, undoAudit } from '../d
 import type { Transaction } from '../domain/schemas';
 import { formatMoney, type Minor } from '../lib/money';
 import { StartFresh } from './Accounts';
+import { usePersisted, usePersistedSet } from '../app/persist';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const monthLabel = (mk: string) => `${MONTH_NAMES[Number(mk.slice(5)) - 1]} ${mk.slice(0, 4)}`;
@@ -23,11 +24,13 @@ export default function Transactions() {
   // Filters can arrive in the URL from a chart click: ?month=2026-11&group=Living, ?date=2026-11-03, ?kind=income
   const [params, setParams] = useSearchParams();
   const pMonth = params.get('month') ?? '', pDate = params.get('date') ?? '', pGroup = params.get('group') ?? '', pUncat = params.get('uncat') === '1';
-  const [q, setQ] = useState('');
-  const [kind, setKind] = useState(params.get('kind') ?? '');
-  const [acc, setAcc] = useState('');
-  const [cat, setCat] = useState(params.get('cat') ?? '');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [q, setQ] = usePersisted('tx.q', '');
+  const [kindSaved, setKind] = usePersisted('tx.kind', '');
+  const kind = params.get('kind') ?? kindSaved;
+  const [acc, setAcc] = usePersisted('tx.acc', '');
+  const [catSaved, setCat] = usePersisted('tx.cat', '');
+  const cat = params.get('cat') ?? catSaved;
+  const [collapsed, toggleMonth] = usePersistedSet('tx.collapsed');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
 
@@ -65,7 +68,6 @@ export default function Transactions() {
     );
   }
 
-  const toggleMonth = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   async function del(t: Transaction) {

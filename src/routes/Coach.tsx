@@ -18,6 +18,7 @@ import { monthReport, weeklyCheckIn } from '../coach/reports';
 import { shiftMonth } from '../coach/context';
 import type { Insight, Severity } from '../coach/types';
 import type { SplitLine } from '../coach/windfall';
+import { usePersisted } from '../app/persist';
 
 const crc = (n: number) => formatMoney(Math.round(n) as Minor, 'CRC', { decimals: 0 });
 
@@ -205,7 +206,7 @@ export function CoachTop() {
 // ── Pages ─────────────────────────────────────────────────────────────────
 function Inbox() {
   const { run, state, patchState } = useCoach();
-  const [filter, setFilter] = useState<Severity | 'all'>('all');
+  const [filter, setFilter] = usePersisted<Severity | 'all'>('coach.filter', 'all');
   if (!run) return null;
   const list = run.dispatch.inbox.filter((i) => filter === 'all' || i.severity === filter);
   const counts = (Object.keys(SEVERITY) as Severity[]).map((s) => [s, run.dispatch.inbox.filter((i) => i.severity === s).length] as const);
@@ -238,7 +239,7 @@ function Inbox() {
 function ForecastPage() {
   const { run } = useCoach();
   const [bal, axis, grid, exp, acc] = useCssVar(['--chart-1', '--chart-axis', '--chart-grid', '--chart-expense', '--accent']);
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>('view.forecast', 'chart');
   if (!run) return null;
   if (!run.safe.known) return <Glass strong><SafeToSpendCard /></Glass>;
   const f = run.forecast;

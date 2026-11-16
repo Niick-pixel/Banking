@@ -10,6 +10,7 @@ import { computeTracker } from '../domain/tracker';
 import { saveSnapshot } from '../db/repo';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, lastDayOfMonth, todayISO } from '../lib/dates';
+import { usePersisted } from '../app/persist';
 
 const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const mLabel = (mk: string) => `${M[Number(mk.slice(5)) - 1]} ${mk.slice(2, 4)}`;
@@ -27,7 +28,7 @@ export default function NetWorth() {
   const l = useLedger();
   const today = todayISO();
   const [year, setYear] = useState(Number(today.slice(0, 4)));
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = usePersisted<'chart' | 'table'>('view.networth', 'chart');
   const [entry, setEntry] = useState(false);
   const [target, setTarget] = usePref('efTargetMonths');
   const [line, grid, axis] = useCssVar(['--chart-1', '--chart-grid', '--chart-axis']);
