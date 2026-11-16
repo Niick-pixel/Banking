@@ -22,6 +22,7 @@ import { CATEGORY_GROUPS, type Category } from '../domain/schemas';
 import { saveCategory } from '../db/repo';
 import { rateForDay } from '../app/fx';
 import { startTour } from '../app/Tour';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { readPersisted, writePersisted } from '../app/persist';
 import { RULES } from '../coach/rules';
 import { COACH_DEFAULTS } from '../coach/prefs';
@@ -155,14 +156,9 @@ function DashboardPanel() {
   const [hidden, setHidden] = usePref('dashHidden');
   return (
     <Section title="Dashboard cards" sub="Turn off the cards you don't use. The month figures at the top always show.">
-      <div className="check-grid">
-        {DASH_CARDS.map((c) => (
-          <label key={c.id} className="check-card">
-            <input type="checkbox" checked={!hidden.includes(c.id)} onChange={(e) => void setHidden(e.target.checked ? hidden.filter((h) => h !== c.id) : [...hidden, c.id])} />
-            {c.label}
-          </label>
-        ))}
-      </div>
+      <ChipGroup<string> multi label="Show on the dashboard" aside={`${DASH_CARDS.length - hidden.length} of ${DASH_CARDS.length}`}
+        value={DASH_CARDS.map((c) => c.id).filter((id) => !hidden.includes(id))} onChange={(on) => void setHidden(DASH_CARDS.map((c) => c.id).filter((id) => !on.includes(id)))}
+        options={DASH_CARDS.map((c) => ({ value: c.id, label: c.label }))} spread={false} />
     </Section>
   );
 }

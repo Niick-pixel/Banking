@@ -13,6 +13,7 @@ import { Empty, PageHeader } from '../ui/Sheet';
 import { formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { replay } from '../coach/replay';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { hoursOfWork } from '../coach/forecast';
 import { monthReport, weeklyCheckIn } from '../coach/reports';
 import { shiftMonth } from '../coach/context';
@@ -206,17 +207,15 @@ export function CoachTop() {
 // ── Pages ─────────────────────────────────────────────────────────────────
 function Inbox() {
   const { run, state, patchState } = useCoach();
-  const [filter, setFilter] = usePersisted<Severity | 'all'>('coach.filter', 'all');
+  const [filter, setFilter] = usePersisted<Severity[]>('coach.filters', []);
   if (!run) return null;
-  const list = run.dispatch.inbox.filter((i) => filter === 'all' || i.severity === filter);
+  const list = run.dispatch.inbox.filter((i) => !filter.length || filter.includes(i.severity));
   const counts = (Object.keys(SEVERITY) as Severity[]).map((s) => [s, run.dispatch.inbox.filter((i) => i.severity === s).length] as const);
   return (
     <div className="coach-grid">
       <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
-        <div className="chips" role="group" aria-label="Filter by severity">
-          <button className="chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All {run.dispatch.inbox.length}</button>
-          {counts.filter(([, n]) => n).map(([s, n]) => <button key={s} className="chip" aria-pressed={filter === s} onClick={() => setFilter(s)}>{SEVERITY[s].label} {n}</button>)}
-        </div>
+        <ChipGroup<Severity> multi label="Show" note="all when none picked" value={filter} onChange={setFilter}
+          options={counts.filter(([, n]) => n).map(([s, n]) => ({ value: s, label: `${SEVERITY[s].label} ${n}` }))} aside={`${list.length} of ${run.dispatch.inbox.length}`} />
         {list.length === 0 ? <Glass strong><p className="muted" style={{ margin: 0 }}>Nothing here. The Coach checks again every time you log something.</p></Glass>
           : <AnimatePresence>{list.map((i) => <InsightCard key={i.dedupeKey} i={i} />)}</AnimatePresence>}
         {run.dispatch.hidden > 0 && (

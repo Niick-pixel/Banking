@@ -75,12 +75,15 @@ function AutoSavingForm({ rule, onDone }: { rule?: RecurringRule; onDone: () => 
   const [to, setTo] = useState(t.to ? `${t.to.accountId}|${t.to.potId ?? ''}` : savingsAcc ? `${savingsAcc.id}|${mineFund?.id ?? ''}` : '');
   const [cat, setCat] = useState(t.categoryId ?? savingsCats.find((c) => /mine/i.test(c.name))?.id ?? savingsCats[0]?.id ?? '');
   const [active, setActive] = useState(rule?.active ?? true);
+  const [includeToday, setIncludeToday] = useState(false);
   const [err, setErr] = useState('');
   const amount = parseAmountInput(raw, 'CRC');
   const dests = useMemo(() => l.accounts.filter((a) => !a.archived && a.type !== 'credit_card' && a.id !== from).flatMap((a) => [
     { key: `${a.id}|`, label: a.name }, ...l.pots.filter((p) => p.accountId === a.id).map((p) => ({ key: `${a.id}|${p.id}`, label: `${a.name} · ${p.name} fund` })),
   ]), [l, from]);
   const today = todayISO();
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const todayIsDay = !rule && days.includes(Number(today.slice(8)));
 
   async function save() {
     setErr('');
@@ -95,7 +98,7 @@ function AutoSavingForm({ rule, onDone }: { rule?: RecurringRule; onDone: () => 
         template: { kind: 'savings', direction: 'deposit', from: { accountId: from }, to: tp ? { accountId: ta, potId: tp } : { accountId: ta }, amount, categoryId: cat, description: name.trim() || 'Automatic savings', tags: ['auto-savings'] },
         schedule: { type: 'days', days }, mode: 'auto_post',
         // A new rule starts today, so it never back-fills deductions you already logged.
-        startDate: rule?.startDate ?? today, endDate: rule?.endDate, lastHandledDate: rule?.lastHandledDate,
+        startDate: rule?.startDate ?? (todayIsDay && includeToday ? today : tomorrow), endDate: rule?.endDate, lastHandledDate: rule?.lastHandledDate,
         skipped: rule?.skipped ?? [], informational: false, active, createdAt: rule?.createdAt ?? now, updatedAt: now,
       });
       onDone();
@@ -120,7 +123,8 @@ function AutoSavingForm({ rule, onDone }: { rule?: RecurringRule; onDone: () => 
         <ChipGroup<string> label="Counts as" required value={cat} onChange={(v) => v && setCat(v)} options={savingsCats.map((c) => ({ value: c.id, label: c.name }))} />
       )}
       <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active (posts itself on each day)</label>
-      <p className="small muted" style={{ margin: 0 }}>{rule ? 'Changes apply from the next deduction.' : `Starts with the next ${days.length > 1 ? 'deduction day' : 'day'}; deductions already logged aren't added again.`}</p>
+      {todayIsDay && <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={includeToday} onChange={(e) => setIncludeToday(e.target.checked)} /> Today's deduction already happened and isn't logged yet: add it too</label>}
+      <p className="small muted" style={{ margin: 0 }}>{rule ? 'Changes apply from the next deduction.' : 'Starts with the next deduction day, so nothing you already logged is counted twice.'}</p>
       {err && <p role="alert" style={{ margin: 0, color: 'var(--expense)', fontWeight: 600 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">{rule ? 'Save' : 'Start automatic savings'}</button></div>
     </form>

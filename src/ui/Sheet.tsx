@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { useTheme } from '../app/theme';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 /** Bottom sheet on mobile, centered panel on desktop. Esc closes; focus moves in and is restored. */
 export function Sheet({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
@@ -19,7 +20,9 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
     }, 30);
     return () => { window.removeEventListener('keydown', onKey); prev?.focus?.(); };
   }, [open, onClose]);
-  return (
+  // Rendered at the top of the page: a dialog opened from inside a glass card would otherwise be
+  // positioned (and clipped) by that card, because backdrop-filter makes it the containing block.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="sheet-root">
@@ -40,7 +43,8 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

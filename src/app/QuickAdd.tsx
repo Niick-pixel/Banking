@@ -5,6 +5,7 @@ import { useLedger, suggestCategories, type Ledger } from './data';
 import { convert, formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { rateForDay } from './fx';
 import { useCoach } from './coach';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { hoursOfWork } from '../coach/forecast';
 import { guessCategory } from '../coach/autocat';
 import type { RateSource } from '../fx/rates';
@@ -187,7 +188,7 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); void submit(false); }} style={{ display: 'grid', gap: 14 }}>
-      <Segmented<Kind> label="Kind" value={kind} onChange={setKind} options={[
+      <ChipGroup<Kind> label="Kind" required value={kind} onChange={(v) => v && setKind(v)} options={[
         { value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }, { value: 'savings', label: 'Savings' },
         { value: 'transfer', label: 'Transfer' }, { value: 'debt_payment', label: 'Debt' },
       ]} />
