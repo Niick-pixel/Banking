@@ -104,7 +104,7 @@ export function NotificationBell() {
 
   return (
     <>
-      <button ref={btn} className={`bell ${unread.length ? 'has-unread' : ''}`} aria-label={`Notifications${unread.length ? `, ${unread.length} new` : ''}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>
+      <button ref={btn} className={`bell ${unread.length ? 'has-unread' : ''}`} aria-label={`Notifications${unread.length ? ` ${unread.length > 9 ? '9+' : unread.length} new` : ''}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>
         <Bell size={20} strokeWidth={1.9} aria-hidden />
         {unread.length > 0 && <span className={`bell-badge ${urgent ? 'urgent' : ''}`} aria-hidden>{unread.length > 9 ? '9+' : unread.length}</span>}
       </button>

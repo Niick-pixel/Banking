@@ -33,7 +33,8 @@ export default function CheckIn() {
 
   useEffect(() => {
     if (!hasCards) return;
-    void rateForDay(today).then((q) => { if (q) { setRateRaw(String(q.rate / 100)); setRateNote(`${q.source} ${q.side} rate, ${formatDateCR(q.rateDate)}`); } }).catch(() => {});
+    const failed = "Couldn't get today's rate. Type it.";
+    void rateForDay(today).then((q) => { if (q) { setRateRaw(String(q.rate / 100)); setRateNote(`${q.source} ${q.side} rate, ${formatDateCR(q.rateDate)}`); } else setRateNote(failed); }).catch(() => setRateNote(failed));
   }, [hasCards, today]);
 
   const rate = parseAmountInput(rateRaw, 'CRC');
@@ -166,7 +167,17 @@ export default function CheckIn() {
 }
 
 /** A card account that starts today with what you owe now, so nothing before today needs fixing. */
-function AddCardForm({ rate, onDone }: { rate: number | null; onDone: () => void }) {
+function AddCardForm({ rate: pageRate, onDone }: { rate: number | null; onDone: () => void }) {
+  const [rateRaw, setRateRaw] = useState(pageRate ? String(pageRate / 100) : '');
+  const [rateNote, setRateNote] = useState(pageRate ? 'from the check-in page' : '');
+  useEffect(() => {
+    if (pageRate) return;
+    const failed = "Couldn't get today's rate. Type it (colones per dollar).";
+    setRateNote('Getting the rate for today…');
+    void rateForDay(todayISO()).then((q) => { if (q) { setRateRaw((r) => r || String(q.rate / 100)); setRateNote(`${q.source} ${q.side} rate, ${formatDateCR(q.rateDate)}`); } else setRateNote(failed); })
+      .catch(() => setRateNote(failed));
+  }, [pageRate]);
+  const rate = parseAmountInput(rateRaw, 'CRC');
   const [name, setName] = useState('');
   const [owedRaw, setOwedRaw] = useState('');
   const [usdRaw, setUsdRaw] = useState('');
@@ -179,7 +190,7 @@ function AddCardForm({ rate, onDone }: { rate: number | null; onDone: () => void
     const owed = owedRaw.trim() ? parseAmountInput(owedRaw, 'CRC') : 0;
     const usdPart = usdRaw.trim() ? parseAmountInput(usdRaw, 'USD') : 0;
     if (owed === null || usdPart === null) return setErr("Can't read an amount");
-    if (usdPart && !rate) return setErr('Set the dollar rate on the check-in page first');
+    if (usdPart && !rate) return setErr('Type the dollar rate below (colones per dollar), e.g. 505');
     const now = Date.now();
     const id = newId();
     const day = (v: string) => { const d = Number(v); return d >= 1 && d <= 31 ? d : undefined; };
@@ -196,6 +207,10 @@ function AddCardForm({ rate, onDone }: { rate: number | null; onDone: () => void
         <div className="field"><label htmlFor="ac-o">Owed in colones today</label><input id="ac-o" className="input" inputMode="decimal" value={owedRaw} onChange={(e) => setOwedRaw(e.target.value)} placeholder="98,198.45" /></div>
         <div className="field"><label htmlFor="ac-u">Owed in dollars</label><input id="ac-u" className="input" inputMode="decimal" value={usdRaw} onChange={(e) => setUsdRaw(e.target.value)} placeholder="275.30" /></div>
       </div>
+      {usdRaw.trim() !== '' && (
+        <div className="field"><label htmlFor="ac-r">Dollar rate (colones per $)</label><input id="ac-r" className="input" inputMode="decimal" value={rateRaw} onChange={(e) => { setRateRaw(e.target.value); setRateNote('typed by you'); }} placeholder="505.20" />
+          <span className="small muted">{rateNote}{rate && parseAmountInput(usdRaw, 'USD') ? ` · $${usdRaw} ≈ ${formatMoney(Math.round((parseAmountInput(usdRaw, 'USD')! * rate) / 100), 'CRC')}` : ''}</span></div>
+      )}
       <div className="grid2">
         <div className="field"><label htmlFor="ac-s">Statement closes on day</label><input id="ac-s" className="input" inputMode="numeric" value={stmt} onChange={(e) => setStmt(e.target.value)} placeholder="optional" /></div>
         <div className="field"><label htmlFor="ac-d">Payment due on day</label><input id="ac-d" className="input" inputMode="numeric" value={due} onChange={(e) => setDue(e.target.value)} placeholder="optional, shows on the calendar" /></div>

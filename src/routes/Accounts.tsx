@@ -10,6 +10,7 @@ import { newId, saveAccount, saveCategory, savePot } from '../db/repo';
 import { DEFAULT_CATEGORIES } from '../domain/defaults';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { formatMoney, parseAmountInput } from '../lib/money';
+import { ExplainBalance } from './ExplainBalance';
 
 const TYPE_LABEL: Record<Account['type'], string> = {
   checking: 'Checking', savings: 'Savings', goal_savings: 'Goal savings', cash: 'Cash', credit_card: 'Credit card',
@@ -36,6 +37,7 @@ export default function Accounts() {
   const l = useLedger();
   const [edit, setEdit] = useState<Account | 'new' | null>(null);
   const [potFor, setPotFor] = useState<Account | null>(null);
+  const [explain, setExplain] = useState<Account | null>(null);
 
   const health: { level: 'warn' | 'info'; msg: string }[] = [];
   for (const d of l.debts) {
@@ -70,7 +72,7 @@ export default function Accounts() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 330px), 1fr))', gap: 14 }}>
                 {accs.map((a) => {
                   const b = l.balances.get(a.id);
-                  const snaps = l.snapshots.filter((s) => s.accountId === a.id);
+                  const snaps = l.snapshots.filter((s) => s.accountId === a.id && s.date <= todayISO());
                   const last = snaps.at(-1);
                   const ledgerAtSnap = last ? accountBalances(l.accounts, l.transactions, last.date).get(a.id)?.total ?? 0 : 0;
                   const diff = last ? last.balance - ledgerAtSnap : 0;
@@ -85,7 +87,7 @@ export default function Accounts() {
                         </div>
                         <button className="btn btn-ghost btn-sm" onClick={() => setEdit(a)}>Edit</button>
                       </div>
-                      <Money amount={b?.total ?? 0} size={30} weight={700} tone="auto" />
+                      <button className="balance-btn" onClick={() => setExplain(a)}><Money amount={b?.total ?? 0} size={30} weight={700} tone="auto" /><span className="small muted">How is this calculated? →</span></button>
                       {pots.length > 0 && (
                         <div style={{ display: 'grid', gap: 6 }}>
                           {pots.map((p) => (
@@ -123,6 +125,9 @@ export default function Accounts() {
 
       <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit === 'new' ? 'New account' : 'Edit account'}>
         {edit && <AccountForm account={edit === 'new' ? undefined : edit} onDone={() => setEdit(null)} />}
+      </Sheet>
+      <Sheet wide open={!!explain} onClose={() => setExplain(null)} title={explain ? `Where ${formatMoney(l.balances.get(explain.id)?.total ?? 0, explain.currency)} in ${explain.name} comes from` : ''}>
+        {explain && <ExplainBalance account={explain} />}
       </Sheet>
       <Sheet open={!!potFor} onClose={() => setPotFor(null)} title={`New fund in ${potFor?.name ?? ''}`}>
         {potFor && <PotForm account={potFor} onDone={() => setPotFor(null)} />}

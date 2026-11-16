@@ -243,3 +243,18 @@ export async function mergeCategory(fromId: string, toId: string, d = db) {
   if (from) await saveCategory({ ...from, archived: true }, d);
   return moved;
 }
+
+/**
+ * Earlier versions suggested "My savings" on payday (15th and month end). BAC takes
+ * Ahorro Objetivo on the 1st and 16th, so move such rules there. Runs once per rule.
+ */
+export async function fixPaydaySavingsRules(d = db): Promise<number> {
+  let n = 0;
+  for (const r of await d.recurring.toArray()) {
+    const t = r.template as { kind?: string; description?: string; tags?: string[] };
+    if (r.schedule.type !== 'quincena' || t.kind !== 'savings' || t.description !== 'Automatic savings' || r.informational) continue;
+    await saveRecurring({ ...r, name: r.name === 'My savings' ? 'Ahorro Objetivo' : r.name, schedule: { type: 'days', days: [1, 16] }, template: { ...r.template, description: 'Ahorro Objetivo', tags: [...new Set([...(t.tags ?? []), 'auto-savings'])] } }, d);
+    n++;
+  }
+  return n;
+}

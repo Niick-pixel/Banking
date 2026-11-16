@@ -13,12 +13,13 @@ import { notifyDue } from './reminders';
 import { CommandPalette } from './CommandPalette';
 import { todayISO } from '../lib/dates';
 import { useQuickAdd } from './QuickAdd';
-import { postDueCuotas, postDueRecurring } from '../db/repo';
+import { postDueCuotas, postDueRecurring, fixPaydaySavingsRules } from '../db/repo';
 import { Aurora, GlassDefs } from '../design/components';
 import { ALL_PAGES, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
 import { useTheme } from './theme';
 import { GuidedTour } from './Tour';
 import { NotificationBell } from './Notifications';
+import { FxCalc } from './FxCalc';
 import { readPersisted, writePersisted } from './persist';
 
 /** Page content fades and rises in; the old page fades out first. */
@@ -75,7 +76,7 @@ export default function Shell() {
   const pending = usePendingReminders();
   useEffect(() => { if (notify) void notifyDue(soon, pending.length, today, tomorrow); }, [notify, soon, pending.length, today, tomorrow]);
   useEffect(() => {
-    const catchUp = () => { void postDueCuotas(); void postDueRecurring(); };
+    const catchUp = () => { void postDueCuotas(); void fixPaydaySavingsRules().then(() => postDueRecurring()); };
     catchUp(); void suggestedFolder().then(setSuggest);
     const t = setInterval(catchUp, 3600_000); // also catches up when the app stays open past midnight
     return () => clearInterval(t);
@@ -141,7 +142,7 @@ export default function Shell() {
               <button className="btn btn-ghost btn-sm" onClick={() => setDismissed(true)}>Later</button>
             </div>
           )}
-          <div className="topbar"><SectionTabs /><NotificationBell /></div>
+          <div className="topbar"><SectionTabs /><div className="topbar-tools"><FxCalc /><NotificationBell /></div></div>
           <AnimatedOutlet />
         </main>
       </div>

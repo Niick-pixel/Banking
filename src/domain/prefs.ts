@@ -38,7 +38,6 @@ export interface FxPrefs {
 }
 
 export const DASH_CARDS: { id: string; label: string }[] = [
-  { id: 'safe', label: 'Safe to spend (Coach)' },
   { id: 'coach', label: 'Coach: top 3 alerts' },
   { id: 'insights', label: 'What happened' },
   { id: 'upcoming', label: 'Coming up (30 days)' },

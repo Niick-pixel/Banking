@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, Cell, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useHealth, useLedger } from '../app/data';
@@ -17,7 +17,8 @@ import { formatDateCR, todayISO } from '../lib/dates';
 import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
 import { useCoach } from '../app/coach';
-import { CoachTop, SafeToSpendCard } from './Coach';
+import { CoachTop } from './Coach';
+import { Deck, type DeckView } from '../design/components/Deck';
 import { MonthWaterfall, SpendingCalendar, SpendingPace } from '../design/components/insightCharts';
 import { SPEND_GROUPS, cumulative, dailySpending, monthWaterfall } from '../domain/spending';
 
@@ -46,6 +47,21 @@ export default function Dashboard() {
   const nw = useMemo(() => netWorthSeries({ accounts: l.accounts, snapshots: l.snapshots, transactions: l.transactions, debts: l.debts, installments: l.installments }, Number(today.slice(0, 4)), today), [l, today]);
   const calendar = useCalendar(addDays(today, 0), addDays(today, 30));
   const pending = usePendingReminders();
+  // The dashboard fills the window exactly: no page scroll, everything sits in stacks.
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [fitH, setFitH] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = fitRef.current;
+      if (!el) return;
+      if (window.innerWidth < 1100 || window.innerHeight < 640) { setFitH(null); return; }
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setFitH(Math.max(420, window.innerHeight - top - 70)); // shell + content bottom padding
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  });
   const [inc, exp, axis, grid, c1] = useCssVar(['--chart-income', '--chart-expense', '--chart-axis', '--chart-grid', '--chart-1']);
 
   if (l.ready && !l.accounts.length) {
@@ -76,6 +92,8 @@ export default function Dashboard() {
   const ef = current ? emergencyFund(current, l.accounts, l.pots, potBal, essentials) : null;
   const activeDebts = l.debts.filter((d) => d.status !== 'paid');
   const errors = health.filter((h) => h.level !== 'info').length;
+  // Views you've hidden in Settings → Dashboard drop out of their stack.
+  const views = (list: [string, string, () => React.ReactNode][]): DeckView[] => list.filter(([id]) => show(id)).map(([key, label, render]) => ({ key, label, render }));
 
   return (
     <>
@@ -86,7 +104,7 @@ export default function Dashboard() {
         <button className="btn btn-primary btn-sm" onClick={() => qa.open()}>+ Add</button>
       </PageHeader>
 
-      <div className="kpis stagger" data-tour="kpis">
+      <div className="kpis" data-tour="kpis">
         <Kpi label="Income" value={f?.income ?? 0} tone="income" />
         <Kpi label="Expenses" value={f?.expenses ?? 0} tone="expense" sub={f?.debtService ? `incl. ${formatMoney(f.debtService, 'CRC')} debt` : undefined} />
         <Kpi label="Net" value={f?.net ?? 0} tone="auto" />
@@ -94,102 +112,108 @@ export default function Dashboard() {
         <Kpi label="Free cash after saving" value={f?.freeCash ?? 0} tone="auto" />
       </div>
 
-      <div className="dash-grid stagger">
-        {show('safe') && coach.run && (<Glass strong className="span-2" data-tour="safe"><SafeToSpendCard /></Glass>)}
-        {show('coach') && coach.run && (<Glass strong className="span-2"><CoachTop /></Glass>)}
-        {show('insights') && (<Glass strong className="span-2" style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">What happened</h2>
-          {sum.insights.length === 0 ? <p className="muted" style={{ margin: 0 }}>No movements yet this month.</p> : (
-            <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
-              {sum.insights.map((i, k) => <li key={k} style={{ display: 'flex', gap: 8 }}><span aria-hidden style={{ color: i.tone === 'good' ? 'var(--income)' : i.tone === 'bad' ? 'var(--expense)' : 'var(--text-3)' }}>●</span><span>{i.text}</span></li>)}
-            </ul>
-          )}
-        </Glass>)}
+      <div ref={fitRef} className="dash-decks" style={fitH ? { height: fitH } : undefined}>
+        <Deck id="coach" label="Coach" className="d-coach" views={views([
+          ['coach', 'Coach: top alerts', () => coach.run ? <CoachTop /> : <p className="muted">The Coach starts once you have accounts.</p>],
+          ['insights', 'What happened', () => (<div style={{ display: 'grid', gap: 8 }}>
+            <h2 className="card-h">What happened</h2>
+            {sum.insights.length === 0 ? <p className="muted" style={{ margin: 0 }}>No movements yet this month.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
+                {sum.insights.map((i, k) => <li key={k} style={{ display: 'flex', gap: 8 }}><span aria-hidden style={{ color: i.tone === 'good' ? 'var(--income)' : i.tone === 'bad' ? 'var(--expense)' : 'var(--text-3)' }}>●</span><span>{i.text}</span></li>)}
+              </ul>
+            )}
+          </div>)],
+        ])} />
 
-        {show('upcoming') && (<Glass strong className="span-2-wide" style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Coming up (30 days)</h2>
-          {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> waiting for you to confirm</Link>}
-          {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
-              {upcoming.slice(0, 7).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'inherit', textDecoration: 'none' }}><span><span className="muted small">{formatDateCR(u.date).slice(0, 5)}</span> {u.label}</span>{u.amount !== undefined && <span className="money">{formatMoney(u.amount, 'CRC')}</span>}</Link></li>)}
-            </ul>
-          )}
-          <Link to="/bills" className="small">Calendar →</Link>
-        </Glass>)}
-
-        {show('waterfall') && f && (<Glass strong className="span-2"><MonthWaterfall steps={monthWaterfall(f, l.category)} month={mk} /></Glass>)}
-        {show('pace') && (<Glass strong className="span-2"><SpendingPace month={mk} days={dim} today={paceDay} thisMonth={cumulative(daily.byDay, mk, dim, paceDay)} lastMonth={cumulative(daily.byDay, shift(mk, -1), daysIn(shift(mk, -1)))} budget={spendBudget} label="All spending this month" /></Glass>)}
-        {show('flow') && (<Glass strong className="span-2"><IncomeExpenseChart title="Income vs expenses" data={flowData} /></Glass>)}
-        {show('groups') && (<Glass strong><GroupDonut title="Spending by group" data={groups} /></Glass>)}
-
-        {show('where') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Where it went</h2>
-          {ranking.length === 0 ? <p className="muted small" style={{ margin: 0 }}>No spending yet.</p> : (
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }} aria-label="Top categories this month">
-              {ranking.map((x) => (
-                <li key={x.c.id} style={{ display: 'grid', gap: 3 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }} className="small"><span>{x.c.name}{x.c.discretionary && <span className="muted"> · avoidable</span>}</span><span className="money">{formatMoney(x.v, 'CRC')}</span></div>
-                  <div className="bar" aria-hidden><span style={{ width: `${(x.v / maxRank) * 100}%`, background: 'var(--chart-1)' }} /></div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Glass>)}
-
-        {show('budget') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Budget health</h2>
-          {budgetRows.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Set budgets in the Tracker.</p> : budgetRows.map((x) => (
-            <div key={x.r.category.id} style={{ display: 'grid', gap: 3 }}>
-              <div className="small" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{x.r.category.name}</span><span className="money" style={{ color: x.pct > 1 ? 'var(--expense)' : undefined }}>{Math.round(x.pct * 100)}%</span></div>
-              <div className="bar" aria-hidden><span style={{ width: `${Math.min(1, x.pct) * 100}%`, background: x.pct > 1 ? 'var(--expense)' : x.pct >= 0.8 ? 'var(--debt)' : 'var(--income)' }} /></div>
+        <Deck id="story" label="This month" className="d-story" views={views([
+          ['waterfall', 'Where the month’s money went', () => f ? <MonthWaterfall steps={monthWaterfall(f, l.category)} month={mk} /> : <p className="muted">No movements this month.</p>],
+          ['pace', 'Spending pace', () => <SpendingPace month={mk} days={dim} today={paceDay} thisMonth={cumulative(daily.byDay, mk, dim, paceDay)} lastMonth={cumulative(daily.byDay, shift(mk, -1), daysIn(shift(mk, -1)))} budget={spendBudget} label="All spending this month" />],
+          ['flow', 'Income vs expenses', () => <IncomeExpenseChart title="Income vs expenses" data={flowData} />],
+          ['freecash', 'Free cash by month', () => (<div className="deck-fill">
+            <h2 className="card-h">Free cash by month</h2>
+            <div className="chart-fill" role="img" aria-label={`Free cash after saving: ${netData.map((d) => `${d.month} ${formatMoney(d.net, 'CRC')}`).join(', ')}`}>
+              <ResponsiveContainer>
+                <BarChart data={netData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke={grid} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 11 }} />
+                  <YAxis hide />
+                  <ReferenceLine y={0} stroke={axis} />
+                  <Tooltip formatter={(v: number) => formatMoney(v, 'CRC')} contentStyle={{ background: 'var(--solid-surface)', border: '1px solid var(--glass-border)', borderRadius: 12 }} cursor={{ fill: 'var(--accent-soft)' }} />
+                  <Bar dataKey="net" name="Free cash" radius={[4, 4, 4, 4]}>{netData.map((d) => <Cell key={d.month} fill={d.net >= 0 ? inc : exp} />)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          ))}
-          <Link to="/tracker" className="small">Full tracker →</Link>
-        </Glass>)}
+          </div>)],
+          ['calendar', 'Daily spending calendar', () => <SpendingCalendar byDay={daily.byDay} to={today} estimated={daily.estimated} weeks={30} />],
+        ])} />
 
-        {show('freecash') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Free cash by month</h2>
-          <div style={{ height: 170 }} role="img" aria-label={`Free cash after saving: ${netData.map((d) => `${d.month} ${formatMoney(d.net, 'CRC')}`).join(', ')}`}>
-            <ResponsiveContainer>
-              <BarChart data={netData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke={grid} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 11 }} />
-                <YAxis hide />
-                <ReferenceLine y={0} stroke={axis} />
-                <Tooltip formatter={(v: number) => formatMoney(v, 'CRC')} contentStyle={{ background: 'var(--solid-surface)', border: '1px solid var(--glass-border)', borderRadius: 12 }} cursor={{ fill: 'var(--accent-soft)' }} />
-                <Bar dataKey="net" name="Free cash" radius={[4, 4, 4, 4]}>{netData.map((d) => <Cell key={d.month} fill={d.net >= 0 ? inc : exp} />)}</Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Glass>)}
+        <Deck id="upcoming" label="Coming up" className="d-up" views={views([
+          ['upcoming', 'Coming up (30 days)', () => (<div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            <h2 className="card-h">Coming up</h2>
+            {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> to confirm</Link>}
+            {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
+                {upcoming.slice(0, 12).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'grid', gap: 1, color: 'inherit', textDecoration: 'none' }}><span className="small muted">{formatDateCR(u.date).slice(0, 5)}</span><span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{u.label}</span>{u.amount !== undefined && <span className="money small">{formatMoney(u.amount, 'CRC')}</span>}</span></Link></li>)}
+              </ul>
+            )}
+            <Link to="/bills" className="small">Calendar →</Link>
+          </div>)],
+          ['debts', 'Debts', () => (<div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+            <h2 className="card-h">Debts</h2>
+            {activeDebts.length === 0 ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
+              const st = debtStatus(d, l.transactions);
+              const pct = Math.max(0, Math.min(1, 1 - st.balance / d.originalAmount));
+              return (
+                <div key={d.id} style={{ display: 'grid', gap: 3 }}>
+                  <div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{d.creditor}</span><span className="money">{formatMoney(st.balance, 'CRC')}</span></div>
+                  <div className="bar" role="img" aria-label={`${Math.round(pct * 100)}% paid`}><span style={{ width: `${pct * 100}%`, background: 'var(--debt)' }} /></div>
+                </div>
+              );
+            })}
+            <Link to="/debts" className="small">Payoff plans →</Link>
+          </div>)],
+        ])} />
 
-        {show('networth') && (<Glass strong style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Net worth</h2>
-          {current ? <>
-            <Money amount={current.netWorth} size={26} weight={800} tone="auto" />
-            <div style={{ height: 90 }} role="img" aria-label="Net worth trend this year">
-              <ResponsiveContainer><LineChart data={nw.map((s) => ({ m: s.month, v: s.netWorth }))}><Line isAnimationActive={false} dataKey="v" stroke={c1} strokeWidth={2} dot={false} /><YAxis hide domain={['auto', 'auto']} /></LineChart></ResponsiveContainer>
-            </div>
-            {ef && essentials > 0 && <div className="small">Emergency fund <b>{ef.liquidMonths.toFixed(1)}</b> / {efTarget} months liquid · {ef.totalMonths.toFixed(1)} incl. cesantía</div>}
-            <Link to="/net-worth" className="small">Balance sheet →</Link>
-          </> : <p className="muted small">No data.</p>}
-        </Glass>)}
-
-        {show('debts') && (<Glass strong style={{ display: 'grid', gap: 10 }}>
-          <h2 className="card-h">Debts</h2>
-          {activeDebts.length === 0 ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
-            const st = debtStatus(d, l.transactions);
-            const pct = Math.max(0, Math.min(1, 1 - st.balance / d.originalAmount));
-            return (
-              <div key={d.id} style={{ display: 'grid', gap: 3 }}>
-                <div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{d.creditor}</span><span className="money">{formatMoney(st.balance, 'CRC')}</span></div>
-                <div className="bar" role="img" aria-label={`${Math.round(pct * 100)}% paid`}><span style={{ width: `${pct * 100}%`, background: 'var(--debt)' }} /></div>
+        <Deck id="spend" label="Spending" className="d-spend" views={views([
+          ['where', 'Where it went', () => (<div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            <h2 className="card-h">Where it went</h2>
+            {ranking.length === 0 ? <p className="muted small" style={{ margin: 0 }}>No spending yet.</p> : (
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }} aria-label="Top categories this month">
+                {ranking.map((x) => (
+                  <li key={x.c.id} style={{ display: 'grid', gap: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }} className="small"><span>{x.c.name}{x.c.discretionary && <span className="muted"> · avoidable</span>}</span><span className="money">{formatMoney(x.v, 'CRC')}</span></div>
+                    <div className="bar" aria-hidden><span style={{ width: `${(x.v / maxRank) * 100}%`, background: 'var(--chart-1)' }} /></div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>)],
+          ['budget', 'Budget health', () => (<div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            <h2 className="card-h">Budget health</h2>
+            {budgetRows.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Set budgets in Budget → Categories.</p> : budgetRows.map((x) => (
+              <div key={x.r.category.id} style={{ display: 'grid', gap: 3 }}>
+                <div className="small" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{x.r.category.name}</span><span className="money" style={{ color: x.pct > 1 ? 'var(--expense)' : undefined }}>{formatMoney(x.spent, 'CRC')} · {Math.round(x.pct * 100)}%</span></div>
+                <div className="bar" aria-hidden><span style={{ width: `${Math.min(1, x.pct) * 100}%`, background: x.pct > 1 ? 'var(--expense)' : x.pct >= 0.8 ? 'var(--debt)' : 'var(--income)' }} /></div>
               </div>
-            );
-          })}
-          <Link to="/debts" className="small">Payoff plans →</Link>
-        </Glass>)}
-        {show('calendar') && (<Glass strong className="span-wide"><SpendingCalendar byDay={daily.byDay} to={today} estimated={daily.estimated} weeks={52} /></Glass>)}
+            ))}
+            <Link to="/tracker" className="small">Budget →</Link>
+          </div>)],
+          ['groups', 'Spending by group', () => <GroupDonut title="Spending by group" data={groups} />],
+        ])} />
+
+        <Deck id="wealth" label="Wealth" className="d-wealth" views={views([
+          ['networth', 'Net worth', () => (<div className="deck-fill">
+            <h2 className="card-h">Net worth</h2>
+            {current ? <>
+              <Money amount={current.netWorth} size={26} weight={800} tone="auto" />
+              <div className="chart-fill" role="img" aria-label="Net worth trend this year">
+                <ResponsiveContainer><LineChart data={nw.map((s) => ({ m: s.month, v: s.netWorth }))}><Line isAnimationActive={false} dataKey="v" stroke={c1} strokeWidth={2} dot={false} /><YAxis hide domain={['auto', 'auto']} /></LineChart></ResponsiveContainer>
+              </div>
+              {ef && essentials > 0 && <div className="small">Emergency fund <b>{ef.liquidMonths.toFixed(1)}</b> / {efTarget} months liquid</div>}
+              <Link to="/net-worth" className="small">Balance sheet →</Link>
+            </> : <p className="muted small">No data.</p>}
+          </div>)],
+        ])} />
       </div>
     </>
   );
