@@ -12,6 +12,9 @@ import type { Debt, Pot } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { PayDebtForm } from './PayDebt';
+import { FundMovesFix } from './FundMovesFix';
+import { asSavings, crossesSavings } from '../domain/fundmoves';
+import type { FlowContext } from '../domain/ledger';
 import { usePersisted } from '../app/persist';
 
 const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -45,6 +48,7 @@ export default function Pots() {
       <PageHeader title="Funds" sub="Money set aside inside your accounts, by whose it is. Fully automatic from your movements.">
         <button className="btn" onClick={() => setMove(true)}>Move between funds</button>
       </PageHeader>
+      <FundMovesFix />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
         {(['hers', 'mine', ...(hasShared ? ['shared'] as const : [])] as const).map((o) => (
@@ -54,7 +58,7 @@ export default function Pots() {
             <div className="small muted">{o === 'hers' ? 'Not yours to spend' : o === 'mine' ? 'Your own savings' : 'Shared'}</div>
           </Glass>
         ))}
-        <Glass pad={20}><div style={{ fontWeight: 750, fontSize: 13 }} className="muted">TOTAL IN POTS</div><Money amount={total} size={32} weight={800} />
+        <Glass pad={20}><div style={{ fontWeight: 750, fontSize: 13 }} className="muted">TOTAL IN FUNDS</div><Money amount={total} size={32} weight={800} />
           <div className="small muted">{l.pots.map((p) => l.account.get(p.accountId)?.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</div></Glass>
       </div>
 
@@ -141,6 +145,9 @@ function MoveForm({ onDone }: { onDone: () => void }) {
   const [to, setTo] = useState(opts[1]?.key ?? '');
   const [raw, setRaw] = useState('');
   const [err, setErr] = useState('');
+  const ctx: FlowContext = { accountType: (id) => l.account.get(id)?.type };
+  const side = (k: string) => { const [a, p] = k.split('|'); return p ? { accountId: a!, potId: p } : { accountId: a! }; };
+  const crosses = from && to && from !== to ? crossesSavings(side(from), side(to), ctx) : null;
   async function save() {
     const amount = parseAmountInput(raw, 'CRC');
     if (!amount) return setErr('Enter an amount');
@@ -148,7 +155,10 @@ function MoveForm({ onDone }: { onDone: () => void }) {
     if (fa !== ta) return setErr('Both sides must be in the same account (use a transfer for different accounts)');
     if (from === to) return setErr('Pick two different places');
     const now = Date.now();
-    await saveTransaction({ id: newId(), kind: 'transfer', date: todayISO(), dateEstimated: false, currency: 'CRC', from: fp ? { accountId: fa!, potId: fp } : { accountId: fa! }, to: tp ? { accountId: ta!, potId: tp } : { accountId: ta! }, amount, description: 'Move between funds', tags: [], notes: '', createdAt: now, updatedAt: now });
+    const tx = { id: newId(), kind: 'transfer' as const, date: todayISO(), dateEstimated: false, currency: 'CRC' as const, from: fp ? { accountId: fa!, potId: fp } : { accountId: fa! }, to: tp ? { accountId: ta!, potId: tp } : { accountId: ta! }, amount, description: 'Move between funds', tags: [], notes: '', createdAt: now, updatedAt: now };
+    // Spending money → fund is saving (and fund → spending money is taking it back out): record it so the budget sees it.
+    const sav = asSavings(tx, ctx, l.categories, l.pots);
+    await saveTransaction(sav ? { ...sav, description: sav.direction === 'deposit' ? 'Set aside into fund' : 'Taken out of fund' } : tx);
     onDone();
   }
   return (
@@ -158,10 +168,12 @@ function MoveForm({ onDone }: { onDone: () => void }) {
         <div className="field"><label htmlFor="mv-f">From</label><select id="mv-f" className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{opts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></div>
         <div className="field"><label htmlFor="mv-t">To</label><select id="mv-t" className="input" value={to} onChange={(e) => setTo(e.target.value)}>{opts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></div>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>Use this to assign the unassigned part of an account to a fund, e.g. money that was already in savings before you started tracking.</p>
+      <p className="small muted" style={{ margin: 0 }}>{crosses === 'deposit' ? 'This moves spending money into a fund, so it counts as saving in your budget (Savings row of whose money it is).'
+        : crosses === 'withdrawal' ? 'This takes money out of a fund back into spending money, so it counts as a savings withdrawal in your budget.'
+        : 'Use this to assign the unassigned part of an account to a fund, e.g. money that was already in savings before you started tracking.'}</p>
       {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Move</button></div>
-      <Pill tone="neutral">Not income or spending</Pill>
+      <Pill tone="neutral">{crosses ? 'Counts as saving, not spending' : 'Not income or spending'}</Pill>
     </form>
   );
 }

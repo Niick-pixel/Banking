@@ -51,7 +51,7 @@ export default function DesignPage() {
           <Segmented<ThemePref> label="Theme" value={theme} onChange={setTheme}
             options={[{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
           <Segmented label="Transparency" value={transparency} onChange={setTransparency}
-            options={[{ value: 'auto', label: 'Glass' }, { value: 'reduced', label: 'Solid' }]} />
+            options={[{ value: 'auto', label: 'Crisp' }, { value: 'frosted', label: 'Frosted' }, { value: 'reduced', label: 'Solid' }]} />
         </Row>
       </header>
 

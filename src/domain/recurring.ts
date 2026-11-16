@@ -116,6 +116,7 @@ export function calendarEvents(inp: CalendarInput, from: ISODate, to: ISODate, t
     const owed = Math.max(0, -(bal.get(a.id)?.total ?? 0));
     let first = true;
     for (const d of occurrences({ type: 'monthly', day: a.cardDueDay! }, from, from, to)) {
+      if (d < a.openingDate) continue; // the card wasn't tracked yet
       const isNext = d >= today && first;
       if (isNext) first = false;
       ev.push({ date: d, title: `${a.name} payment due`, amount: isNext && owed ? owed : undefined, tone: 'card', source: 'card', status: d < today ? 'posted' : 'upcoming', to: '/accounts' });

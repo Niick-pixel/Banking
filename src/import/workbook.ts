@@ -316,7 +316,7 @@ export function parseWorkbook(grid: Grid, opts: ParseOptions): ImportPlan {
           const owner: Pot['owner'] = /hers|her |loan fund/i.test(catName) ? 'hers' : 'mine';
           const potId = owner === 'hers' ? potFor('hers', 'Hers (loan fund)', 'Money set aside to pay back her loan') : potFor('mine', 'Mine', 'My own savings');
           const place = { accountId: savingsAcc?.id ?? spending.id, potId };
-          if (!savingsAcc) issues.push({ level: 'warning', sheet: ledger.name, row: r + 1, message: 'No savings account found in Net Worth; savings kept in checking under a pot' });
+          if (!savingsAcc) issues.push({ level: 'warning', sheet: ledger.name, row: r + 1, message: 'No savings account found in Net Worth; savings kept in checking under a fund' });
           tx = negative
             ? { ...base, kind: 'savings', direction: 'withdrawal', from: place, to: spendFrom, amount, categoryId: cat.id }
             : { ...base, kind: 'savings', direction: 'deposit', from: spendFrom, to: place, amount, categoryId: cat.id };

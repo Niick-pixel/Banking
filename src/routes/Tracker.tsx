@@ -7,6 +7,7 @@ import { formatMoney, parseAmountInput } from '../lib/money';
 import { todayISO } from '../lib/dates';
 import { saveBudget } from '../db/repo';
 import { usePref } from '../app/prefs';
+import { FundMovesFix } from './FundMovesFix';
 
 const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const GROUP_LABEL: Record<string, string> = { Income: 'Income', Fixed: 'Fixed costs', Living: 'Living / variable', Discretionary: 'Discretionary', 'Debt Service': 'Debt service', Savings: 'Savings' };
@@ -30,6 +31,7 @@ export default function Tracker() {
           {[...new Set([...years, Number(today.slice(0, 4))])].map((y) => <option key={y}>{y}</option>)}
         </select>
       </PageHeader>
+      <FundMovesFix />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 16 }}>
         <Stat label="Income YTD" value={t.ytd.income} tone="income" />

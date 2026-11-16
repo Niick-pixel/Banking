@@ -209,3 +209,37 @@ export async function confirmOccurrence(r: RecurringRule, date: string, amount?:
 export async function skipOccurrence(r: RecurringRule, date: string, d = db) {
   return saveRecurring({ ...r, skipped: [...new Set([...(r.skipped ?? []), date])] }, d);
 }
+
+/**
+ * Merge one category into another: every movement (and split, recurring rule and
+ * debt) that used `fromId` now uses `toId`; its budget moves over if `toId` has none;
+ * `fromId` is archived. Each movement change is audited, so it can be undone.
+ */
+export async function mergeCategory(fromId: string, toId: string, d = db) {
+  if (fromId === toId) return 0;
+  const now = Date.now();
+  let moved = 0;
+  const txs = await d.transactions.toArray();
+  for (const t of txs) {
+    const uses = ('categoryId' in t && t.categoryId === fromId) || (t.kind === 'expense' && t.splits?.some((s) => s.categoryId === fromId));
+    if (!uses) continue;
+    const next = { ...t, ...('categoryId' in t && t.categoryId === fromId ? { categoryId: toId } : {}) } as Transaction;
+    if (next.kind === 'expense' && next.splits) next.splits = next.splits.map((s) => (s.categoryId === fromId ? { ...s, categoryId: toId } : s));
+    await saveTransaction(next, d);
+    moved++;
+  }
+  for (const r of await d.recurring.toArray()) {
+    const tpl = r.template as { categoryId?: string };
+    if (tpl.categoryId === fromId) await d.recurring.put({ ...r, template: { ...r.template, categoryId: toId } as typeof r.template, updatedAt: now });
+  }
+  for (const x of await d.debts.toArray()) if (x.categoryId === fromId) await d.debts.put({ ...x, categoryId: toId, updatedAt: now });
+  const budgets = await d.budgets.where('categoryId').equals(fromId).toArray();
+  const targetMonths = new Set((await d.budgets.where('categoryId').equals(toId).toArray()).map((b) => b.month));
+  for (const b of budgets) {
+    if (!targetMonths.has(b.month)) await d.budgets.put({ ...b, categoryId: toId, updatedAt: now });
+    else await d.budgets.delete(b.id);
+  }
+  const from = await d.categories.get(fromId);
+  if (from) await saveCategory({ ...from, archived: true }, d);
+  return moved;
+}

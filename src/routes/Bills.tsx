@@ -15,6 +15,8 @@ import { daysInMonth, formatDateCR, lastDayOfMonth, todayISO, toISO } from '../l
 
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** ₡185k, ₡1.2M: fits in a calendar cell. */
+const short = (v: number) => { const c = Math.abs(v) / 100; return c >= 1_000_000 ? `₡${(c / 1_000_000).toFixed(c >= 10_000_000 ? 0 : 1)}M` : c >= 1000 ? `₡${Math.round(c / 1000)}k` : `₡${Math.round(c)}`; };
 const TONE: Record<CalendarEvent['tone'], string> = { income: 'var(--income)', expense: 'var(--expense)', savings: 'var(--savings)', debt: 'var(--debt)', card: 'var(--accent)', info: 'var(--text-3)' };
 const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
@@ -27,6 +29,7 @@ export default function Bills() {
   const [payroll] = usePref('payroll');
   const pending = usePendingReminders();
   const [y, m] = ym.split('-').map(Number) as [number, number];
+  const m0 = m;
   const monthEvents = useCalendar(`${ym}-01`, lastDayOfMonth(y, m));
   const next60 = useCalendar(addDays(today, 1), addDays(today, 60));
   const suggestions = useMemo(() => suggestRecurring(l.transactions, l.categories, l.accounts, payroll, today, l.recurring), [l, payroll, today]);
@@ -38,7 +41,31 @@ export default function Bills() {
   while (cells.length % 7) cells.push(null);
   const byDay = new Map<string, CalendarEvent[]>();
   for (const e of monthEvents) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
+  // Bills the app spotted in your history but you haven't added yet: shown dashed, one tap to add.
+  const suggestedByDay = useMemo(() => {
+    const m = new Map<string, typeof suggestions>();
+    for (const sg of suggestions) for (const d of occurrences(sg.rule.schedule, sg.rule.startDate, `${ym}-01`, lastDayOfMonth(y, m0))) m.set(d, [...(m.get(d) ?? []), sg]);
+    return m;
+  }, [suggestions, ym, y, m0]);
+  const daySuggested = day ? suggestedByDay.get(day) ?? [] : [];
   const dayEvents = day ? byDay.get(day) ?? [] : [];
+  const dayTx = day ? l.transactions.filter((t) => t.date === day && !t.recurringId && t.kind !== 'adjustment') : [];
+  // What actually happened on past days (everything you logged, not only recurring).
+  const spentByDay = useMemo(() => {
+    const m = new Map<string, { out: number; in: number }>();
+    for (const t of l.transactions) {
+      if (!t.date.startsWith(ym) || t.currency !== 'CRC') continue;
+      const cur = m.get(t.date) ?? { out: 0, in: 0 };
+      if (t.kind === 'expense' || t.kind === 'debt_payment') cur.out += t.amount;
+      else if (t.kind === 'income') cur.in += t.amount;
+      m.set(t.date, cur);
+    }
+    return m;
+  }, [l.transactions, ym]);
+  const monthIn = monthEvents.filter((e) => e.tone === 'income' && e.status !== 'skipped').reduce((s, e) => s + (e.amount ?? 0), 0);
+  const monthOut = monthEvents.filter((e) => ['expense', 'debt', 'card'].includes(e.tone) && e.source !== 'tasa_cero' && e.status !== 'skipped').reduce((s, e) => s + (e.amount ?? 0), 0);
+  const monthSave = monthEvents.filter((e) => e.tone === 'savings' && e.status !== 'skipped').reduce((s, e) => s + (e.amount ?? 0), 0);
+  const leftToPay = monthEvents.filter((e) => ['expense', 'debt', 'card'].includes(e.tone) && e.source !== 'tasa_cero' && e.date >= today && e.status !== 'posted' && e.status !== 'skipped').reduce((s, e) => s + (e.amount ?? 0), 0);
   const inflow = next60.filter((e) => e.tone === 'income').reduce((s, e) => s + (e.amount ?? 0), 0);
   const outflow = next60.filter((e) => ['expense', 'debt', 'card', 'savings'].includes(e.tone) && e.source !== 'tasa_cero').reduce((s, e) => s + (e.amount ?? 0), 0);
 
@@ -63,6 +90,12 @@ export default function Bills() {
             <h2 className="card-h">{MN[m - 1]} {y}</h2>
             <button className="btn btn-sm" aria-label="Next month" onClick={() => shift(1)}>›</button>
           </div>
+          <div className="cal-summary small">
+            <span>Scheduled in <b className="money" style={{ color: 'var(--income)' }}>{formatMoney(monthIn, 'CRC')}</b></span>
+            <span>Bills & debts <b className="money" style={{ color: 'var(--expense)' }}>{formatMoney(monthOut, 'CRC')}</b></span>
+            <span>Savings <b className="money" style={{ color: 'var(--savings)' }}>{formatMoney(monthSave, 'CRC')}</b></span>
+            {ym === today.slice(0, 7) && <span>Still to pay <b className="money">{formatMoney(leftToPay, 'CRC')}</b></span>}
+          </div>
           <div className="cal" role="group" aria-label={`Calendar ${MN[m - 1]} ${y}`}>
             {DOW.map((d) => <div key={d} className="cal-dow" aria-hidden="true">{d}</div>)}
             {cells.map((d, i) => {
@@ -70,25 +103,51 @@ export default function Bills() {
               const evs = byDay.get(d) ?? [];
               return (
                 <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} aria-label={`${Number(d.slice(8))}${evs[0] ? ` ${evs[0].title}` : ''}, ${formatDateCR(d)}${evs.length > 1 ? `, plus ${evs.slice(1).map((e) => e.title).join(', ')}` : evs.length ? '' : ', nothing scheduled'}`}>
-                  <span className="cal-num">{Number(d.slice(8))}</span>
-                  <span className="cal-dots" aria-hidden>{evs.slice(0, 4).map((e, k) => <i key={k} style={{ background: TONE[e.tone], opacity: e.status === 'skipped' ? 0.3 : 1, outline: e.status === 'pending' ? '2px solid var(--debt)' : undefined }} />)}{evs.length > 4 && <b>+{evs.length - 4}</b>}</span>
-                  {evs[0] && <span className="cal-first">{evs[0].title}</span>}
+                  <span className="cal-top"><span className="cal-num">{Number(d.slice(8))}</span>
+                    {d <= today && spentByDay.get(d)?.out ? <span className="cal-spent" title="Spent that day">−{short(spentByDay.get(d)!.out)}</span> : null}</span>
+                  {evs.slice(0, 3).map((e, k) => (
+                    <span key={k} className={`cal-ev ${e.status}`} style={{ borderLeftColor: TONE[e.tone] }} aria-hidden>
+                      <span className="cal-ev-t">{e.title}</span>{e.amount ? <span className="cal-ev-a">{short(e.amount)}</span> : null}
+                    </span>
+                  ))}
+                  {evs.length > 3 && <span className="cal-more" aria-hidden>+{evs.length - 3} more</span>}
+                  {evs.length < 3 && (suggestedByDay.get(d) ?? []).slice(0, 3 - evs.length).map((sg) => (
+                    <span key={sg.key} className="cal-ev suggested" aria-hidden><span className="cal-ev-t">{sg.name}?</span></span>
+                  ))}
                 </button>
               );
             })}
           </div>
           <div className="small muted" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {(['income', 'expense', 'savings', 'debt', 'card', 'info'] as const).map((t) => <span key={t}><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: TONE[t], marginRight: 4 }} />{{ income: 'Income', expense: 'Bills', savings: 'Savings', debt: 'Debt', card: 'Card / Tasa Cero', info: 'Payroll (info)' }[t]}</span>)}
+            {suggestions.length > 0 && <span><i className="cal-legend-suggested" aria-hidden />Spotted in your history, not added yet</span>}
           </div>
         </Glass>
 
         <Glass strong style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
           <h2 className="card-h">{day ? formatDateCR(day) : 'Pick a day'}</h2>
-          {dayEvents.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing on this day.</p> : <EventList events={dayEvents} />}
+          {dayEvents.length === 0 && !dayTx.length && !daySuggested.length ? <p className="muted small" style={{ margin: 0 }}>Nothing on this day.</p> : dayEvents.length > 0 && <EventList events={dayEvents} onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />}
+          {daySuggested.length > 0 && (<>
+            <div className="small muted" style={{ marginTop: 4 }}>Looks like it happens on this day (not added yet)</div>
+            {daySuggested.map((sg) => <SuggestionRow key={sg.key} s={sg} />)}
+          </>)}
+          {dayTx.length > 0 && (<>
+            <div className="small muted" style={{ marginTop: 4 }}>Logged that day</div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+              {dayTx.slice(0, 12).map((t) => (
+                <li key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                  <i aria-hidden style={{ width: 8, height: 8, borderRadius: 4, flex: 'none', alignSelf: 'center', background: t.kind === 'income' ? TONE.income : t.kind === 'savings' ? TONE.savings : t.kind === 'debt_payment' ? TONE.debt : t.kind === 'expense' ? TONE.expense : TONE.info }} />
+                  <span style={{ flex: 1 }}>{t.description || ('categoryId' in t && t.categoryId ? l.category.get(t.categoryId)?.name : '') || t.kind}</span>
+                  {'amount' in t && <span className="money small">{formatMoney(t.amount, 'CRC')}</span>}
+                </li>
+              ))}
+              {dayTx.length > 12 && <li className="small muted">+{dayTx.length - 12} more in <Link to="/transactions">Transactions</Link></li>}
+            </ul>
+          </>)}
           <hr style={{ border: 0, borderTop: '1px solid var(--glass-hairline)', width: '100%' }} />
           <h2 className="card-h">Next 60 days</h2>
           <div className="small" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}><span>In <b className="money" style={{ color: 'var(--income)' }}>{formatMoney(inflow, 'CRC')}</b></span><span>Out <b className="money" style={{ color: 'var(--expense)' }}>{formatMoney(outflow, 'CRC')}</b></span></div>
-          {next60.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled yet. Add recurring items below.</p> : <EventList events={next60.slice(0, 14)} showDate />}
+          {next60.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled yet. Add recurring items below.</p> : <EventList events={next60.slice(0, 14)} showDate onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />}
         </Glass>
       </div>
 
@@ -130,11 +189,11 @@ export default function Bills() {
   );
 }
 
-function EventList({ events, showDate }: { events: CalendarEvent[]; showDate?: boolean }) {
+function EventList({ events, showDate, onEdit }: { events: CalendarEvent[]; showDate?: boolean; onEdit?: (ruleId: string) => void }) {
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
       {events.map((e, k) => (
-        <li key={k}><Link to={e.to} style={{ display: 'flex', gap: 8, alignItems: 'baseline', color: 'inherit', textDecoration: e.status === 'skipped' ? 'line-through' : 'none' }}>
+        <li key={k}><Link to={e.to} onClick={(ev) => { if (e.ruleId && onEdit) { ev.preventDefault(); onEdit(e.ruleId); } }} title={e.ruleId && onEdit ? 'Edit this recurring item' : undefined} style={{ display: 'flex', gap: 8, alignItems: 'baseline', color: 'inherit', textDecoration: e.status === 'skipped' ? 'line-through' : 'none' }}>
           <i aria-hidden style={{ width: 8, height: 8, borderRadius: 4, background: TONE[e.tone], flex: 'none', alignSelf: 'center' }} />
           {showDate && <span className="small muted" style={{ width: 40, flex: 'none' }}>{formatDateCR(e.date).slice(0, 5)}</span>}
           <span style={{ flex: 1 }}>{e.title}{e.status === 'pending' && <> <Pill tone="debt">confirm</Pill></>}{e.status === 'posted' && <span className="small muted"> ✓</span>}</span>

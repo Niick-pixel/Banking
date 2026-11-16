@@ -35,7 +35,7 @@ export const R10 = rule({
         body: reason ? `Reason given: “${reason}”. ${pot.name} now holds ${crc(bal)}.`
           : ctx.say(`That's her money. Say why, and it's logged as borrowing. ${pot.name} now holds ${crc(bal)}${months ? `; at ${crc(monthlyPlan)}/month it takes ${months} more month${months > 1 ? 's' : ''} to refill` : ''}.`,
             `This money is set aside for her. Add a short reason so it's tracked as a loan from her fund${months ? `; it will take about ${months} month${months > 1 ? 's' : ''} to put back` : ''}.`),
-        why: { formula: 'withdrawal from a fund with owner = hers (paying her debt from it excluded)', inputs: { pot: pot.name, amount: crc(t.amount), balanceNow: crc(bal), monthlyPlan: crc(monthlyPlan) }, threshold: 'any amount' },
+        why: { formula: 'withdrawal from a fund with owner = hers (paying her debt from it excluded)', inputs: { fund: pot.name, amount: crc(t.amount), balanceNow: crc(bal), monthlyPlan: crc(monthlyPlan) }, threshold: 'any amount' },
         impactCRC: t.amount, actWithinDays: 1, confidence: 1,
         action: { label: reason ? 'Open her fund' : 'Give a reason (log as borrowing)', kind: reason ? 'open' : 'log_reason', payload: { transactionId: t.id, to: '/funds', amount: t.amount } },
         dedupeKey: `R10:${t.id}`,

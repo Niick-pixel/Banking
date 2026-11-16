@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { existsSync, readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AufwindDB } from './db';
-import { postDueRecurring, saveRecurring, confirmOccurrence, skipOccurrence, commitImport, deleteTransaction, lastAuditId, postDueCuotas, saveInstallmentPlan, saveTransaction, undoAudit, undoImport, UndoBlockedError } from './repo';
+import { mergeCategory, saveBudget, saveCategory, postDueRecurring, saveRecurring, confirmOccurrence, skipOccurrence, commitImport, deleteTransaction, lastAuditId, postDueCuotas, saveInstallmentPlan, saveTransaction, undoAudit, undoImport, UndoBlockedError } from './repo';
 import { parseWorkbook } from '../import/workbook';
 import { gridFromXlsx } from '../import/grid';
 import { account, crc, tx } from '../test/factories';
@@ -86,5 +86,21 @@ describe('automatic savings (Ahorro Objetivo)', () => {
     expect(await postDueRecurring('2026-12-02', d)).toBe(0);
     const posted = (await d.transactions.toArray()).map((t) => t.date).sort();
     expect(posted).toEqual(['2026-11-16', '2026-12-01']);
+  });
+});
+
+describe('categories', () => {
+  it('merging moves movements and the budget, then archives the old one', async () => {
+    await d.accounts.add(account('c', 'checking'));
+    const cat = (id: string, name: string) => ({ id, name, group: 'Living' as const, discretionary: false, sortOrder: 0, archived: false, createdAt: 0, updatedAt: 0 });
+    await saveCategory(cat('uber', 'Uber'), d);
+    await saveCategory(cat('transport', 'Transport'), d);
+    await saveBudget('uber', '*', crc(30_000), d);
+    await saveTransaction(tx({ kind: 'expense', date: '2026-11-01', from: { accountId: 'c' }, amount: crc(5_000), categoryId: 'uber' }), d);
+    await saveTransaction(tx({ kind: 'expense', date: '2026-11-02', from: { accountId: 'c' }, amount: crc(7_000), categoryId: 'transport' }), d);
+    expect(await mergeCategory('uber', 'transport', d)).toBe(1);
+    expect((await d.transactions.toArray()).every((t) => 'categoryId' in t && t.categoryId === 'transport')).toBe(true);
+    expect((await d.budgets.toArray()).map((b) => b.categoryId)).toEqual(['transport']);
+    expect((await d.categories.get('uber'))!.archived).toBe(true);
   });
 });

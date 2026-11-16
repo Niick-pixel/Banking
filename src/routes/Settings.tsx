@@ -140,8 +140,8 @@ function AppearancePanel() {
         </Row>
       </Section>
       <Section title="Glass & motion">
-        <Row label="Transparency" hint="Solid replaces the blur with opaque panels: easier on older GPUs and on the eyes.">
-          <Segmented<Appearance['transparency']> label="Transparency" value={a.transparency} onChange={(transparency) => set({ transparency })} options={[{ value: 'auto', label: 'Glass' }, { value: 'reduced', label: 'Solid' }]} />
+        <Row label="Transparency" hint="Crisp: still background and panels, the sharpest text on Windows (ClearType). Frosted: blurred moving glass, softer text. Solid: fully opaque panels.">
+          <Segmented<Appearance['transparency']> label="Transparency" value={a.transparency} onChange={(transparency) => set({ transparency })} options={[{ value: 'auto', label: 'Crisp' }, { value: 'frosted', label: 'Frosted' }, { value: 'reduced', label: 'Solid' }]} />
         </Row>
         <Row label="Animations" hint="Smooth: slow, soft transitions everywhere. Quick: the same, faster. Off: instant.">
           <Segmented<Appearance['motion']> label="Animations" value={a.motion} onChange={(motion) => set({ motion })} options={[{ value: 'smooth', label: 'Smooth' }, { value: 'quick', label: 'Quick' }, { value: 'off', label: 'Off' }]} />
@@ -282,7 +282,7 @@ function BudgetsPanel() {
         <Row label="Warn me at" hint="Tracker and Dashboard flag a category when it reaches this share of its budget; 100% is always flagged.">
           <NumberField label="Budget warning threshold" value={Math.round(warn * 100)} min={50} max={99} suffix="% of budget" onSave={(v) => void setWarn(v / 100)} />
         </Row>
-        <p className="small muted" style={{ margin: 0 }}>Budget amounts are set per category and month in <Link to="/tracker">Budget → Tracker</Link>: click any amount.</p>
+        <p className="small muted" style={{ margin: 0 }}>Add, rename, budget or merge categories in <Link to="/categories">Budget → Categories</Link>. One-month budgets: click any amount in <Link to="/tracker">the Tracker</Link>.</p>
       </Section>
       <Section title="Categories" sub="Rename, regroup, mark as avoidable (used by insights), or archive a category you no longer use. History keeps its category.">
         <label className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived</label>

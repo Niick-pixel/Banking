@@ -4,6 +4,7 @@ import { Segmented } from '../design/components';
 import { useLedger, suggestCategories, type Ledger } from './data';
 import { convert, formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { rateForDay } from './fx';
+import { crossesSavings, savingsCategoryFor } from '../domain/fundmoves';
 import { useCoach } from './coach';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { hoursOfWork } from '../coach/forecast';
@@ -119,9 +120,21 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
   }, [guess?.categoryId, guess?.mode]);
   const suggested = suggestCategories(l.transactions, description, kind).filter((id) => cats.some((c) => c.id === id)).slice(0, 5);
 
+  // A transfer between spending money and a fund/savings account is really saving: offer to record it as such.
+  const keepPlaces = useRef<string | null>(null);
+  const splitKey = (k: string) => { const [a, p] = k.split('|'); return p ? { accountId: a!, potId: p } : { accountId: a! }; };
+  const crosses = kind === 'transfer' && from && to && from !== to ? crossesSavings(splitKey(from), splitKey(to), { accountType: (id) => l.account.get(id)?.type }) : null;
+  function recordAsSavings() {
+    if (!crosses) return;
+    const fundSide = splitKey(crosses === 'deposit' ? to : from);
+    keepPlaces.current = savingsCategoryFor(l.categories, l.pots.find((p) => p.id === fundSide.potId)?.owner)?.id ?? '';
+    if (direction === crosses) { setKind('savings'); } else { setDirection(crosses); setKind('savings'); }
+  }
+
   // Keep from/to sensible when switching kind.
   useEffect(() => {
     if (edit) return;
+    if (keepPlaces.current !== null) { setCategoryId(keepPlaces.current); keepPlaces.current = null; return; }
     if (kind === 'savings') { setFrom(direction === 'deposit' ? spending : firstSavings); setTo(direction === 'deposit' ? firstSavings : spending); }
     else if (kind === 'transfer') { setFrom(spending); setTo(plc.find((p) => p.key !== spending)?.key ?? ''); }
     else { setFrom(spending); }
@@ -287,6 +300,12 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
       </div>
       {(kind === 'transfer' || kind === 'savings') && (
         <div className="field"><label htmlFor="qa-date2">Date</label><input id="qa-date2" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
+      )}
+      {crosses && (
+        <div className="hint-row" role="note">
+          <span className="small">{crosses === 'deposit' ? 'This puts spending money into savings. As a transfer it won\'t show in your budget.' : 'This takes money out of savings. As a transfer it won\'t show in your budget.'}</span>
+          <button type="button" className="btn btn-sm" onClick={recordAsSavings}>Record as savings</button>
+        </div>
       )}
       {error && <p role="alert" style={{ color: 'var(--expense)', margin: 0, fontWeight: 600 }}>{error}</p>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>

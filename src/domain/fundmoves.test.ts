@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest';
+import { asSavings, uncountedFundMoves } from './fundmoves';
+import { computeTracker } from './tracker';
+import type { Category, Pot, Transaction } from './schemas';
+
+const now = 0;
+const cat = (id: string, name: string, group: Category['group']): Category => ({ id, name, group, discretionary: false, sortOrder: 0, archived: false, createdAt: now, updatedAt: now });
+const cats = [cat('mine', 'Savings - Mine', 'Savings'), cat('hers', 'Savings - Hers (loan fund)', 'Savings')];
+const pots: Pot[] = [{ id: 'p-hers', accountId: 'chk', name: 'Hers (loan fund)', owner: 'hers', purpose: '', archived: false, createdAt: now, updatedAt: now } as Pot];
+const ctx = { accountType: (id: string) => (id === 'chk' ? 'checking' as const : id === 'sav' ? 'savings' as const : undefined) };
+const tr = (id: string, from: { accountId: string; potId?: string }, to: { accountId: string; potId?: string }, amount: number): Transaction =>
+  ({ id, kind: 'transfer', date: '2026-11-10', dateEstimated: false, currency: 'CRC', description: '', tags: [], notes: '', from, to, amount, createdAt: now, updatedAt: now });
+
+describe('transfers into funds', () => {
+  const into = tr('a', { accountId: 'chk' }, { accountId: 'chk', potId: 'p-hers' }, 4_000_000);
+  const between = tr('b', { accountId: 'chk' }, { accountId: 'chk', potId: 'p-hers' }, 1);
+  const plain = tr('c', { accountId: 'sav' }, { accountId: 'sav', potId: 'p-x' }, 100);
+
+  it('finds spending → fund transfers and leaves savings → savings alone', () => {
+    expect(uncountedFundMoves([into, plain], ctx).map((t) => t.id)).toEqual(['a']);
+    expect(uncountedFundMoves([between], ctx)).toHaveLength(1);
+  });
+
+  it('turns ₡40,000 into her fund into Savings - Hers, and the budget sees it', () => {
+    const fixed = asSavings(into as Extract<Transaction, { kind: 'transfer' }>, ctx, cats, pots)!;
+    expect(fixed).toMatchObject({ kind: 'savings', direction: 'deposit', categoryId: 'hers', amount: 4_000_000, id: 'a' });
+    const before = computeTracker(2026, [into], cats, [], ctx);
+    const after = computeTracker(2026, [fixed], cats, [], ctx);
+    expect(before.saved[10]).toBe(0);
+    expect(after.saved[10]).toBe(4_000_000);
+    expect(after.sections.find((s) => s.group === 'Savings')!.rows.find((r) => r.category.id === 'hers')!.months[10]).toBe(4_000_000);
+  });
+
+  it('a move out of the fund becomes a withdrawal', () => {
+    const out = tr('d', { accountId: 'chk', potId: 'p-hers' }, { accountId: 'chk' }, 500);
+    expect(asSavings(out as Extract<Transaction, { kind: 'transfer' }>, ctx, cats, pots)).toMatchObject({ direction: 'withdrawal', categoryId: 'hers' });
+  });
+});
