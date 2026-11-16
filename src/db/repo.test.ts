@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { existsSync, readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AufwindDB } from './db';
-import { mergeCategory, saveBudget, saveCategory, postDueRecurring, saveRecurring, confirmOccurrence, skipOccurrence, commitImport, deleteTransaction, lastAuditId, postDueCuotas, saveInstallmentPlan, saveTransaction, undoAudit, undoImport, UndoBlockedError } from './repo';
+import { fixPaydaySavingsRules, mergeCategory, saveBudget, saveCategory, postDueRecurring, saveRecurring, confirmOccurrence, skipOccurrence, commitImport, deleteTransaction, lastAuditId, postDueCuotas, saveInstallmentPlan, saveTransaction, undoAudit, undoImport, UndoBlockedError } from './repo';
 import { parseWorkbook } from '../import/workbook';
 import { gridFromXlsx } from '../import/grid';
 import { account, crc, tx } from '../test/factories';
@@ -102,5 +102,19 @@ describe('categories', () => {
     expect((await d.transactions.toArray()).every((t) => 'categoryId' in t && t.categoryId === 'transport')).toBe(true);
     expect((await d.budgets.toArray()).map((b) => b.categoryId)).toEqual(['transport']);
     expect((await d.categories.get('uber'))!.archived).toBe(true);
+  });
+});
+
+describe('payday savings rules', () => {
+  it('moves an old "My savings" rule from payday to the 1st and 16th', async () => {
+    await d.accounts.add(account('c', 'checking'));
+    await d.accounts.add(account('s', 'goal_savings'));
+    await saveRecurring({ id: 'r', name: 'My savings', mode: 'auto_post', schedule: { type: 'quincena' }, startDate: '2026-11-17', skipped: [], informational: false, active: true, createdAt: 0, updatedAt: 0,
+      template: { kind: 'savings', direction: 'deposit', from: { accountId: 'c' }, to: { accountId: 's' }, amount: crc(35_000), categoryId: 'mine', description: 'Automatic savings' } }, d);
+    expect(await fixPaydaySavingsRules(d)).toBe(1);
+    const r = (await d.recurring.get('r'))!;
+    expect(r.schedule).toEqual({ type: 'days', days: [1, 16] });
+    expect(r.name).toBe('Ahorro Objetivo');
+    expect(await fixPaydaySavingsRules(d)).toBe(0);
   });
 });

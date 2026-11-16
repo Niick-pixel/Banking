@@ -184,7 +184,8 @@ export function suggestRecurring(txs: Transaction[], categories: Category[], acc
   const savingsAcc = accounts.find((a) => (a.type === 'goal_savings' || a.type === 'savings') && !a.archived);
   const savCat = categories.find((c) => c.group === 'Savings' && /mine|mío|mia/i.test(c.name)) ?? categories.find((c) => c.group === 'Savings');
   if (payroll.mySavingsPerQuincena > 0 && savingsAcc && savCat && !covered.has(`savings|${savCat.id}|`)) {
-    out.push({ key: 'payroll-savings', name: 'My savings (each quincena)', reason: 'From your payroll settings.', rule: { ...base, startDate: startFor(savCat.id), mode: 'auto_post', name: 'My savings', schedule: { type: 'quincena' }, template: { kind: 'savings', direction: 'deposit', from: { accountId: spending.id }, to: { accountId: savingsAcc.id }, amount: payroll.mySavingsPerQuincena, categoryId: savCat.id, description: 'Automatic savings' } } });
+    // BAC takes Ahorro Objetivo on the 1st and the 16th (the day after each payday), not on payday itself.
+    out.push({ key: 'payroll-savings', name: 'Ahorro Objetivo (automatic savings)', reason: 'From your payroll settings: taken on the 1st and the 16th. You can change the days in Savings & goals → Automatic savings.', rule: { ...base, startDate: startFor(savCat.id), mode: 'auto_post', name: 'Ahorro Objetivo', schedule: { type: 'days', days: [1, 16] }, template: { kind: 'savings', direction: 'deposit', from: { accountId: spending.id }, to: { accountId: savingsAcc.id }, amount: payroll.mySavingsPerQuincena, categoryId: savCat.id, description: 'Ahorro Objetivo', tags: ['auto-savings'] } } });
   }
   const assoc = accounts.find((a) => a.type === 'association_voluntary' && !a.archived);
   if (payroll.associationPerQuincena > 0 && assoc && !covered.has(`adjustment||${assoc.id}`)) {
