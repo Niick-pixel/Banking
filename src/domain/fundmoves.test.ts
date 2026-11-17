@@ -47,3 +47,24 @@ describe('savings that missed their fund', () => {
     expect(intoFund(found[0]!.tx, found[0]!.pot).to).toEqual({ accountId: 'sav', potId: 'p-mine' });
   });
 });
+
+import { fundActivity } from './fundmoves';
+import { accountBalances } from './ledger';
+
+describe('fund activity', () => {
+  const sv = (id: string, date: string, dir: 'deposit' | 'withdrawal', amount: number): Transaction =>
+    ({ id, kind: 'savings', direction: dir, date, dateEstimated: false, currency: 'CRC', description: '', tags: [], notes: '', categoryId: 'hers',
+      from: dir === 'deposit' ? { accountId: 'chk' } : { accountId: 'chk', potId: 'p-hers' }, to: dir === 'deposit' ? { accountId: 'chk', potId: 'p-hers' } : { accountId: 'chk' }, amount, createdAt: now, updatedAt: now });
+  const txs = [sv('1', '2026-10-01', 'deposit', 7_000_000), sv('2', '2026-11-01', 'withdrawal', 2_000_000), sv('3', '2026-11-16', 'deposit', 4_000_000), sv('0', '2025-01-01', 'deposit', 999)];
+  const act = fundActivity('p-hers', txs, '2026-01-01');
+
+  it('lists newest first with signed amounts and the running balance, skipping pre-opening rows', () => {
+    expect(act.map((e) => [e.tx.id, e.amount, e.after])).toEqual([['3', 4_000_000, 9_000_000], ['2', -2_000_000, 5_000_000], ['1', 7_000_000, 7_000_000]]);
+    expect(act[0]!.other).toEqual({ accountId: 'chk' });
+  });
+
+  it('ends at the same balance the ledger shows', () => {
+    const acc = { id: 'chk', name: 'C', type: 'checking', currency: 'CRC', openingBalance: 0, openingDate: '2026-01-01', archived: false, createdAt: now, updatedAt: now } as never;
+    expect(accountBalances([acc], txs.slice(0, 3)).get('chk')!.pots.get('p-hers')).toBe(act[0]!.after);
+  });
+});

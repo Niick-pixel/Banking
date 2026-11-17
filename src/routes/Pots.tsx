@@ -14,6 +14,7 @@ import { formatDateCR, todayISO } from '../lib/dates';
 import { PayDebtForm } from './PayDebt';
 import { InfoTip } from '../design/components/InfoTip';
 import { FundMovesFix } from './FundMovesFix';
+import { FundActivity } from './FundActivity';
 import { asSavings, crossesSavings } from '../domain/fundmoves';
 import type { FlowContext } from '../domain/ledger';
 import { usePersisted } from '../app/persist';
@@ -88,6 +89,8 @@ export default function Pots() {
           </Glass>
         );
       })}
+
+      <FundActivity />
 
       <div className="funds-charts">
       <Glass strong pad={16} style={{ display: 'grid', gap: 12 }}>

@@ -4,7 +4,7 @@
  * budget. These helpers find such moves and turn them into proper savings records.
  */
 import type { Category, Pot, Transaction } from './schemas';
-import { isSavingsPlace, type FlowContext } from './ledger';
+import { isSavingsPlace, legs, type FlowContext } from './ledger';
 
 type TransferTx = Extract<Transaction, { kind: 'transfer' }>;
 type SavingsTx = Extract<Transaction, { kind: 'savings' }>;
@@ -68,4 +68,36 @@ export function unfundedSavings(txs: Transaction[], pots: Pot[], categories: Cat
 
 export function intoFund(t: SavingsTxT, pot: Pot): SavingsTxT {
   return t.direction === 'deposit' ? { ...t, to: { accountId: pot.accountId, potId: pot.id }, updatedAt: Date.now() } : { ...t, from: { accountId: pot.accountId, potId: pot.id }, updatedAt: Date.now() };
+}
+
+export interface FundEntry {
+  tx: Transaction;
+  /** Signed: + money came into the fund, − went out. */
+  amount: number;
+  /** The other side of the move, when there is one (where it came from / went to). */
+  other?: { accountId: string; potId?: string };
+  /** Fund balance right after this movement. */
+  after: number;
+}
+
+/**
+ * Every movement that touched one fund, newest first, with the fund balance after each.
+ * Uses the same rule as the balances: movements dated before the account's opening date don't count.
+ */
+export function fundActivity(potId: string, txs: Transaction[], openingDate: string): FundEntry[] {
+  const rows: Omit<FundEntry, 'after'>[] = [];
+  for (const tx of txs) {
+    if (tx.date < openingDate) continue;
+    const ls = legs(tx);
+    const mine = ls.filter((g) => g.potId === potId);
+    if (!mine.length) continue;
+    const amount = mine.reduce((n, g) => n + g.amount, 0);
+    const o = ls.find((g) => g.potId !== potId);
+    const other = o ? { accountId: o.accountId, potId: o.potId } : undefined;
+    if (amount !== 0) rows.push({ tx, amount, other });
+  }
+  rows.sort((a, b) => a.tx.date.localeCompare(b.tx.date) || a.tx.createdAt - b.tx.createdAt);
+  let run = 0;
+  const out = rows.map((r) => ({ ...r, after: (run += r.amount) }));
+  return out.reverse();
 }
