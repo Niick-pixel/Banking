@@ -660,3 +660,11 @@ h2 { font-size: 15px; }
 .acc-unassigned { color: rgb(var(--amber)); border-color: rgb(var(--amber) / .4); }
 .acc-actions { display: flex; gap: 4px; justify-content: flex-end; }
 @media (max-width: 1200px) { .acc-row { grid-template-columns: minmax(160px, 1fr) minmax(110px, .7fr) minmax(0, 1.2fr); } .acc-head span:nth-child(n+4) { display: none; } .acc-funds, .acc-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+/* Quick add: date-only strip, a taller window so From/To never scroll */
+.sheet-wide .sheet-strip { height: auto; overflow: visible; }
+.sheet-wide .sheet-body { height: min(560px, calc(100vh - 210px)); }
+.qa-col { overflow: hidden; }
+.sheet-wide { width: min(1120px, calc(100vw - 32px)); }
+.qa-grid { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr) minmax(0, 1.25fr); }
+.chipopt { max-width: 100%; min-width: 0; }
+.chipopt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
