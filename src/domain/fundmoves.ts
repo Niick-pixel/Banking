@@ -40,3 +40,32 @@ export function asSavings(t: TransferTx, ctx: FlowContext, categories: Category[
   const { toAmount: _a, rateId: _r, ...rest } = t;
   return { ...rest, kind: 'savings', direction, categoryId: cat.id, updatedAt: Date.now() };
 }
+
+type SavingsTxT = Extract<Transaction, { kind: 'savings' }>;
+/** Which fund a Savings category belongs to: "Savings - Hers…" → hers, "Savings - Mine" → mine. */
+export function ownerOfCategory(c?: Category): Pot['owner'] | undefined {
+  if (!c || c.group !== 'Savings') return undefined;
+  if (/hers|her\b|ella|loan fund/i.test(c.name)) return 'hers';
+  if (/mine|mío|mio/i.test(c.name)) return 'mine';
+  return undefined;
+}
+
+/** Savings that went into (or out of) an account that has funds, but not into any fund, while the category says whose it is. */
+export function unfundedSavings(txs: Transaction[], pots: Pot[], categories: Category[]): { tx: SavingsTxT; pot: Pot }[] {
+  const cat = new Map(categories.map((c) => [c.id, c]));
+  const out: { tx: SavingsTxT; pot: Pot }[] = [];
+  for (const t of txs) {
+    if (t.kind !== 'savings') continue;
+    const side = t.direction === 'deposit' ? t.to : t.from;
+    if (side.potId) continue;
+    const owner = ownerOfCategory(cat.get(t.categoryId));
+    if (!owner) continue;
+    const pot = pots.find((p) => p.accountId === side.accountId && p.owner === owner && !p.archived);
+    if (pot) out.push({ tx: t, pot });
+  }
+  return out;
+}
+
+export function intoFund(t: SavingsTxT, pot: Pot): SavingsTxT {
+  return t.direction === 'deposit' ? { ...t, to: { accountId: pot.accountId, potId: pot.id }, updatedAt: Date.now() } : { ...t, from: { accountId: pot.accountId, potId: pot.id }, updatedAt: Date.now() };
+}
