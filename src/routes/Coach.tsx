@@ -20,6 +20,7 @@ import { shiftMonth } from '../coach/context';
 import type { Insight, Severity } from '../coach/types';
 import type { SplitLine } from '../coach/windfall';
 import { usePersisted } from '../app/persist';
+import { DuplicateReview } from './DuplicateReview';
 
 const crc = (n: number) => formatMoney(Math.round(n) as Minor, 'CRC', { decimals: 0 });
 
@@ -53,6 +54,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
   const [reason, setReason] = useState('');
   const [split, setSplit] = useState(false);
   const [done, setDone] = useState('');
+  const [dup, setDup] = useState(false);
   const sev = SEVERITY[i.severity];
   const p = (i.action?.payload ?? {}) as Record<string, unknown>;
 
@@ -60,6 +62,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
     if (!i.action) return;
     switch (i.action.kind) {
       case 'open': case 'recategorize': {
+        if (i.ruleId === 'R17' && Array.isArray(p.ids)) { setDup(true); return; }
         const tx = p.transactionId ? l.transactions.find((t) => t.id === p.transactionId) : undefined;
         if (tx && i.action.kind === 'recategorize') qa.open(tx);
         else if (p.to) nav(String(p.to));
@@ -106,6 +109,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
         </button>
         {!i.requiresReason && <button className="btn btn-sm" style={{ marginLeft: 'auto' }} title="Mark as seen: it leaves the inbox until something changes" onClick={() => void coach.dismiss(i)}>✓ Got it</button>}
       </div>
+      {i.ruleId === 'R17' && Array.isArray(p.ids) && <DuplicateReview open={dup} ids={p.ids as string[]} onClose={() => setDup(false)} />}
       {done && <p className="small" role="status" style={{ margin: 0, color: 'var(--income)' }}>✓ {done}</p>}
 
       <AnimatePresence initial={false}>

@@ -137,13 +137,17 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   }
 
   // Savings: the category says whose money it is, so put it into that fund (Mine / Hers) when the account has funds.
+  const lastCat = useRef(categoryId);
   useEffect(() => {
     if (kind !== 'savings' || !categoryId) return;
     const owner = ownerOfCategory(l.category.get(categoryId));
     const sideKeyNow = direction === 'deposit' ? to : from;
     const acc = sideKeyNow.split('|')[0];
-    // That fund in the same account, or else the fund of that owner wherever it is.
-    const pot = owner ? l.pots.find((p) => p.accountId === acc && p.owner === owner && !p.archived) ?? l.pots.find((p) => p.owner === owner && !p.archived) : undefined;
+    // That fund in the same account. Only when the category itself changed may it jump to that owner's fund in another account:
+    // if you picked the account yourself, it stays.
+    const catChanged = lastCat.current !== categoryId;
+    lastCat.current = categoryId;
+    const pot = owner ? l.pots.find((p) => p.accountId === acc && p.owner === owner && !p.archived) ?? (catChanged ? l.pots.find((p) => p.owner === owner && !p.archived) : undefined) : undefined;
     if (!pot) return;
     const k = `${pot.accountId}|${pot.id}`;
     if (direction === 'deposit' && to !== k) setTo(k);

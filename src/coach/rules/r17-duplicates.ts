@@ -13,7 +13,7 @@ export const R17 = rule({
       body: ctx.say(`Logged ${ddmm(a.date)} and ${ddmm(b.date)}. Merge if it's the same purchase.`, `Two very similar entries on ${ddmm(a.date)} and ${ddmm(b.date)}. Keep both if they're real.`),
       why: { formula: 'same kind, account and amount, within 1 day, similar description', inputs: { first: `${a.date} ${a.description}`, second: `${b.date} ${b.description}` }, threshold: '±1 day' },
       impactCRC: 'amount' in a ? a.amount : 0, actWithinDays: 7, confidence: 0.7,
-      action: { label: 'Review: merge or keep both', kind: 'open', payload: { to: `/transactions?date=${a.date}`, ids: [a.id, b.id] } },
+      action: { label: 'Compare them', kind: 'open', payload: { to: `/transactions?date=${a.date}`, ids: [a.id, b.id] } },
       dedupeKey: `R17:${[a.id, b.id].sort().join(':')}`,
     }));
   },

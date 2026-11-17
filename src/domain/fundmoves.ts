@@ -101,3 +101,24 @@ export function fundActivity(potId: string, txs: Transaction[], openingDate: str
   const out = rows.map((r) => ({ ...r, after: (run += r.amount) }));
   return out.reverse();
 }
+
+/**
+ * Make one fund match the bank. `diff` = bank − app for the account (céntimos).
+ * - 'saved': you moved it from an everyday account → a Savings record (counts as saved in the budget).
+ * - 'correct': it's interest or a correction → an adjustment on the fund (not income, not spending).
+ */
+export function bankMatchTx(o: {
+  diff: number; accountId: string; potId?: string; mode: 'saved' | 'correct';
+  spendingAccountId?: string; categoryId?: string; date: string; currency: Transaction['currency']; id: string; now: number;
+}): Transaction | null {
+  if (!o.diff) return null;
+  const base = { id: o.id, date: o.date, dateEstimated: false, currency: o.currency, tags: ['bank-match'], notes: '', createdAt: o.now, updatedAt: o.now };
+  const fund = { accountId: o.accountId, ...(o.potId ? { potId: o.potId } : {}) };
+  if (o.mode === 'saved' && o.spendingAccountId && o.categoryId) {
+    const deposit = o.diff > 0;
+    return { ...base, kind: 'savings', direction: deposit ? 'deposit' : 'withdrawal', categoryId: o.categoryId, amount: Math.abs(o.diff),
+      from: deposit ? { accountId: o.spendingAccountId } : fund, to: deposit ? fund : { accountId: o.spendingAccountId },
+      description: deposit ? 'Saved (matched to the bank)' : 'Taken out (matched to the bank)' } as Transaction;
+  }
+  return { ...base, kind: 'adjustment', side: fund, signedAmount: o.diff, reason: 'Matched to the bank balance', description: 'Matched to the bank' } as Transaction;
+}

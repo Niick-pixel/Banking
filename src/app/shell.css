@@ -684,3 +684,13 @@ h2 { font-size: 15px; }
 .fund-act-amt { display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; }
 .fund-act-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 0; padding: 0 4px; }
 .fund-act-foot:empty { display: none; }
+/* Coach → duplicate review */
+.dup-grid { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 12px; align-content: start; }
+.dup-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: calc(14px * var(--rk, 1)); border: 1px solid var(--glass-stroke); background: rgb(var(--shadow-rgb) / .025); min-width: 0; }
+.dup-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dup-amt { font-size: 20px; }
+.dup-dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: 13px; }
+.dup-dl dt { color: var(--text-dim); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; }
+.dup-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.dup-actions { display: flex; gap: 8px; margin-top: auto; }
+.dup-del { color: rgb(var(--loss)); }
