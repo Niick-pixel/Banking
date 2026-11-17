@@ -13,6 +13,7 @@ import { useLedger } from '../app/data';
 import { useCssVar } from '../app/theme';
 import { Glass, Pill, Segmented } from '../design/components';
 import { InfoTip } from '../design/components/InfoTip';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { usePersisted } from '../app/persist';
 import { PageHeader } from '../ui/Sheet';
 import { budgetAlerts, budgetFor, computeTracker, type TrackerRow } from '../domain/tracker';
@@ -34,13 +35,13 @@ const SLOT = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5'];
 export default function Tracker() {
   const [view, setView] = usePersisted<'overview' | 'year'>('budget.view2', 'overview');
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Budget" sub={view === 'overview' ? 'How your spending compares with your plan, month by month.' : 'The full year, laid out like your workbook.'}>
         <Segmented label="View" value={view} onChange={setView} options={[{ value: 'overview', label: 'Overview' }, { value: 'year', label: 'Year table' }]} />
       </PageHeader>
       <FundMovesFix />
       {view === 'overview' ? <Overview /> : <YearTable />}
-    </>
+    </div>
   );
 }
 
@@ -66,11 +67,12 @@ function Overview() {
   const status = !budget ? 'none' : spent > budget ? 'over' : spent > expectedByNow * 1.1 ? 'ahead' : 'ok';
   const chart = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1], Income: flow(m)?.income ?? 0, Budget: budgetIn(m), Spending: spentIn(m) }));
   const alerts = useMemo(() => budgetAlerts(computeTracker(Number(cur.slice(0, 4)), l.transactions.filter((t) => t.currency === 'CRC'), l.categories, l.budgets, { accountType: (id) => l.account.get(id)?.type }), today, warnAt), [l, cur, today, warnAt]);
+  const budgeted = spendCats.map((c) => ({ c, budget: budgetFor(l.budgets, c.id, cur), spent: flow(cur)?.byCategory.get(c.id) ?? 0 })).filter((b) => b.budget > 0).sort((a, b) => b.spent / b.budget - a.spent / a.budget);
   const pctChange = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : null);
   const sc = pctChange(spent, spentPrev), ic = pctChange(inc, incPrev);
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div className="fit budget-fit">
       <div className="bkpis">
         <Glass pad={18} className="bkpi">
           <span className="bkpi-label">Spent this month <InfoTip text="Everything you paid this month: fixed costs, living, discretionary and debt payments. Savings are not spending." /></span>
@@ -97,19 +99,20 @@ function Overview() {
         </Glass>
       </div>
 
-      <Glass strong pad={20} style={{ display: 'grid', gap: 10 }}>
+      <div className="budget-mid">
+      <Glass strong pad={14} className="budget-chart">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h2 className="card-h" style={{ margin: 0 }}>Monthly comparison <InfoTip text="For each month: what came in, what you planned to spend, and what you actually spent. Spending above the budget bar means that month went over." /></h2>
-          <Segmented label="Period" value={String(span)} onChange={(v) => setSpan(Number(v))} options={[{ value: '3', label: '3 months' }, { value: '6', label: '6 months' }, { value: '12', label: '12 months' }]} />
+          <Segmented label="Period" value={String(span)} onChange={(v) => setSpan(Number(v))} options={[{ value: '3', label: '3 mo' }, { value: '6', label: '6 mo' }, { value: '12', label: '12 mo' }]} />
         </div>
-        <div style={{ height: 250 }} role="img" aria-label={`Income, budget and spending by month: ${chart.map((c) => `${c.month} income ${short(c.Income)}, budget ${short(c.Budget)}, spending ${short(c.Spending)}`).join('; ')}`}>
+        <div className="chart-fill" role="img" aria-label={`Income, budget and spending by month: ${chart.map((c) => `${c.month} income ${short(c.Income)}, budget ${short(c.Budget)}, spending ${short(c.Spending)}`).join('; ')}`}>
           <ResponsiveContainer>
             <BarChart data={chart} margin={{ top: 18, right: 4, left: 0, bottom: 0 }} barGap={4} barCategoryGap="22%">
               <CartesianGrid vertical={false} stroke={grid} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 12 }} />
-              <YAxis tickFormatter={short} tickLine={false} axisLine={false} width={56} tick={{ fill: axis, fontSize: 12 }} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 11 }} />
+              <YAxis tickFormatter={short} tickLine={false} axisLine={false} width={56} tick={{ fill: axis, fontSize: 11 }} />
               <Tooltip formatter={(v: number) => formatMoney(v, 'CRC')} contentStyle={{ background: 'var(--solid-surface)', border: '1px solid var(--glass-border)', borderRadius: 12 }} cursor={{ fill: 'var(--accent-soft)' }} />
-              <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13 }} align="right" verticalAlign="top" height={26} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11.5 }} align="right" verticalAlign="top" height={26} />
               <Bar isAnimationActive={false} dataKey="Income" fill={income} radius={[4, 4, 0, 0]} />
               <Bar isAnimationActive={false} dataKey="Budget" fill={budgetLine} radius={[4, 4, 0, 0]} />
               <Bar isAnimationActive={false} dataKey="Spending" fill={spend} radius={[4, 4, 0, 0]} />
@@ -118,21 +121,28 @@ function Overview() {
         </div>
       </Glass>
 
-      <CategoriesTable months={months} />
-
-      {alerts.length > 0 && (
-        <Glass strong pad={18} role="region" aria-label="Budget alerts this month">
-          <h2 className="card-h" style={{ margin: '0 0 8px' }}>Watch this month <InfoTip text="Categories at 80% or more of their budget (change the threshold in Settings → Budgets). For living and discretionary spending it also projects where you'll end the month at today's pace." /></h2>
-          <ul className="watch-list">
+      <Glass strong pad={14} className="budget-watch" role="region" aria-label="Budget alerts this month">
+        <h2 className="card-h" style={{ margin: '0 0 6px' }}>Watch this month <span className="n">n {alerts.length}</span><InfoTip text="Categories at 80% or more of their budget (change the threshold in Settings → Budgets). For living and discretionary spending it also projects where you'll end the month at today's pace." /></h2>
+        {alerts.length === 0 && <p className="small faint" style={{ margin: 0 }}>Nothing at 80% of its budget yet.</p>}
+        <ul className="watch-list scroll-box" tabIndex={0} aria-label="Budget alerts and what is left">
             {alerts.map((a) => (
               <li key={a.category.id}>
                 <Pill tone={a.level === 'over' ? 'expense' : a.level === 'full' ? 'neutral' : 'debt'}>{a.level === 'over' ? 'Over' : a.level === 'full' ? 'At budget' : `${Math.round(a.pct * 100)}%`}</Pill>
-                <span><b>{a.category.name}</b>: {formatMoney(a.spent, 'CRC')} of {formatMoney(a.budget, 'CRC')}{a.projected > a.spent && a.projected > a.budget ? <span className="muted">. At this pace: {formatMoney(a.projected, 'CRC')} by month end</span> : null}</span>
+                <span className="small"><b>{a.category.name}</b> {formatMoney(a.spent, 'CRC')} of {formatMoney(a.budget, 'CRC')}{a.projected > a.spent && a.projected > a.budget ? <span className="guess"> · pace {formatMoney(a.projected, 'CRC')} (guess)</span> : null}</span>
               </li>
             ))}
-          </ul>
-        </Glass>
-      )}
+          {budgeted.filter((b) => !alerts.some((a) => a.category.id === b.c.id)).map((b) => (
+            <li key={b.c.id} className="watch-rest">
+              <span className="small" style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.c.name}</span>
+              <span className="bar" style={{ width: 70, height: 5 }} aria-hidden><span style={{ width: `${Math.min(1, b.spent / b.budget) * 100}%`, background: 'var(--income)' }} /></span>
+              <span className="small faint money" style={{ width: 92, textAlign: 'right' }}>{formatMoney(b.budget - b.spent, 'CRC')} left</span>
+            </li>
+          ))}
+        </ul>
+      </Glass>
+      </div>
+
+      <CategoriesTable months={months} />
     </div>
   );
 }
@@ -157,11 +167,11 @@ function CategoriesTable({ months }: { months: string[] }) {
   const val = (c: Category, m: string) => l.flows.get(m)?.byCategory.get(c.id) ?? 0;
   const groups: Category['group'][] = [...CATEGORY_GROUPS.filter((g) => g !== 'Income'), 'Income'];
   return (
-    <Glass strong pad={0} style={{ overflow: 'hidden' }}>
+    <Glass strong pad={0} className="btable-card">
       <div className="btable-head">
         <h2 className="card-h" style={{ margin: 0 }}>Categories <InfoTip text="Each row is one category. Month columns show what you spent (or saved, or earned). The bar shows how much of this month's budget is used; click the budget to change it. Trend is the same months as a line. The arrow opens its movements." /></h2>
       </div>
-      <div className="btable-wrap">
+      <div className="btable-wrap scroll-box">
         <table className="btable">
           <thead>
             <tr>
@@ -278,13 +288,10 @@ function YearTable() {
   const t = useMemo(() => computeTracker(year, l.transactions.filter((x) => x.currency === 'CRC'), l.categories, l.budgets, { accountType: (id) => l.account.get(id)?.type }), [year, l]);
   const curMonth = year === Number(today.slice(0, 4)) ? Number(today.slice(5, 7)) - 1 : -1;
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <label htmlFor="yt-year" className="small muted">Year</label>
-        <select id="yt-year" className="input" style={{ width: 120, height: 38 }} value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y}>{y}</option>)}</select>
-      </div>
-      <Glass strong pad={0} style={{ overflow: 'hidden' }}>
-        <div className="tracker-wrap" tabIndex={0} aria-label="Year table, scroll horizontally">
+    <div className="fit">
+      <ChipGroup<number> inline size="sm" label="Year" value={year} onChange={(v) => v && setYear(v)} options={years.map((y) => ({ value: y, label: String(y) }))} />
+      <Glass strong pad={0} className="btable-card">
+        <div className="tracker-wrap scroll-box" tabIndex={0} aria-label="Year table">
           <table className="table tracker">
             <thead>
               <tr>

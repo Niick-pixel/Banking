@@ -16,24 +16,24 @@ import { useQuickAdd } from './QuickAdd';
 import { postDueCuotas, postDueRecurring, fixPaydaySavingsRules } from '../db/repo';
 import { Aurora, GlassDefs } from '../design/components';
 import { ALL_PAGES, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
-import { useTheme } from './theme';
 import { GuidedTour } from './Tour';
 import { NotificationBell } from './Notifications';
 import { FxCalc } from './FxCalc';
+import { SPRING, reducedMotion } from '../design/motion';
 import { readPersisted, writePersisted } from './persist';
 
 /** Page content fades and rises in; the old page fades out first. */
 function AnimatedOutlet() {
   const loc = useLocation();
   const outlet = useOutlet();
-  const { dur } = useTheme();
+  const rm = reducedMotion();
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <motion.div key={loc.pathname}
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0, transition: { duration: dur(0.55), ease: [0.2, 0.8, 0.2, 1] } }}
-        exit={{ opacity: 0, y: -10, transition: { duration: dur(0.28), ease: [0.4, 0, 1, 1] } }}>
-        {outlet}
+      <motion.div key={loc.pathname} className="page-frame"
+        initial={rm ? { opacity: 0 } : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0, transition: rm ? { duration: 0.12 } : SPRING.base }}
+        exit={rm ? { opacity: 0 } : { opacity: 0, y: -6, transition: { duration: 0.13 } }}>
+        <div className="page-scroll">{outlet}</div>
       </motion.div>
     </AnimatePresence>
   );
@@ -43,7 +43,6 @@ function AnimatedOutlet() {
 function SectionTabs() {
   const loc = useLocation();
   const s = sectionFor(loc.pathname);
-  const { dur } = useTheme();
   if (!s || s.pages.length < 2) return null;
   return (
     <nav className="section-tabs" aria-label={`${s.label} pages`} data-tour="tabs">
@@ -51,7 +50,7 @@ function SectionTabs() {
         const active = loc.pathname === p.to;
         return (
           <Link key={p.to} to={p.to} className={`section-tab ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}>
-            {active && <motion.span layoutId="section-tab-pill" className="section-tab-pill" transition={{ type: 'spring', stiffness: 380, damping: 34, duration: dur(0.5) }} />}
+            {active && <motion.span layoutId="section-tab-pill" className="section-tab-pill" transition={SPRING.snappy} />}
             <span style={{ position: 'relative' }}>{p.label}</span>
           </Link>
         );
@@ -63,7 +62,6 @@ function SectionTabs() {
 export default function Shell() {
   const qa = useQuickAdd();
   const loc = useLocation();
-  const { dur } = useTheme();
   const { engine, status } = useSync();
   const [suggest, setSuggest] = useState<string | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
@@ -104,7 +102,7 @@ export default function Shell() {
       <div className="shell">
         <nav className="glass sidebar" aria-label="Main" data-tour="sidebar">
           <Link to="/" className="brand">
-            <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" width={38} height={38} style={{ borderRadius: 10 }} />
+            <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" width={26} height={26} style={{ borderRadius: 7 }} />
             <span>Aufwind<small className="brand-tag">Rise on what you already have</small></span>
           </Link>
           <ul className="nav-sections">
@@ -114,7 +112,7 @@ export default function Shell() {
               return (
                 <li key={s.id}>
                   <NavLink to={entry(s)} end title={s.blurb} className={`nav-item ${active ? 'active' : ''}`} data-tour={`nav-${s.id}`} aria-current={active ? 'page' : undefined}>
-                    {active && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 360, damping: 34, duration: dur(0.5) }} />}
+                    {active && <motion.span layoutId="nav-pill" className="nav-pill" transition={SPRING.snappy} />}
                     <Icon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
                     <span style={{ position: 'relative', display: 'grid' }}>{s.label}<small className="nav-blurb">{s.blurb}</small></span>
                   </NavLink>
@@ -127,7 +125,7 @@ export default function Shell() {
               <Search size={18} aria-hidden /> <span>Search</span> <kbd>Ctrl K</kbd>
             </button>
             <Link to="/settings" title={syncText} className={`nav-item ${inSettings ? 'active' : ''}`} data-tour="settings" aria-current={inSettings ? 'page' : undefined}>
-              {inSettings && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 360, damping: 34, duration: dur(0.5) }} />}
+              {inSettings && <motion.span layoutId="nav-pill" className="nav-pill" transition={SPRING.snappy} />}
               <SettingsIcon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
               <span style={{ position: 'relative', display: 'grid' }}>Settings</span>
               <span className="sync-dot" style={{ background: syncDot }} title={syncText} role="img" aria-label={syncText} />

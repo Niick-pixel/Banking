@@ -7,7 +7,8 @@ import { PageHeader } from '../ui/Sheet';
 import { APP_VERSION, chooseFolder, hasSavedFolderNeedingPermission, openDataFolder, reconnectFolder, suggestedFolder, useSync } from '../sync';
 import { isTauri, supportsFolderAccess } from '../sync/backends';
 import { checkForUpdate, type UpdateInfo } from '../sync/updater';
-import { PALETTES, useTheme, type Appearance, type DarkPalette, type LightPalette } from '../app/theme';
+import { PALETTES, useTheme, type Appearance } from '../app/theme';
+import { SPRING, enterExit } from '../design/motion';
 import { useHealth, useLedger } from '../app/data';
 import { backupFileText, backupIsEncrypted, restoreFromFileText } from '../sync/backup';
 import { EncryptionPanel } from './EncryptionPanel';
@@ -105,12 +106,15 @@ function NumberField({ value, onSave, label, min, max, step = 1, suffix }: { val
 function AppearancePanel() {
   const { appearance: a, set, resolved } = useTheme();
   const card = (p: (typeof PALETTES)[number]) => {
-    const selected = p.mode === 'light' ? a.light === p.id : a.dark === p.id;
+    const selected = a.palette === p.id;
+    const sw = resolved === 'dark' ? p.dark : p.light;
     return (
-      <button key={p.id} type="button" className={`theme-card ${selected ? 'selected' : ''}`} aria-pressed={selected}
-        onClick={() => set(p.mode === 'light' ? { light: p.id as LightPalette, ...(a.mode === 'dark' ? { mode: 'light' } : {}) } : { dark: p.id as DarkPalette, ...(a.mode === 'light' ? { mode: 'dark' } : {}) })}>
-        <span className="theme-preview" style={{ background: `radial-gradient(60% 80% at 20% 20%, ${p.swatch[1]}, transparent), radial-gradient(50% 70% at 85% 30%, ${p.swatch[2]}, transparent), radial-gradient(60% 70% at 50% 100%, ${p.swatch[3]}, transparent), ${p.swatch[0]}` }}>
-          <span className="theme-preview-glass" data-mode={p.mode} />
+      <button key={p.id} type="button" className={`theme-card ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={() => set({ palette: p.id })}>
+        <span className="theme-preview" style={{ background: sw[0] }}>
+          <span className="theme-preview-glass" style={{ background: sw[1], borderColor: `${sw[3]}22` }}>
+            <span style={{ display: 'block', margin: '10px 10px 6px', height: 6, width: '55%', borderRadius: 3, background: sw[3], opacity: .8 }} />
+            <span style={{ display: 'block', margin: '0 10px', height: 14, width: '38%', borderRadius: 7, background: sw[2] }} />
+          </span>
         </span>
         <span className="theme-name">{p.name}{selected && <Pill tone="income">In use</Pill>}</span>
         <span className="small muted">{p.blurb}</span>
@@ -119,14 +123,11 @@ function AppearancePanel() {
   };
   return (
     <>
-      <Section title="Mode" sub={a.mode === 'auto' ? `Following Windows, now ${resolved}. Each mode keeps its own theme.` : 'Each mode keeps its own theme, so switching back and forth is one click.'}>
+      <Section title="Mode" sub={a.mode === 'auto' ? `Following Windows, now ${resolved}. Every theme has a light and a dark side.` : 'Every theme has a light and a dark side.'}>
         <Segmented<Appearance['mode']> label="Mode" value={a.mode} onChange={(mode) => set({ mode })} options={[{ value: 'auto', label: 'Match Windows' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
       </Section>
-      <Section title="Light themes">
-        <div className="theme-grid">{PALETTES.filter((p) => p.mode === 'light').map(card)}</div>
-      </Section>
-      <Section title="Dark themes">
-        <div className="theme-grid">{PALETTES.filter((p) => p.mode === 'dark').map(card)}</div>
+      <Section title="Theme">
+        <div className="theme-grid">{PALETTES.map(card)}</div>
       </Section>
       <Section title="Layout">
         <Row label="Content width" hint="Full uses the whole screen; Centered keeps lines short on very wide monitors.">
@@ -484,7 +485,6 @@ function HelpPanel() {
 export default function Settings() {
   const loc = useLocation();
   const nav = useNavigate();
-  const { dur } = useTheme();
   const cats = CATS.filter((c) => !c.desktopOnly || isTauri());
   const fromUrl = new URLSearchParams(loc.search).get('c') as CatId | null;
   const lastCat = readPersisted<CatId>('settings.cat', 'appearance');
@@ -501,27 +501,27 @@ export default function Settings() {
   }
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Settings" sub={`Aufwind ${APP_VERSION}${isTauri() ? ' · Windows app' : ' · web'}`} />
-      <div className="settings-layout">
-        <nav className="glass settings-cats" aria-label="Settings categories">
+      <div className="settings-layout fill">
+        <nav className="glass settings-cats scroll-box" aria-label="Settings categories">
           {cats.map((c) => {
             const Icon = c.icon;
             const active = c.id === cat;
             return (
               <button key={c.id} type="button" className={`settings-cat ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => { setMsg(''); nav(`/settings?c=${c.id}`, { replace: true }); }}>
-                {active && <motion.span layoutId="settings-cat-pill" className="settings-cat-pill" transition={{ type: 'spring', stiffness: 380, damping: 34, duration: dur(0.5) }} />}
-                <Icon size={18} aria-hidden style={{ position: 'relative' }} />
+                {active && <motion.span layoutId="settings-cat-pill" className="settings-cat-pill" transition={SPRING.snappy} />}
+                <Icon size={16} aria-hidden style={{ position: 'relative' }} />
                 <span style={{ position: 'relative', display: 'grid' }}>{c.label}<small className="muted">{c.blurb}</small></span>
               </button>
             );
           })}
         </nav>
-        <div style={{ minWidth: 0 }}>
-          {msg && <Glass strong pad={14} style={{ marginBottom: 16 }} role="status">{msg}</Glass>}
+        <div className="scroll-box" style={{ minWidth: 0, height: '100%', paddingRight: 4 }} tabIndex={0} aria-label={current.label}>
+          {msg && <Glass strong pad={12} style={{ marginBottom: 12 }} role="status">{msg}</Glass>}
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={cat} className="settings-panel stagger" aria-label={current.label}
-              initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0, transition: { duration: dur(0.45), ease: [0.2, 0.8, 0.2, 1] } }} exit={{ opacity: 0, x: -10, transition: { duration: dur(0.2) } }}>
+            <motion.div key={cat} className="settings-panel" aria-label={current.label}
+              {...enterExit('base')}>
               {cat === 'appearance' && <AppearancePanel />}
               {cat === 'dashboard' && <DashboardPanel />}
               {cat === 'coach' && <CoachPanel />}
@@ -537,6 +537,6 @@ export default function Settings() {
           </AnimatePresence>
         </div>
       </div>
-    </>
+    </div>
   );
 }

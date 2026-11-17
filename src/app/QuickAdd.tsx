@@ -7,6 +7,7 @@ import { rateForDay } from './fx';
 import { crossesSavings, savingsCategoryFor } from '../domain/fundmoves';
 import { useCoach } from './coach';
 import { ChipGroup } from '../design/components/ChipGroup';
+import { InfoTip } from '../design/components/InfoTip';
 import { hoursOfWork } from '../coach/forecast';
 import { guessCategory } from '../coach/autocat';
 import type { RateSource } from '../fx/rates';
@@ -39,8 +40,8 @@ export function places(l: Ledger) {
 }
 
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ open: boolean; edit?: Transaction }>({ open: false });
-  const open = useCallback((tx?: Transaction) => setState({ open: true, edit: tx }), []);
+  const [state, setState] = useState<{ open: boolean; edit?: Transaction; n: number }>({ open: false, n: 0 });
+  const open = useCallback((tx?: Transaction) => setState((x) => ({ open: true, edit: tx, n: x.n + 1 })), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -53,17 +54,15 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   return (
     <QuickAddCtx.Provider value={{ open }}>
       {children}
-      <Sheet open={state.open} onClose={() => setState({ open: false })} title={state.edit ? 'Edit movement' : 'Quick add'}>
-        {state.open && <QuickAddForm edit={state.edit} onDone={() => setState({ open: false })} />}
-      </Sheet>
+      <QuickAddForm key={state.n} open={state.open} edit={state.edit} onDone={() => setState((x) => ({ ...x, open: false }))} />
     </QuickAddCtx.Provider>
   );
 }
 
-function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void }) {
+function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transaction; onDone: () => void }) {
   const l = useLedger();
   const plc = useMemo(() => places(l), [l]);
-  const spending = plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
+  const spending = plc.find((p) => !p.savings && l.account.get(p.key.split('|')[0]!)?.type === 'checking')?.key ?? plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
   const firstSavings = plc.find((p) => p.savings)?.key ?? '';
 
   const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : 'expense';
@@ -77,6 +76,7 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
   const [to, setTo] = useState(edit && 'to' in edit ? sideKey(edit.to) : firstSavings);
   const [debtId, setDebtId] = useState(edit?.kind === 'debt_payment' ? edit.debtId : l.debts.find((d) => d.status === 'active')?.id ?? '');
   const [error, setError] = useState('');
+  const [flash, setFlash] = useState(false);
   const [toast, setToast] = useState<{ msg: string; auditId?: number } | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const coach = useCoach();
@@ -188,140 +188,179 @@ function QuickAddForm({ edit, onDone }: { edit?: Transaction; onDone: () => void
     } else onDone();
   }
 
-  const placeSelect = (id: string, label: string, value: string, set: (v: string) => void, filter?: (p: (typeof plc)[number]) => boolean) => (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <select id={id} className="input" value={value} onChange={(e) => set(e.target.value)}>
-        {plc.filter(filter ?? (() => true)).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-      </select>
+  // What's still unanswered, in the order you'd answer it.
+  const needsCategory = kind !== 'transfer' && !(kind === 'expense');
+  const missing = [
+    !amount ? (usdMode ? 'amount in dollars' : 'amount') : null,
+    usdMode && !rate ? 'rate' : null,
+    kind !== 'transfer' && !categoryId && (needsCategory || kind === 'expense') ? 'category' : null,
+    kind === 'debt_payment' && !debtId ? 'debt' : null,
+    (kind === 'transfer' || kind === 'savings') && (!to || to === from) ? 'where it goes' : null,
+  ].filter(Boolean) as string[];
+  const tryCommit = (again: boolean) => {
+    if (missing.length) { setFlash(true); setTimeout(() => setFlash(false), 1900); setError(''); }
+    void submit(again);
+  };
+  const dirty = !!(amountRaw || usdRaw || description || (categoryId && !edit));
+  const dayChip = (n: number) => { const d = new Date(Date.parse(`${todayISO()}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10); return d; };
+  const dateChoice = date === dayChip(0) ? 'today' : date === dayChip(1) ? 'yesterday' : date === dayChip(2) ? 'two' : 'other';
+  const accounts = plc.filter((p) => !p.key.split('|')[1]);
+  const placeLabel = (p: (typeof plc)[number]) => p.label.replace(/\s*\((checking|savings)\)/i, '');
+  const ORDER = ['Income', 'Fixed', 'Living', 'Discretionary', 'Debt Service', 'Savings'];
+  const groups = [...new Set(cats.map((c) => c.group))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  const similar = description.trim().length >= 3 ? l.transactions.filter((t) => t.kind === kind && t.description.toLowerCase().includes(description.trim().toLowerCase()) && t.id !== edit?.id) : [];
+  const simAvg = similar.length ? Math.round(similar.reduce((s0, t) => s0 + ('amount' in t ? t.amount : 0), 0) / similar.length) : 0;
+  const KINDS: { value: Kind; label: string; tone: 'loss' | 'win' | 'save' | 'accent' | 'amber' }[] = [
+    { value: 'expense', label: 'Expense', tone: 'loss' }, { value: 'income', label: 'Income', tone: 'win' }, { value: 'savings', label: 'Savings', tone: 'save' },
+    { value: 'transfer', label: 'Transfer', tone: 'accent' }, { value: 'debt_payment', label: 'Debt payment', tone: 'amber' },
+  ];
+  const kindLabel = KINDS.find((k) => k.value === kind)!.label;
+
+  const strip = l.accounts.length ? (
+    <div className="qa-strip">
+      <ChipGroup<string> inline size="sm" label={kind === 'income' ? 'Into' : 'From'}
+        info={kind === 'income' ? 'The account the money landed in.' : 'Where the money came out of. Funds inside an account are offered in the right column for savings and transfers.'}
+        value={`${from.split('|')[0]}|`} onChange={(v) => v && setFrom(v)}
+        options={accounts.map((p) => ({ value: p.key, label: placeLabel(p) }))} />
+      <ChipGroup<string> inline size="sm" compact label="Date" value={dateChoice} onChange={(v) => { if (v === 'today') setDate(dayChip(0)); else if (v === 'yesterday') setDate(dayChip(1)); else if (v === 'two') setDate(dayChip(2)); }}
+        options={[{ value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'two', label: '2 days ago' }, ...(dateChoice === 'other' ? [{ value: 'other', label: date.split('-').reverse().join('/') }] : [])]} />
+      <input className="input qa-date" type="date" aria-label="Another date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
     </div>
+  ) : undefined;
+
+  const footer = (
+    <>
+      <span className={`status ${missing.length ? 'todo' : ''}`} role="status">
+        {error ? <span style={{ color: 'var(--expense)' }}>{error}</span>
+          : missing.length ? <>Still to tap: {missing.slice(0, 3).join(', ')}{missing.length > 3 ? `, +${missing.length - 3}` : ''}.</>
+          : <>Ready: {kindLabel.toLowerCase()} of {formatMoney(amount!, 'CRC')}{categoryId ? ` · ${l.category.get(categoryId)?.name}` : ''}.</>}
+      </span>
+      {!edit && <button type="button" className="btn" onClick={() => tryCommit(true)}>Save & add another <kbd>⇧↵</kbd></button>}
+      <button type="button" className="btn btn-primary" onClick={() => tryCommit(false)}>{edit ? 'Save changes' : 'Save'} <kbd style={{ color: 'inherit', borderColor: 'currentColor', background: 'transparent', opacity: .8 }}>↵</kbd></button>
+    </>
   );
 
-  if (!l.accounts.length) return <p className="muted">Add an account or import your workbook first.</p>;
-
   return (
-    <form onSubmit={(e) => { e.preventDefault(); void submit(false); }} style={{ display: 'grid', gap: 14 }}>
-      <ChipGroup<Kind> label="Kind" required value={kind} onChange={(v) => v && setKind(v)} options={[
-        { value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }, { value: 'savings', label: 'Savings' },
-        { value: 'transfer', label: 'Transfer' }, { value: 'debt_payment', label: 'Debt' },
-      ]} />
-      {usdMode ? (
-        <div className="field">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
-            <label htmlFor="qa-amount">Amount in dollars</label>
-            <CurrencySwitch value={cur} onChange={setCur} />
+    <Sheet open={open} onClose={onDone} wide dirty={dirty} title={edit ? 'Edit movement' : 'Add a movement'} caption={kindLabel}
+      actions={<span className="small faint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><kbd>Tab</kbd> next <kbd>1–9</kbd> pick <kbd>Esc</kbd> close</span>}
+      strip={strip} footer={footer}>
+      {!l.accounts.length ? <p className="muted">Add an account or import your workbook first.</p> : (
+      <form className="qa-grid" onSubmit={(e) => { e.preventDefault(); tryCommit(false); }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          if (e.shiftKey && !edit) { e.preventDefault(); tryCommit(true); return; }
+          // Enter confirms from anywhere (Space toggles a chip).
+          if ((e.target as HTMLElement).tagName === 'BUTTON') { e.preventDefault(); tryCommit(false); }
+        }}>
+        {/* Column 1: what and how much */}
+        <div className="qa-col">
+          <ChipGroup<Kind> label="Kind" value={kind} onChange={(v) => v && setKind(v)} options={KINDS} info="Expense: money spent. Income: money in. Savings: into or out of savings. Transfer: between your own accounts, not counted. Debt payment: lowers a loan." />
+          {kind === 'savings' && <ChipGroup<'deposit' | 'withdrawal'> label="Direction" compact value={direction} onChange={(v) => v && setDirection(v)} options={[{ value: 'deposit', label: 'Put in', tone: 'win' }, { value: 'withdrawal', label: 'Take out', tone: 'loss' }]} />}
+          <div className={`field ${flash && !amount ? 'missing-flash' : ''}`}>
+            <label htmlFor="qa-amount">{usdMode ? 'Amount in dollars' : 'Amount'} {!amount && <span className="req">required</span>}<InfoTip text="Type the amount. Shortcuts work: 70k is 70,000 and 1.5m is 1,500,000." />
+              {kind === 'expense' && <span style={{ marginLeft: 'auto' }}><CurrencySwitch value={cur} onChange={setCur} /></span>}</label>
+            {usdMode ? (
+              <input id="qa-amount" ref={amountRef} data-autofocus className="input input-amount" inputMode="decimal" autoComplete="off" placeholder="19.99"
+                value={usdRaw} onChange={(e) => setUsdRaw(e.target.value)} aria-invalid={!!usdRaw && !usd} />
+            ) : (
+              <input id="qa-amount" ref={amountRef} data-autofocus className="input input-amount" inputMode="decimal" autoComplete="off" placeholder="12,500 or 70k"
+                value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} aria-invalid={!!amountRaw && !amount} aria-describedby="qa-amt-hint" />
+            )}
+            <span id="qa-amt-hint" className="small" style={{ color: (usdMode ? usdRaw && !usd : amountRaw && !amount) ? 'var(--expense)' : 'var(--text-faint)' }}>
+              {usdMode ? (converted ? <>= {formatMoney(converted, 'CRC', { decimals: 2 })} <span className="derived">· derived</span></> : 'In dollars, e.g. 19.99')
+                : amount ? formatMoney(amount as Minor, 'CRC', { decimals: amount % 100 ? 2 : 0 }) : amountRaw ? 'Can’t read that amount' : 'In colones'}
+            </span>
           </div>
-          <input id="qa-amount" ref={amountRef} data-autofocus className="input input-amount" inputMode="decimal" autoComplete="off" placeholder="$0.00"
-            value={usdRaw} onChange={(e) => setUsdRaw(e.target.value)} aria-invalid={!!usdRaw && !usd} />
-          <div className="fx-calc" aria-live="polite">
-            <div className="field" style={{ margin: 0 }}>
-              <label htmlFor="qa-fx-date">Date of the purchase</label>
-              <input id="qa-fx-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </div>
-            <div className="field" style={{ margin: 0 }}>
-              <label htmlFor="qa-rate">Rate (₡ per $1)</label>
-              <input id="qa-rate" className="input" inputMode="decimal" value={rateRaw} placeholder={rateState === 'loading' ? 'Getting the rate…' : 'e.g. 506.43'}
+          {usdMode && (
+            <div className={`field ${flash && !rate ? 'missing-flash' : ''}`}>
+              <label htmlFor="qa-rate">Rate, ₡ per $1 <InfoTip text="The exchange rate of the purchase day, from BCCR or the market (Settings → Exchange rates). Type the one on your statement to override it." /></label>
+              <input id="qa-rate" className="input" inputMode="decimal" value={rateRaw} placeholder={rateState === 'loading' ? 'Getting the rate…' : '506.43'}
                 onChange={(e) => { setRateRaw(e.target.value); setRateState('idle'); setQuote({ source: 'manual', rateDate: date, side: quote?.side ?? 'sell' }); }} />
+              <span className="small faint">{rateState === 'loading' ? 'Getting the rate for that day…' : rateState === 'none' && !rateRaw ? 'No rate offline: type it from your statement.'
+                : quote ? (quote.source === 'manual' ? 'Typed by you' : <span className="guess">{quote.source === 'BCCR' ? `BCCR ${quote.side}` : 'Market'} rate of {quote.rateDate.split('-').reverse().join('/')} · a guess until your statement</span>) : ''}</span>
             </div>
-            <div className="fx-result">
-              <span className="small muted">In colones</span>
-              <b className="money" style={{ fontSize: 22 }}>{converted ? formatMoney(converted, 'CRC', { decimals: 2 }) : '—'}</b>
-              <span className="small muted">{rateState === 'loading' ? 'Getting the rate for that day…'
-                : rateState === 'none' && (!quote || quote.source === 'manual') && !rateRaw ? 'No rate available offline: type it from your statement.'
-                : quote ? `${quote.source === 'BCCR' ? `BCCR ${quote.side === 'buy' ? 'buy' : 'sell'} rate` : quote.source === 'market' ? 'Market rate' : 'Your rate'}${quote.source !== 'manual' ? ` of ${quote.rateDate.split('-').reverse().join('/')}` : ''}` : ''}</span>
-            </div>
+          )}
+          <div className="field">
+            <label htmlFor="qa-desc">Description <InfoTip text="A few words to recognise it later, like the shop. It also teaches the app which category to suggest." /></label>
+            <input id="qa-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Walmart, Uber, rent…" />
+          </div>
+          <div className="qa-context group">
+            <span className="label">Context</span>
+            {similar.length ? <span className="small">“{description.trim()}” before: <b>{similar.length}</b> time{similar.length > 1 ? 's' : ''} · avg {formatMoney(simAvg, 'CRC')} · last {similar[0]!.date.split('-').reverse().join('/')} <span className="n">n {similar.length}</span></span>
+              : <span className="small faint">Type a description to see how often you've logged it.</span>}
+            {(() => {
+              const c = l.category.get(categoryId);
+              const run = coach?.run;
+              if (kind !== 'expense' || !amount || !run || !c || amount < run.ctx.prefs.hoursNoteMin) return null;
+              const h = hoursOfWork(run.ctx, amount);
+              const cap = coach.state.caps.find((x) => x.categoryId === categoryId && x.month === date.slice(0, 7));
+              return <span className="small">≈ {h.toFixed(1)} hours of work <span className="derived">· derived</span>{cap ? ` · your cap ${formatMoney(cap.dailyCap as Minor, 'CRC', { decimals: 0 })}/day` : ''}</span>;
+            })()}
           </div>
         </div>
-      ) : (
-        <div className="field">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
-            <label htmlFor="qa-amount">Amount</label>
-            {kind === 'expense' && <CurrencySwitch value={cur} onChange={setCur} />}
-          </div>
-          <input id="qa-amount" ref={amountRef} data-autofocus className="input input-amount" inputMode="decimal" autoComplete="off" placeholder="₡0"
-            value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} aria-invalid={!!amountRaw && !amount} aria-describedby="qa-amt-hint" />
-          <span id="qa-amt-hint" className="small" style={{ color: amountRaw && !amount ? 'var(--expense)' : 'var(--text-2)' }}>
-            {amount ? formatMoney(amount as Minor, 'CRC', { decimals: amount % 100 ? 2 : 0 }) : amountRaw ? 'Can’t read that amount' : 'Try 70k, 1.5m, 12,500'}
-          </span>
-        </div>
-      )}
-      <div className="field">
-        <label htmlFor="qa-desc">Description</label>
-        <input id="qa-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Walmart, Uber, rent…" />
-      </div>
-      {kind === 'savings' && (
-        <Segmented label="Direction" value={direction} onChange={setDirection} options={[{ value: 'deposit', label: 'Put money in' }, { value: 'withdrawal', label: 'Take money out' }]} />
-      )}
-      {kind !== 'transfer' && (
-        <div className="field">
-          <label htmlFor="qa-cat">Category</label>
-          {suggested.length > 0 && (
-            <div className="chips" aria-label="Suggested categories">
-              {suggested.map((id) => (
-                <button type="button" key={id} className="chip" aria-pressed={categoryId === id} onClick={() => setCategoryId(id)}>{l.category.get(id)?.name}</button>
+
+        {/* Column 2: category */}
+        <div className={`qa-col qa-cats ${flash && !categoryId && kind !== 'transfer' ? 'missing-flash' : ''}`}>
+          {kind === 'transfer' ? (
+            <div className="qa-note group"><span className="label">Category · derived</span><span className="small">Transfers between your own accounts are neither income nor spending, so they have no category.</span>
+              {crosses && <><span className="small">{crosses === 'deposit' ? 'This one puts spending money into savings, so it would be missing from your budget.' : 'This one takes money out of savings, so it would be missing from your budget.'}</span><button type="button" className="btn btn-sm" style={{ justifySelf: 'start' }} onClick={recordAsSavings}>Record as savings</button></>}
+            </div>
+          ) : (<>
+            <div className="chipgroup-head">
+              <span className="chipgroup-label">Category</span>
+              {!categoryId && <span className="req">required</span>}
+              <InfoTip text="What it was for. The first row is what you usually pick for this description; tap any other below." />
+              {guess && guess.mode !== 'ask' && cats.some((c) => c.id === guess.categoryId) && <span className="chipgroup-aside guess">{guess.mode === 'auto' && categoryId === guess.categoryId ? 'picked for you' : 'suggested'} · {Math.round(guess.confidence * 100)}% · n {guess.similar}</span>}
+            </div>
+            <div className="qa-cat-box scroll-box">
+              {suggested.length > 0 && <ChipGroup<string> size="sm" label="Usually" value={categoryId || null} onChange={(v) => { setCategoryId(v ?? ''); setAutoPicked(false); }} allowNone
+                options={suggested.map((id) => ({ value: id, label: l.category.get(id)?.name ?? '' }))} />}
+              {groups.map((g) => (
+                <ChipGroup<string> key={g} size="sm" label={g === 'Debt Service' ? 'Debt payments' : g} value={categoryId || null} onChange={(v) => { setCategoryId(v ?? ''); setAutoPicked(false); }} allowNone
+                  options={cats.filter((c) => c.group === g).map((c) => ({ value: c.id, label: c.name }))} />
               ))}
             </div>
+          </>)}
+        </div>
+
+        {/* Column 3: where it goes */}
+        <div className="qa-col">
+          {(kind === 'transfer' || kind === 'savings' || kind === 'debt_payment') && l.pots.some((p) => p.accountId === from.split('|')[0]) && (
+            <ChipGroup<string> size="sm" label="From fund" info="Which part of the account the money comes from. Unassigned is the part not set aside in any fund."
+              value={from} onChange={(v) => v && setFrom(v)}
+              options={[{ value: `${from.split('|')[0]}|`, label: 'Unassigned' }, ...l.pots.filter((p) => p.accountId === from.split('|')[0] && !p.archived).map((p) => ({ value: `${p.accountId}|${p.id}`, label: p.name }))]} />
           )}
-          {guess && guess.mode !== 'ask' && cats.some((c) => c.id === guess.categoryId) && (
-            <span className="small muted">{guess.mode === 'auto' && categoryId === guess.categoryId ? 'Picked for you' : `Suggested (${Math.round(guess.confidence * 100)}% sure)`}: {l.category.get(guess.categoryId)?.name}, learned from {guess.similar} similar transaction{guess.similar > 1 ? 's' : ''}{guess.mode === 'suggest' && categoryId !== guess.categoryId ? <> · <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCategoryId(guess.categoryId)}>Use it</button></> : null}</span>
+          {(kind === 'transfer' || kind === 'savings') && (
+            <ChipGroup<string> size="sm" label={kind === 'savings' && direction === 'withdrawal' ? 'Back into' : 'To'} value={to || null} onChange={(v) => v && setTo(v)} flash={flash}
+              required info="Where the money went. Funds (Mine, Hers…) are parts of an account." hiddenNote={from ? 'the account it comes from is not offered' : undefined}
+              options={plc.map((p) => ({ value: p.key, label: placeLabel(p), hidden: p.key === from }))} />
           )}
-          <select id="qa-cat" className="input" value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setAutoPicked(false); }}>
-            <option value="">Choose…</option>
-            {[...new Set(cats.map((c) => c.group))].map((g) => (
-              <optgroup key={g} label={g}>{cats.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
-            ))}
-          </select>
+          {kind === 'debt_payment' && (
+            <ChipGroup<string> size="sm" label="Debt" required value={debtId || null} onChange={(v) => setDebtId(v ?? '')} flash={flash}
+              info="Paying from a fund (e.g. Hers) takes it out of the fund and lowers the debt in one step, counted once."
+              options={l.debts.filter((d) => d.status !== 'paid').map((d) => ({ value: d.id, label: d.creditor }))} hiddenNote={l.debts.some((d) => d.status === 'paid') ? 'paid-off debts are not offered' : undefined} />
+          )}
+          {(kind === 'expense' || kind === 'income') && (
+            <div className="qa-note group">
+              <span className="label">{kind === 'income' ? 'Into' : 'Paid from'} · from the strip</span>
+              <span className="small">{plc.find((p) => p.key === from)?.label ?? '—'}</span>
+              <span className="small faint">Change it in the row above. Card purchases: pick the card, so its balance stays right.</span>
+            </div>
+          )}
+          <div className="qa-summary group fill">
+            <span className="label">This movement</span>
+            <span className="qa-big money" style={{ color: kind === 'income' ? 'var(--income)' : kind === 'expense' ? 'var(--expense)' : kind === 'savings' ? 'var(--savings)' : kind === 'debt_payment' ? 'var(--debt)' : 'var(--text)' }}>{amount ? formatMoney(amount, 'CRC') : '₡—'}</span>
+            <span className="small faint">{kindLabel} · {date.split('-').reverse().join('/')} · {plc.find((p) => p.key === from)?.label ?? '—'}{(kind === 'transfer' || kind === 'savings') && to ? ` → ${plc.find((p) => p.key === to)?.label}` : ''}</span>
+            <span className="small faint">{categoryId ? l.category.get(categoryId)?.name : kind === 'transfer' ? 'No category · derived' : 'No category yet'}</span>
+          </div>
         </div>
-      )}
-      {(() => {
-        const c = l.category.get(categoryId);
-        const run = coach?.run;
-        if (kind !== 'expense' || !amount || !run || !c || !(c.group === 'Discretionary' || c.discretionary || c.group === 'Living') || amount < run.ctx.prefs.hoursNoteMin) return null;
-        const h = hoursOfWork(run.ctx, amount);
-        const cap = coach.state.caps.find((x) => x.categoryId === categoryId && x.month === date.slice(0, 7));
-        return <p className="small muted" style={{ margin: '-6px 0 0' }}>≈ {h.toFixed(1)} hours of work{cap ? ` · cap ${formatMoney(cap.dailyCap as Minor, 'CRC', { decimals: 0 })}/day` : ''}{amount >= run.ctx.prefs.coolingMin && (c.group === 'Discretionary' || c.discretionary) ? <> · not sure? <a href="/coach/wants" onClick={(e) => { e.preventDefault(); void coach.addWant({ name: description || c.name, amount, categoryId }).then(onDone); }}>add it to your cooling-off list</a></> : null}</p>;
-      })()}
-      {kind === 'debt_payment' && (
-        <div className="field">
-          <label htmlFor="qa-debt">Debt</label>
-          <select id="qa-debt" className="input" value={debtId} onChange={(e) => setDebtId(e.target.value)}>
-            <option value="">Choose…</option>
-            {l.debts.filter((d) => d.status !== 'paid').map((d) => <option key={d.id} value={d.id}>{d.creditor}</option>)}
-          </select>
-          <span className="small muted">Paying from a fund (e.g. Hers) takes it out of the fund and lowers the debt in one step. It's counted once.</span>
-        </div>
-      )}
-      <div className="grid2">
-        {kind === 'income' ? placeSelect('qa-to', 'Into', from, setFrom)
-          : placeSelect('qa-from', kind === 'savings' && direction === 'withdrawal' ? 'Take from' : 'From', from, setFrom)}
-        {(kind === 'transfer' || kind === 'savings') ? placeSelect('qa-to2', 'To', to, setTo) : usdMode ? <div /> : (
-          <div className="field"><label htmlFor="qa-date">Date</label><input id="qa-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
-        )}
-      </div>
-      {(kind === 'transfer' || kind === 'savings') && (
-        <div className="field"><label htmlFor="qa-date2">Date</label><input id="qa-date2" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
-      )}
-      {crosses && (
-        <div className="hint-row" role="note">
-          <span className="small">{crosses === 'deposit' ? 'This puts spending money into savings. As a transfer it won\'t show in your budget.' : 'This takes money out of savings. As a transfer it won\'t show in your budget.'}</span>
-          <button type="button" className="btn btn-sm" onClick={recordAsSavings}>Record as savings</button>
-        </div>
-      )}
-      {error && <p role="alert" style={{ color: 'var(--expense)', margin: 0, fontWeight: 600 }}>{error}</p>}
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        {!edit && <button type="button" className="btn" onClick={() => void submit(true)}>Save & add another</button>}
-        <button type="submit" className="btn btn-primary">Save</button>
-      </div>
-      {toast && <Toast message={toast.msg} action={toast.auditId ? 'Undo' : undefined} onAction={() => toast.auditId && void undoAudit(toast.auditId)} onDone={() => setToast(null)} />}
-    </form>
+        <button type="submit" hidden aria-hidden tabIndex={-1} />
+        {toast && <Toast message={toast.msg} action={toast.auditId ? 'Undo' : undefined} onAction={() => toast.auditId && void undoAudit(toast.auditId)} onDone={() => setToast(null)} />}
+      </form>)}
+    </Sheet>
   );
 }
 
 function CurrencySwitch({ value, onChange }: { value: 'CRC' | 'USD'; onChange: (v: 'CRC' | 'USD') => void }) {
-  return (
-    <div className="segmented segmented-sm" role="group" aria-label="Currency">
-      <button type="button" aria-pressed={value === 'CRC'} onClick={() => onChange('CRC')}>₡ Colones</button>
-      <button type="button" aria-pressed={value === 'USD'} onClick={() => onChange('USD')}>$ Dollars</button>
-    </div>
-  );
+  return <Segmented<'CRC' | 'USD'> label="Currency" value={value} onChange={onChange} options={[{ value: 'CRC', label: '₡' }, { value: 'USD', label: '$' }]} />;
 }

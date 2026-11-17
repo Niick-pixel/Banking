@@ -7,16 +7,18 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 export type ThemePref = 'auto' | 'light' | 'dark';
 export type TransparencyPref = 'auto' | 'frosted' | 'reduced';
-export type LightPalette = 'latte' | 'paper' | 'sage';
-export type DarkPalette = 'graphite' | 'espresso' | 'ocean';
+export type ThemeId = 'paper' | 'graphite' | 'sage' | 'terracotta' | 'ledger';
+/** @deprecated kept so older settings code compiles; every theme now has a light and a dark side. */
+export type LightPalette = ThemeId;
+export type DarkPalette = ThemeId;
 export type Density = 'comfortable' | 'compact';
 export type ContentWidth = 'full' | 'wide' | 'centered';
 export type MotionPref = 'smooth' | 'quick' | 'off';
 
 export interface Appearance {
   mode: ThemePref;
-  light: LightPalette;
-  dark: DarkPalette;
+  /** One theme, used in light and dark mode. */
+  palette: ThemeId;
   transparency: TransparencyPref;
   density: Density;
   width: ContentWidth;
@@ -25,16 +27,15 @@ export interface Appearance {
   motion: MotionPref;
 }
 
-export const PALETTES: { id: LightPalette | DarkPalette; mode: 'light' | 'dark'; name: string; blurb: string; swatch: string[] }[] = [
-  { id: 'latte', mode: 'light', name: 'Latte', blurb: 'Light brown: cream, sand and coffee', swatch: ['#eadccb', '#d9b99a', '#f1e2cf', '#8b5a36'] },
-  { id: 'paper', mode: 'light', name: 'Paper', blurb: 'Crisp white with slate blue', swatch: ['#edf0f4', '#dde5f0', '#ffffff', '#3a5a8c'] },
-  { id: 'sage', mode: 'light', name: 'Sage', blurb: 'Soft green-grey, calm and natural', swatch: ['#e3eae2', '#c6dac8', '#f1f4ea', '#2e6a4e'] },
-  { id: 'graphite', mode: 'dark', name: 'Graphite', blurb: 'Neutral charcoal with a cool blue accent', swatch: ['#121316', '#2b2f38', '#323745', '#8ab4ff'] },
-  { id: 'espresso', mode: 'dark', name: 'Espresso', blurb: 'Dark roast brown with caramel', swatch: ['#16100c', '#3b2718', '#4a3020', '#dba56c'] },
-  { id: 'ocean', mode: 'dark', name: 'Ocean', blurb: 'Deep teal night with aqua', swatch: ['#0a1417', '#0f3a40', '#12494a', '#4fd1c5'] },
+export const PALETTES: { id: ThemeId; name: string; blurb: string; light: string[]; dark: string[] }[] = [
+  { id: 'paper', name: 'Paper', blurb: 'Warm paper with amber ink', light: ['#e9e2d4', '#f6f1e6', '#8a5205', '#241b12'], dark: ['#131009', '#1d1811', '#e9a63f', '#f3e7d3'] },
+  { id: 'graphite', name: 'Graphite', blurb: 'Neutral grey, slate blue', light: ['#e3e3e0', '#f3f3f0', '#2e5496', '#1b1d20'], dark: ['#111214', '#1a1b1e', '#8cace8', '#ececea'] },
+  { id: 'sage', name: 'Sage', blurb: 'Soft green-grey', light: ['#e1e5da', '#f1f3ec', '#286442', '#1a231b'], dark: ['#0e120e', '#171c17', '#80c494', '#e6eee3'] },
+  { id: 'terracotta', name: 'Terracotta', blurb: 'Clay and cream', light: ['#ebddd2', '#f8ede5', '#9a3e20', '#2a1810'], dark: ['#150d09', '#20150f', '#ea8c68', '#f4e4d8'] },
+  { id: 'ledger', name: 'Ledger', blurb: 'Ink blue on grey paper', light: ['#e2e4df', '#f3f3ee', '#165476', '#142029'], dark: ['#0c1114', '#141b20', '#70b2d6', '#e3ecf1'] },
 ];
 
-const DEFAULTS: Appearance = { mode: 'auto', light: 'latte', dark: 'graphite', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth' };
+const DEFAULTS: Appearance = { mode: 'auto', palette: 'paper', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth' };
 const KEY = 'aufwind.appearance';
 
 function load(): Appearance {
@@ -43,10 +44,10 @@ function load(): Appearance {
     const legacyMode = localStorage.getItem('aufwind.theme') as ThemePref | null;
     const legacyTr = localStorage.getItem('aufwind.transparency') as TransparencyPref | null;
     const a: Appearance = { ...DEFAULTS, ...(legacyMode ? { mode: legacyMode } : {}), ...(legacyTr ? { transparency: legacyTr } : {}), ...(raw ? JSON.parse(raw) : {}) };
-    // v0.4 theme ids → their v0.5 counterparts.
-    const MAP: Record<string, LightPalette | DarkPalette> = { aurora: 'paper', dune: 'latte', glacier: 'sage', midnight: 'graphite', ember: 'espresso', updraft: 'ocean' };
-    if (MAP[a.light]) a.light = MAP[a.light] as LightPalette;
-    if (MAP[a.dark]) a.dark = MAP[a.dark] as DarkPalette;
+    // Older theme choices → the closest new theme.
+    const MAP: Record<string, ThemeId> = { latte: 'paper', dune: 'paper', aurora: 'graphite', paper: 'paper', glacier: 'sage', sage: 'sage', midnight: 'graphite', graphite: 'graphite', ember: 'terracotta', espresso: 'terracotta', updraft: 'ledger', ocean: 'ledger' };
+    const legacy = a as Appearance & { light?: string; dark?: string };
+    if (!PALETTES.some((p) => p.id === a.palette)) a.palette = MAP[(prefersDark() ? legacy.dark : legacy.light) ?? ''] ?? 'paper';
     return a;
   } catch { return DEFAULTS; }
 }
@@ -98,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const el = document.documentElement;
     el.setAttribute('data-theme', resolved);
-    el.setAttribute('data-palette', resolved === 'dark' ? a.dark : a.light);
+    el.setAttribute('data-palette', a.palette);
     el.setAttribute('data-density', a.density);
     el.setAttribute('data-width', a.width);
     el.setAttribute('data-motion', motion);
@@ -140,6 +141,6 @@ export function useCssVar(names: string[]): string[] {
     });
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved, appearance.light, appearance.dark, names.join()]);
+  }, [resolved, appearance.palette, names.join()]);
   return vals;
 }

@@ -50,7 +50,7 @@ export default function Accounts() {
   }
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Accounts" sub="Balances are derived from your movements. Statements are checked against them.">
         <button className="btn btn-primary" onClick={() => setEdit('new')}>+ Account</button>
       </PageHeader>
@@ -62,7 +62,7 @@ export default function Accounts() {
         </Glass>
       )}
 
-      <div style={{ display: 'grid', gap: 22 }}>
+      <div className="scroll-box fill" tabIndex={0} aria-label="List" style={{ display: 'grid', alignContent: 'start', paddingRight: 4, gap: 22 }}>
         {GROUPS.map(([g, types]) => {
           const accs = l.accounts.filter((a) => types.includes(a.type) && !a.archived);
           if (!accs.length) return null;
@@ -133,7 +133,7 @@ export default function Accounts() {
         {potFor && <PotForm account={potFor} onDone={() => setPotFor(null)} />}
       </Sheet>
       <p className="small muted" style={{ marginTop: 24 }}>Opening balance is the balance at the start of the opening date. Movements before that date don't change the balance but still count in monthly reports.</p>
-    </>
+    </div>
   );
 }
 

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useLedger } from '../app/data';
 import { useQuickAdd } from '../app/QuickAdd';
 import { Money, Pill } from '../design/components';
-import { Empty, PageHeader, Toast } from '../ui/Sheet';
+import { Empty, PageHeader, Sheet, Toast } from '../ui/Sheet';
 import { formatDateCR, monthKey } from '../lib/dates';
 import { deleteTransaction, lastAuditId, saveTransaction, undoAudit } from '../db/repo';
 import type { Transaction } from '../domain/schemas';
@@ -73,6 +73,7 @@ export default function Transactions() {
     );
   }
 
+  const [pick, setPick] = useState<'cat' | 'acc' | null>(null);
   const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   async function del(t: Transaction) {
@@ -125,7 +126,7 @@ export default function Transactions() {
   const placeName = (s: { accountId: string; potId?: string }) => `${l.account.get(s.accountId)?.name ?? '?'}${s.potId ? ` · ${l.pot.get(s.potId)?.name ?? ''}` : ''}`;
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Transactions" sub={`${filtered.length} of ${l.transactions.length} movements`}>
         <button className="btn btn-primary" onClick={() => qa.open()}>+ Add <kbd className="small" style={{ opacity: .7 }}>N</kbd></button>
       </PageHeader>
@@ -141,12 +142,11 @@ export default function Transactions() {
         </div>
       )}
 
-      <div className="glass tx-filters" style={{ padding: 16, display: 'grid', gap: 14, marginBottom: 16 }}>
+      <div className="glass tx-filters" style={{ padding: 12, display: 'grid', gap: 10, flex: 'none' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(200px, 1fr) auto', gap: 10, alignItems: 'center' }}>
           <input className="input" type="search" placeholder="Search description, notes, category…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="input" aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
-            <option value="">All categories</option>{l.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          {cat ? <button type="button" className="btn btn-sm" onClick={() => setCat('')} aria-label={`Showing only ${l.category.get(cat)?.name}; remove this filter`}>Category: {l.category.get(cat)?.name} ✕</button>
+            : <span className="small faint">Search also matches category names</span>}
           <button className="btn btn-ghost btn-sm" disabled={!q && !kinds.length && !accs.length && !groups.length && !cat} onClick={() => { setQ(''); setKinds([]); setAccs([]); setGroups([]); setCat(''); }}>Clear filters</button>
         </div>
         <div className="tx-chip-row">
@@ -160,22 +160,18 @@ export default function Transactions() {
       </div>
 
       {selected.size > 0 && (
-        <div className="glass glass-strong" style={{ padding: 12, display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, position: 'sticky', top: 12, zIndex: 5, flexWrap: 'wrap' }}>
+        <div className="glass glass-strong" style={{ padding: 8, display: 'flex', gap: 8, alignItems: 'center', flex: 'none', flexWrap: 'wrap' }}>
           <b>{selected.size} selected</b>
           <span className="small muted">net <Money amount={selectedTotal} tone="auto" /></span>
-          <select className="input" style={{ maxWidth: 240, height: 38 }} aria-label="Change category of the selected movements" value="" onChange={(e) => e.target.value && void bulkRecategorize(e.target.value)}>
-            <option value="">Category…</option>{l.categories.filter((c) => !c.archived).map((c) => <option key={c.id} value={c.id}>{c.group} · {c.name}</option>)}
-          </select>
-          <select className="input" style={{ maxWidth: 220, height: 38 }} aria-label="Move the selected movements to another account" value="" onChange={(e) => e.target.value && void bulkAccount(e.target.value)}>
-            <option value="">Account…</option>{l.accounts.filter((a) => !a.archived).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          <button className="btn btn-sm" onClick={() => setPick('cat')}>Category…</button>
+          <button className="btn btn-sm" onClick={() => setPick('acc')}>Account…</button>
           <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>Date <input type="date" className="input" style={{ height: 38, width: 160 }} aria-label="Set the date of the selected movements" onChange={(e) => void bulkDate(e.target.value)} /></label>
           <button className="btn btn-sm" style={{ color: 'var(--expense)' }} onClick={() => void bulkDelete()}>Delete</button>
           <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelected(new Set())}>Clear selection</button>
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div className="scroll-box fill stack" tabIndex={0} aria-label="Movements by month">
         {months.map(([mk, txs]) => {
           const f = l.flows.get(mk);
           const open = !collapsed.has(mk);
@@ -187,7 +183,7 @@ export default function Transactions() {
               <button className="month-head" aria-expanded={open} onClick={() => toggleMonth(mk)}>
                 <span className="chev" aria-hidden>{open ? '▾' : '▸'}</span>
                 <span style={{ fontWeight: 700, fontSize: 17 }}>{monthLabel(mk)}</span>
-                <span className="muted small">{txs.length}</span>
+                <span className="n">n {txs.length}</span>
                 {f && (
                   <span className="month-totals">
                     <span>In <Money amount={f.income} tone="income" /></span>
@@ -231,7 +227,17 @@ export default function Transactions() {
           );
         })}
       </div>
+      <Sheet open={!!pick} onClose={() => setPick(null)} title={pick === 'cat' ? `Category for ${selected.size} movement(s)` : `Account for ${selected.size} movement(s)`} caption="Tap one to apply">
+        {pick === 'cat' && <div style={{ display: 'grid', gap: 10, maxHeight: '60vh' }} className="scroll-box">
+          {['Income', 'Fixed', 'Living', 'Discretionary', 'Debt Service', 'Savings'].map((g) => {
+            const cs = l.categories.filter((c) => c.group === g && !c.archived);
+            return cs.length ? <ChipGroup<string> key={g} size="sm" label={g} value={null} onChange={(v) => { if (v) { setPick(null); void bulkRecategorize(v); } }} options={cs.map((c) => ({ value: c.id, label: c.name }))} /> : null;
+          })}
+        </div>}
+        {pick === 'acc' && <ChipGroup<string> label="Account" info="Expenses and payments change where they came from; income changes where it landed. Transfers and savings are left as they are." value={null}
+          onChange={(v) => { if (v) { setPick(null); void bulkAccount(v); } }} options={l.accounts.filter((a) => !a.archived).map((a) => ({ value: a.id, label: a.name }))} />}
+      </Sheet>
       {toast && <Toast message={toast.msg} action={toast.undo ? 'Undo' : undefined} onAction={toast.undo} onDone={() => setToast(null)} />}
-    </>
+    </div>
   );
 }

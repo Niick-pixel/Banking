@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, Cell, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useHealth, useLedger } from '../app/data';
@@ -50,21 +50,6 @@ export default function Dashboard() {
   const nw = useMemo(() => netWorthSeries({ accounts: l.accounts, snapshots: l.snapshots, transactions: l.transactions, debts: l.debts, installments: l.installments }, Number(today.slice(0, 4)), today), [l, today]);
   const calendar = useCalendar(addDays(today, 0), addDays(today, 30));
   const pending = usePendingReminders();
-  // The dashboard fills the window exactly: no page scroll, everything sits in stacks.
-  const fitRef = useRef<HTMLDivElement>(null);
-  const [fitH, setFitH] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const measure = () => {
-      const el = fitRef.current;
-      if (!el) return;
-      if (window.innerWidth < 1100 || window.innerHeight < 640) { setFitH(null); return; }
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      setFitH(Math.max(420, window.innerHeight - top - 70)); // shell + content bottom padding
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  });
   const [inc, exp, axis, grid, c1] = useCssVar(['--chart-income', '--chart-expense', '--chart-axis', '--chart-grid', '--chart-1']);
 
   if (l.ready && !l.accounts.length) {
@@ -83,7 +68,7 @@ export default function Dashboard() {
   const flowData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, income: l.flows.get(m)!.income, expenses: l.flows.get(m)!.expenses }));
   const netData = months.map((m) => ({ month: MS[Number(m.slice(5)) - 1]!, net: l.flows.get(m)!.freeCash }));
   const groups = (['Fixed', 'Living', 'Discretionary', 'Debt Service'] as const).map((g, slot) => ({ name: g, slot, value: [...(f?.byCategory ?? [])].filter(([id]) => l.category.get(id)?.group === g).reduce((s, [, v]) => s + Math.max(0, v), 0) })).filter((x) => x.value > 0);
-  const ranking = [...(f?.byCategory ?? [])].map(([id, v]) => ({ c: l.category.get(id)!, v })).filter((x) => x.c && !['Income', 'Savings'].includes(x.c.group) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
+  const ranking = [...(f?.byCategory ?? [])].map(([id, v]) => ({ c: l.category.get(id)!, v })).filter((x) => x.c && !['Income', 'Savings'].includes(x.c.group) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 12);
   const maxRank = Math.max(1, ...ranking.map((x) => x.v));
   const budgetRows = tracker.sections.filter((s) => !['Income', 'Savings'].includes(s.group)).flatMap((s) => s.rows).map((r) => ({ r, b: budgetFor(l.budgets, r.category.id, mk), spent: r.months[month - 1]! })).filter((x) => x.b > 0 && x.spent > 0).map((x) => ({ ...x, pct: x.spent / x.b })).sort((a, b) => b.pct - a.pct).slice(0, 6);
 
@@ -95,12 +80,14 @@ export default function Dashboard() {
   const ef = current ? emergencyFund(current, l.accounts, l.pots, potBal, essentials) : null;
   const activeDebts = l.debts.filter((d) => d.status !== 'paid');
   const errors = health.filter((h) => h.level !== 'info').length;
+  const monthTx = l.transactions.filter((t) => t.date.startsWith(mk) && t.currency === 'CRC');
+  const nOf = (k: string) => monthTx.filter((t) => t.kind === k).length;
   const setup = useSetup();
   // Views you've hidden in Settings → Dashboard drop out of their stack.
   const views = (list: [string, string, () => React.ReactNode][]): DeckView[] => list.filter(([id]) => show(id)).map(([key, label, render]) => ({ key, label, render }));
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title={`${MN[month - 1]} ${year}`} sub={mk === today.slice(0, 7) ? `Month so far · ${formatDateCR(today)}` : 'Month at a glance'}>
         <button className="btn btn-sm" aria-label="Previous month" onClick={() => setMk(shift(mk, -1))}>‹</button>
         <button className="btn btn-sm" aria-label="Next month" disabled={mk >= today.slice(0, 7)} onClick={() => setMk(shift(mk, 1))}>›</button>
@@ -109,14 +96,14 @@ export default function Dashboard() {
       </PageHeader>
 
       <div className="kpis" data-tour="kpis">
-        <Kpi label="Income" value={f?.income ?? 0} tone="income" />
-        <Kpi label="Expenses" value={f?.expenses ?? 0} tone="expense" sub={f?.debtService ? `incl. ${formatMoney(f.debtService, 'CRC')} debt` : undefined} />
-        <Kpi label="Net" value={f?.net ?? 0} tone="auto" />
-        <Kpi label="Saved" value={f?.saved ?? 0} tone="savings" sub={f?.income ? <><b>{(sum.savingsRate * 100).toFixed(1)}%</b> of income · target {Math.round(target * 100)}%</> : undefined} />
-        <Kpi label="Free cash after saving" value={f?.freeCash ?? 0} tone="auto" />
+        <Kpi label="Income" value={f?.income ?? 0} tone="income" n={nOf('income')} />
+        <Kpi label="Expenses" value={f?.expenses ?? 0} tone="expense" n={nOf('expense') + nOf('debt_payment')} sub={f?.debtService ? `incl. ${formatMoney(f.debtService, 'CRC')} debt` : undefined} />
+        <Kpi label="Net" value={f?.net ?? 0} tone="auto" derived sub="income − expenses" />
+        <Kpi label="Saved" value={f?.saved ?? 0} tone="savings" n={nOf('savings')} sub={f?.income ? <>{(sum.savingsRate * 100).toFixed(1)}% of income · target {Math.round(target * 100)}%</> : undefined} />
+        <Kpi label="Free cash" value={f?.freeCash ?? 0} tone="auto" derived sub="net − saved" />
       </div>
 
-      <div ref={fitRef} className="dash-decks" style={fitH ? { height: fitH } : undefined}>
+      <div className="dash-decks">
         <Deck id="coach" label="Coach" className="d-coach" views={views([
           ...(setup.done < setup.total ? [['setup', 'Get set up', () => <SetupChecklist />] as [string, string, () => React.ReactNode]] : []),
           ['coach', 'Coach: top alerts', () => coach.run ? <CoachTop /> : <p className="muted">The Coach starts once you have accounts.</p>],
@@ -154,13 +141,14 @@ export default function Dashboard() {
 
         <Deck id="upcoming" label="Coming up" className="d-up" views={views([
           ['upcoming', 'Coming up (30 days)', () => (<div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-            <h2 className="card-h">Coming up</h2>
+            <h2 className="card-h">Coming up <span className="n">n {upcoming.length}</span></h2>
             {pending.length > 0 && <Link to="/bills" className="btn btn-sm" style={{ justifySelf: 'start' }}><Pill tone="debt">{pending.length}</Pill> to confirm</Link>}
             {upcoming.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled. <Link to="/bills">Add recurring items</Link>.</p> : (
               <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
-                {upcoming.slice(0, 12).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'grid', gap: 1, color: 'inherit', textDecoration: 'none' }}><span className="small muted">{formatDateCR(u.date).slice(0, 5)}</span><span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{u.label}</span>{u.amount !== undefined && <span className="money small">{formatMoney(u.amount, 'CRC')}</span>}</span></Link></li>)}
+                {upcoming.slice(0, 6).map((u, k) => <li key={k}><Link to={u.to} style={{ display: 'grid', gap: 1, color: 'inherit', textDecoration: 'none' }}><span className="small muted">{formatDateCR(u.date).slice(0, 5)}</span><span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{u.label}</span>{u.amount !== undefined && <span className="money small">{formatMoney(u.amount, 'CRC')}</span>}</span></Link></li>)}
               </ul>
             )}
+            <NextDays events={calendar} today={today} />
             <Link to="/bills" className="small">Calendar →</Link>
           </div>)],
           ['cards', 'Credit cards', () => <CardsWidget compact />],
@@ -221,7 +209,7 @@ export default function Dashboard() {
           </div>)],
         ])} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -230,14 +218,37 @@ const KPI_HELP: Record<string, string> = {
   Expenses: 'Everything you paid this month, including debt and card payments counted as spending. Moving money to savings is not an expense.',
   Net: 'Income minus expenses: what was left before saving.',
   Saved: 'Money you moved into savings this month, minus what you took out of savings.',
-  'Free cash after saving': 'Net minus saved. Negative means you spent or saved more than you earned this month, so it came from money you already had or from credit.',
+  'Free cash': 'Net minus saved. Negative means you spent or saved more than you earned this month, so it came from money you already had or from credit.',
 };
-function Kpi({ label, value, tone, sub }: { label: string; value: number; tone: 'income' | 'expense' | 'savings' | 'auto'; sub?: React.ReactNode }) {
+function Kpi({ label, value, tone, sub, n, derived }: { label: string; value: number; tone: 'income' | 'expense' | 'savings' | 'auto'; sub?: React.ReactNode; n?: number; derived?: boolean }) {
   return (
-    <Glass pad={16} style={{ display: 'grid', gap: 2 }}>
-      <span className="small muted">{label}{KPI_HELP[label] && <InfoTip text={KPI_HELP[label]!} label={`About ${label}`} />}</span>
-      <Money amount={value} size={24} weight={800} tone={tone} />
-      {sub && <span className="small muted">{sub}</span>}
+    <Glass pad={14} className="stat">
+      <span className="stat-label">{label}{derived && <span className="derived" style={{ textTransform: 'none', letterSpacing: 0 }}>· derived</span>}{KPI_HELP[label] && <InfoTip text={KPI_HELP[label]!} label={`About ${label}`} />}{n !== undefined && <span className="n" style={{ marginLeft: 'auto' }}>n {n}</span>}</span>
+      <Money amount={value} size={24} weight={650} tone={tone} />
+      {sub && <span className="stat-cap">{sub}</span>}
     </Glass>
+  );
+}
+
+/** The next 4 weeks as a small grid that takes the card's spare height: a dot per scheduled item. */
+function NextDays({ events, today }: { events: { date: string; tone: string; title: string; amount?: number; status: string }[]; today: string }) {
+  const days = Array.from({ length: 28 }, (_, i) => addDays(today, i));
+  const by = new Map<string, typeof events>();
+  for (const e of events) if (e.status !== 'posted' && e.status !== 'skipped') by.set(e.date, [...(by.get(e.date) ?? []), e]);
+  const tone = (t: string) => (t === 'income' ? 'var(--income)' : t === 'savings' ? 'var(--savings)' : t === 'info' ? 'var(--text-faint)' : 'var(--debt)');
+  return (
+    <div className="nextdays" role="img" aria-label={`Next 4 weeks: ${[...by.entries()].map(([d, es]) => `${d.slice(8)} ${es.map((e) => e.title).join(', ')}`).join('; ') || 'nothing scheduled'}`}>
+      {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="nd-dow">{d}</span>)}
+      {Array.from({ length: (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7 }, (_, i) => <span key={`x${i}`} />)}
+      {days.map((d) => {
+        const es = by.get(d) ?? [];
+        return (
+          <span key={d} className={`nd-day ${d === today ? 'today' : ''}`} title={es.map((e) => `${e.title}${e.amount ? ` ${formatMoney(e.amount, 'CRC')}` : ''}`).join('\n') || undefined}>
+            <span>{Number(d.slice(8))}</span>
+            <span className="nd-dots">{es.slice(0, 3).map((e, k) => <i key={k} style={{ background: tone(e.tone) }} />)}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }

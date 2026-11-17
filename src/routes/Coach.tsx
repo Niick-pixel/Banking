@@ -26,7 +26,7 @@ const crc = (n: number) => formatMoney(Math.round(n) as Minor, 'CRC', { decimals
 export const SEVERITY: Record<Severity, { label: string; color: string; Icon: typeof Info }> = {
   critical: { label: 'Critical', color: 'var(--expense)', Icon: AlertOctagon },
   warning: { label: 'Warning', color: 'var(--debt)', Icon: AlertTriangle },
-  heads_up: { label: 'Heads-up', color: 'var(--accent)', Icon: Lightbulb },
+  heads_up: { label: 'Heads-up', color: 'rgb(var(--accent))', Icon: Lightbulb },
   info: { label: 'Info', color: 'var(--text-3)', Icon: Info },
   win: { label: 'Win', color: 'var(--income)', Icon: Trophy },
 };
@@ -212,17 +212,19 @@ function Inbox() {
   const list = run.dispatch.inbox.filter((i) => !filter.length || filter.includes(i.severity));
   const counts = (Object.keys(SEVERITY) as Severity[]).map((s) => [s, run.dispatch.inbox.filter((i) => i.severity === s).length] as const);
   return (
-    <div className="coach-grid">
-      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+    <div className="coach-grid fill">
+      <div className="coach-main">
         <ChipGroup<Severity> multi label="Show" note="all when none picked" value={filter} onChange={setFilter}
           options={counts.filter(([, n]) => n).map(([s, n]) => ({ value: s, label: `${SEVERITY[s].label} ${n}` }))} aside={`${list.length} of ${run.dispatch.inbox.length}`} />
+        <div className="scroll-box fill stack" tabIndex={0} aria-label="Coach alerts">
         {list.length === 0 ? <Glass strong><p className="muted" style={{ margin: 0 }}>Nothing here. The Coach checks again every time you log something.</p></Glass>
           : <AnimatePresence>{list.map((i) => <InsightCard key={i.dedupeKey} i={i} />)}</AnimatePresence>}
         {run.dispatch.hidden > 0 && (
           <p className="small muted">{run.dispatch.hidden} dismissed or snoozed. <button className="btn btn-ghost btn-sm" onClick={() => void patchState({ dismissed: {}, snoozed: {} })}>Show them again</button></p>
         )}
+        </div>
       </div>
-      <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
+      <div className="scroll-box" style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
         <Glass strong><SafeToSpendCard /></Glass>
         <Glass strong style={{ display: 'grid', gap: 8 }}>
           <h2 className="card-h">Money not wasted</h2>
@@ -443,13 +445,13 @@ export default function Coach() {
   };
   const [t, sub] = titles[page] ?? titles['']!;
   return (
-    <>
+    <div className={page === '' ? 'fit' : undefined}>
       <PageHeader title={t} sub={sub}>{page === '' && <span className="small muted">Updated {todayISO() === coach.run?.ctx.today ? 'just now' : coach.run?.ctx.today}</span>}</PageHeader>
       {page === '' && <Inbox />}
       {page === 'forecast' && <ForecastPage />}
       {page === 'wants' && <WantsPage />}
       {page === 'history' && <HistoryPage />}
       {page === 'reports' && <ReportsPage />}
-    </>
+    </div>
   );
 }
