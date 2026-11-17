@@ -174,8 +174,8 @@ export function SpendingCalendar({ byDay, to, weeks = 26, estimated }: { byDay: 
   return (
     <Frame title={title} sub={<>Last {weeks} weeks · {fmt(total)} over {active} spending days{estimated ? ` · ${estimated} undated workbook rows not placed on a day` : ''}. Click a day to see it.</>}
       table={<DataTable caption={title} columns={['Day', 'Spent']} rows={cells.filter((c) => c.v > 0).reverse().slice(0, 60).map((c) => [c.d.split('-').reverse().join('/'), c.v])} />}>
-      <div style={{ position: 'relative', overflowX: 'auto' }} onMouseLeave={() => setHover(null)}>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', minWidth: 640 }} role="img" aria-label={`${title}: ${fmt(total)} over ${active} days. Switch to Table for each day.`}>
+      <div style={{ position: 'relative' }} onMouseLeave={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', maxHeight: '100%' }} role="img" aria-label={`${title}: ${fmt(total)} over ${active} days. Switch to Table for each day.`}>
           {months.map((m) => <text key={`${m.w}${m.label}`} x={L + m.w * (S + G)} y={11} fontSize={11} fill="var(--text-3)">{m.label}</text>)}
           {DOW.map((d, i) => d && <text key={d} x={0} y={T + i * (S + G) + 12} fontSize={10} fill="var(--text-3)">{d}</text>)}
           {cells.map((c) => {

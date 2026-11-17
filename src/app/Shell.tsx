@@ -92,6 +92,8 @@ export default function Shell() {
   const entry = (s: (typeof SECTIONS)[number]) => { const last = readPersisted<string>(`lastPage.${s.id}`, s.pages[0]!.to); return s.pages.some((p) => p.to === last) ? last : s.pages[0]!.to; };
   const inSettings = SETTINGS_PATHS.includes(loc.pathname);
   const syncDot = !status ? 'var(--text-3)' : status.phase === 'locked' || status.phase === 'syncing' || status.dirty ? 'var(--debt)' : status.phase === 'error' ? 'var(--expense)' : 'var(--income)';
+  // A dot on Settings only when something needs you: a save problem, a locked file, or no data folder in the desktop app.
+  const syncAttention = isTauri() ? (!status || status.phase === 'locked' || status.phase === 'error') : false;
   const syncText = !status ? 'Not saving to a folder' : status.phase === 'locked' ? 'Data file locked' : status.phase === 'error' ? 'Sync problem' : status.phase === 'syncing' || status.dirty ? 'Saving…' : `Saved ${ago(status.lastSyncedAt)}`;
 
   return (
@@ -128,7 +130,7 @@ export default function Shell() {
               {inSettings && <motion.span layoutId="nav-pill" className="nav-pill" transition={SPRING.snappy} />}
               <SettingsIcon size={19} strokeWidth={1.9} aria-hidden style={{ position: 'relative' }} />
               <span style={{ position: 'relative', display: 'grid' }}>Settings</span>
-              <span className="sync-dot" style={{ background: syncDot }} title={syncText} role="img" aria-label={syncText} />
+              {syncAttention && <span className="sync-dot" style={{ background: syncDot }} title={syncText} role="img" aria-label={syncText} />}
             </Link>
           </div>
         </nav>

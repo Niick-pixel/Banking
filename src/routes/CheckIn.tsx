@@ -147,7 +147,10 @@ export default function CheckIn() {
                   <div role="cell"><b>{a.name}</b><div className="small muted">{card ? 'Credit card · type what you owe' : a.type.replace('_', ' ')}</div></div>
                   <div role="cell" className="money">{formatMoney(ledger, a.currency)}</div>
                   <div role="cell" style={{ display: 'grid', gap: 6 }}>
-                    <input className="input" inputMode="decimal" aria-label={`${a.name} balance in ${a.currency}`} placeholder={a.currency === 'CRC' ? '₡ e.g. 98,198.45' : '$'} value={main[a.id] ?? ''} onChange={(e) => setMain({ ...main, [a.id]: e.target.value })} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="input" inputMode="decimal" aria-label={`${a.name} balance in ${a.currency}`} placeholder={last ? `last ${(Math.abs(last.balance) / 100).toLocaleString('en-US')}` : a.currency === 'CRC' ? '98,198.45' : '$'} value={main[a.id] ?? ''} onChange={(e) => setMain({ ...main, [a.id]: e.target.value })} />
+                      <button type="button" className="btn btn-sm" title="The bank shows the same as the app" onClick={() => setMain({ ...main, [a.id]: String(Math.abs(ledger) / 100) })}>Matches</button>
+                    </div>
                     {card && a.currency === 'CRC' && <input className="input" inputMode="decimal" aria-label={`${a.name} dollar part`} placeholder="+ $ part, e.g. 275.30" value={usd[a.id] ?? ''} onChange={(e) => setUsd({ ...usd, [a.id]: e.target.value })} />}
                     {p !== null && <span className="small">{p === ledger ? <Pill tone="income">✓ matches</Pill> : <span className="muted">Difference {formatMoney(p - ledger, a.currency, { signed: true })}</span>}</span>}
                   </div>
@@ -159,7 +162,11 @@ export default function CheckIn() {
           </div>
           <p className="small muted" style={{ margin: 0 }}>Leave a box empty to skip that account. Cards: the colón and dollar parts are added together at the rate above, because your dollar purchases are already logged in colones.</p>
           {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Save check-in</button></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
+            <span className="small faint" style={{ marginRight: 'auto' }}>{rows.filter((r) => preview(r.account) !== null).length} of {rows.length} filled · empty rows are skipped</span>
+            <button type="button" className="btn" title="Fill every empty row with the app's balance: for accounts you checked and that haven't changed" onClick={() => setMain(Object.fromEntries(rows.map((r) => [r.account.id, main[r.account.id] || String(Math.abs(ledgerNow.get(r.account.id)?.total ?? 0) / 100)])))}>Rest match the app</button>
+            <button className="btn btn-primary" type="submit">Save check-in</button>
+          </div>
         </form>
       </Glass>
     </>

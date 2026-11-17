@@ -73,6 +73,8 @@ function Overview() {
 
   return (
     <div className="fit budget-fit">
+      <CategoriesTable months={months} />
+      <div className="budget-bottom">
       <div className="bkpis">
         <Glass pad={18} className="bkpi">
           <span className="bkpi-label">Spent this month <InfoTip text="Everything you paid this month: fixed costs, living, discretionary and debt payments. Savings are not spending." /></span>
@@ -113,9 +115,9 @@ function Overview() {
               <YAxis tickFormatter={short} tickLine={false} axisLine={false} width={56} tick={{ fill: axis, fontSize: 11 }} />
               <Tooltip formatter={(v: number) => formatMoney(v, 'CRC')} contentStyle={{ background: 'var(--solid-surface)', border: '1px solid var(--glass-border)', borderRadius: 12 }} cursor={{ fill: 'var(--accent-soft)' }} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11.5 }} align="right" verticalAlign="top" height={26} />
-              <Bar isAnimationActive={false} dataKey="Income" fill={income} radius={[4, 4, 0, 0]} />
-              <Bar isAnimationActive={false} dataKey="Budget" fill={budgetLine} radius={[4, 4, 0, 0]} />
-              <Bar isAnimationActive={false} dataKey="Spending" fill={spend} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Income" fill={income} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Budget" fill={budgetLine} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Spending" fill={spend} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -142,7 +144,7 @@ function Overview() {
       </Glass>
       </div>
 
-      <CategoriesTable months={months} />
+      </div>
     </div>
   );
 }
@@ -162,10 +164,11 @@ function Ring({ pct, tone }: { pct: number; tone: string }) {
 function CategoriesTable({ months }: { months: string[] }) {
   const l = useLedger();
   const cur = months.at(-1)!;
-  const [open, setOpen] = usePersisted<string[]>('budget.groupsOpen', SPEND);
+  const [open, setOpen] = usePersisted<string[]>('budget.groupsOpen2', ['Income', ...SPEND]);
   const colors = useCssVar(SPEND.map((_, i) => SLOT[i % SLOT.length]!));
   const val = (c: Category, m: string) => l.flows.get(m)?.byCategory.get(c.id) ?? 0;
-  const groups: Category['group'][] = [...CATEGORY_GROUPS.filter((g) => g !== 'Income'), 'Income'];
+  // Income first, then spending, then savings.
+  const groups: Category['group'][] = ['Income', ...CATEGORY_GROUPS.filter((g) => g !== 'Income' && g !== 'Savings'), 'Savings'];
   return (
     <Glass strong pad={0} className="btable-card">
       <div className="btable-head">

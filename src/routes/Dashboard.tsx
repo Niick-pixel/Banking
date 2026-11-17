@@ -18,7 +18,7 @@ import { useEssentials } from './NetWorth';
 import { useCalendar, usePendingReminders } from '../app/useRecurring';
 import { useCoach } from '../app/coach';
 import { CoachTop } from './Coach';
-import { CardsWidget } from './CardsWidget';
+import { CardsWidget, useCards } from './CardsWidget';
 import { SetupChecklist, useSetup } from './Setup';
 import { InfoTip } from '../design/components/InfoTip';
 import { Deck, type DeckView } from '../design/components/Deck';
@@ -50,8 +50,12 @@ export default function Dashboard() {
   const nw = useMemo(() => netWorthSeries({ accounts: l.accounts, snapshots: l.snapshots, transactions: l.transactions, debts: l.debts, installments: l.installments }, Number(today.slice(0, 4)), today), [l, today]);
   const calendar = useCalendar(addDays(today, 0), addDays(today, 30));
   const pending = usePendingReminders();
+  const setup = useSetup();
+  const cardSum = useCards();
   const [inc, exp, axis, grid, c1] = useCssVar(['--chart-income', '--chart-expense', '--chart-axis', '--chart-grid', '--chart-1']);
 
+  // Charts mount once the data is loaded, so they animate in instead of appearing already drawn.
+  if (!l.ready) return <div className="fit" aria-busy="true" />;
   if (l.ready && !l.accounts.length) {
     return (<><PageHeader title="Aufwind" sub="Rise on what you already have." /><Empty title="Welcome"><p className="muted" style={{ margin: 0 }}>Import your workbook to see your month at a glance.</p><Link className="btn btn-primary" to="/import">Import workbook</Link></Empty></>);
   }
@@ -82,7 +86,6 @@ export default function Dashboard() {
   const errors = health.filter((h) => h.level !== 'info').length;
   const monthTx = l.transactions.filter((t) => t.date.startsWith(mk) && t.currency === 'CRC');
   const nOf = (k: string) => monthTx.filter((t) => t.kind === k).length;
-  const setup = useSetup();
   // Views you've hidden in Settings → Dashboard drop out of their stack.
   const views = (list: [string, string, () => React.ReactNode][]): DeckView[] => list.filter(([id]) => show(id)).map(([key, label, render]) => ({ key, label, render }));
 
@@ -153,8 +156,14 @@ export default function Dashboard() {
           </div>)],
           ['cards', 'Credit cards', () => <CardsWidget compact />],
           ['debts', 'Debts', () => (<div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-            <h2 className="card-h">Debts</h2>
-            {activeDebts.length === 0 ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
+            <h2 className="card-h">Debts <span className="n">n {activeDebts.length + cardSum.cards.filter((c) => c.owed > 0).length}</span></h2>
+            {cardSum.cards.filter((c) => c.owed > 0).map((c) => (
+              <div key={c.account.id} style={{ display: 'grid', gap: 3 }}>
+                <div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{c.account.name} <span className="faint">· card</span></span><span className="money">{formatMoney(c.owed, c.account.currency)}</span></div>
+                <div className="bar" role="img" aria-label={c.utilization !== undefined ? `${Math.round(c.utilization * 100)}% of the limit used` : 'credit card balance'}><span style={{ width: `${Math.min(1, c.utilization ?? c.owed / Math.max(1, ...cardSum.cards.map((x) => x.owed))) * 100}%`, background: 'var(--debt)' }} /></div>
+              </div>
+            ))}
+            {activeDebts.length === 0 && !cardSum.cards.some((c) => c.owed > 0) ? <Pill tone="income">No active debts</Pill> : activeDebts.map((d) => {
               const st = debtStatus(d, l.transactions);
               const pct = Math.max(0, Math.min(1, 1 - st.balance / d.originalAmount));
               return (
@@ -201,7 +210,7 @@ export default function Dashboard() {
             {current ? <>
               <Money amount={current.netWorth} size={26} weight={800} tone="auto" />
               <div className="chart-fill" role="img" aria-label="Net worth trend this year">
-                <ResponsiveContainer><LineChart data={nw.map((s) => ({ m: s.month, v: s.netWorth }))}><Line isAnimationActive={false} dataKey="v" stroke={c1} strokeWidth={2} dot={false} /><YAxis hide domain={['auto', 'auto']} /></LineChart></ResponsiveContainer>
+                <ResponsiveContainer><LineChart data={nw.map((s) => ({ m: s.month, v: s.netWorth }))}><Line dataKey="v" stroke={c1} strokeWidth={2} dot={false} /><YAxis hide domain={['auto', 'auto']} /></LineChart></ResponsiveContainer>
               </div>
               {ef && essentials > 0 && <div className="small">Emergency fund <b>{ef.liquidMonths.toFixed(1)}</b> / {efTarget} months liquid</div>}
               <Link to="/net-worth" className="small">Balance sheet →</Link>

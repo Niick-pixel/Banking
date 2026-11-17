@@ -104,6 +104,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
         <button className="btn btn-sm btn-ghost why-btn" aria-expanded={why} onClick={() => setWhy((x) => !x)}>
           Why am I seeing this? <motion.span animate={{ rotate: why ? 180 : 0 }} transition={{ duration: dur(0.3) }} style={{ display: 'inline-flex' }}><ChevronDown size={14} /></motion.span>
         </button>
+        {!i.requiresReason && <button className="btn btn-sm" style={{ marginLeft: 'auto' }} title="Mark as seen: it leaves the inbox until something changes" onClick={() => void coach.dismiss(i)}>✓ Got it</button>}
       </div>
       {done && <p className="small" role="status" style={{ margin: 0, color: 'var(--income)' }}>✓ {done}</p>}
 

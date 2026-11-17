@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
+import { useQuickAdd } from '../app/QuickAdd';
 import { commitmentForMonth, planProgress, schedule, splitCuotas } from '../domain/installments';
 import { newId, saveAccount, saveInstallmentPlan } from '../db/repo';
 import { formatMoney, parseAmountInput } from '../lib/money';
@@ -12,6 +13,7 @@ import { usePersisted } from '../app/persist';
 const TERMS = [3, 6, 10, 12, 18, 24, 36];
 
 export default function TasaCero() {
+  const qa = useQuickAdd();
   const l = useLedger();
   const today = todayISO();
   const [raw, setRaw] = useState('');
@@ -52,7 +54,9 @@ export default function TasaCero() {
 
   return (
     <>
-      <PageHeader title="Tasa Cero" sub="0% interest card purchases split into monthly cuotas. Each cuota posts automatically on its billing date, so nothing is counted twice." />
+      <PageHeader title="Tasa Cero" sub="0% interest card purchases split into monthly cuotas. Each cuota posts to Activity by itself on its date, and the bell reminds you a week before.">
+        <button className="btn btn-primary" onClick={() => qa.open(undefined, 'tasa_cero')}>+ Tasa Cero purchase</button>
+      </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 16, alignItems: 'start' }}>
         <Glass strong style={{ display: 'grid', gap: 14 }}>

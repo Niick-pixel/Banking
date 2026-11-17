@@ -25,6 +25,8 @@ export interface Appearance {
   /** 0 = automatic (bigger on large screens), otherwise a fixed scale like 1.1 */
   uiScale: number;
   motion: MotionPref;
+  /** Show keyboard shortcut hints (keycaps) in the app. */
+  keyHints: boolean;
 }
 
 export const PALETTES: { id: ThemeId; name: string; blurb: string; light: string[]; dark: string[] }[] = [
@@ -35,7 +37,7 @@ export const PALETTES: { id: ThemeId; name: string; blurb: string; light: string
   { id: 'ledger', name: 'Ledger', blurb: 'Ink blue on grey paper', light: ['#e2e4df', '#f3f3ee', '#165476', '#142029'], dark: ['#0c1114', '#141b20', '#70b2d6', '#e3ecf1'] },
 ];
 
-const DEFAULTS: Appearance = { mode: 'auto', palette: 'paper', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth' };
+const DEFAULTS: Appearance = { mode: 'auto', palette: 'paper', transparency: 'auto', density: 'comfortable', width: 'full', uiScale: 0, motion: 'smooth', keyHints: false };
 const KEY = 'aufwind.appearance';
 
 function load(): Appearance {
@@ -103,6 +105,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     el.setAttribute('data-density', a.density);
     el.setAttribute('data-width', a.width);
     el.setAttribute('data-motion', motion);
+    el.setAttribute('data-keyhints', a.keyHints ? 'on' : 'off');
     if (a.transparency !== 'auto') el.setAttribute('data-transparency', a.transparency); else el.removeAttribute('data-transparency');
     el.style.setProperty('--ui-scale', String(scale));
     // Size: native webview zoom in the desktop app (keeps charts, hit-testing and layout exact).
