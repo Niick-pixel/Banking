@@ -1,6 +1,6 @@
 [package]
 name = "aufwind"
-version = "0.10.3"
+version = "0.10.4"
 description = "Aufwind — personal finance tracker"
 edition = "2021"
 rust-version = "1.77"

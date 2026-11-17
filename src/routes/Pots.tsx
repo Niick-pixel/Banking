@@ -15,6 +15,7 @@ import { PayDebtForm } from './PayDebt';
 import { InfoTip } from '../design/components/InfoTip';
 import { FundMovesFix } from './FundMovesFix';
 import { FundActivity } from './FundActivity';
+import { BankMatchCard } from './BankMatch';
 import { asSavings, crossesSavings } from '../domain/fundmoves';
 import type { FlowContext } from '../domain/ledger';
 import { usePersisted } from '../app/persist';
@@ -34,7 +35,6 @@ export default function Pots() {
   const potBal = (p: Pot) => l.balances.get(p.accountId)?.pots.get(p.id) ?? 0;
   const byOwner = { hers: 0, mine: 0, shared: 0 };
   for (const p of l.pots) byOwner[p.owner] += potBal(p);
-  const total = byOwner.hers + byOwner.mine + byOwner.shared;
   const months = useMemo(() => potsByMonth(l.pots, l.transactions, year), [l.pots, l.transactions, year]);
   const hasShared = l.pots.some((p) => p.owner === 'shared');
   const funded = l.debts.filter((d) => d.fundPotId && d.status !== 'paid');
@@ -60,8 +60,7 @@ export default function Pots() {
             <div className="small muted">{o === 'hers' ? 'Not yours to spend' : o === 'mine' ? 'Your own savings' : 'Shared'}</div>
           </Glass>
         ))}
-        <Glass pad={20}><div style={{ fontWeight: 750, fontSize: 13 }} className="muted">TOTAL IN FUNDS</div><Money amount={total} size={32} weight={800} />
-          <div className="small muted">{l.pots.map((p) => l.account.get(p.accountId)?.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</div></Glass>
+        {[...new Set(l.pots.filter((p) => !p.archived).map((p) => p.accountId))].map((id) => l.account.get(id)).filter((a) => !!a).map((a) => <BankMatchCard key={a!.id} account={a!} />)}
       </div>
 
       {funded.map((d) => {

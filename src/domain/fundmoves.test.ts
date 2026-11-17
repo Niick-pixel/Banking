@@ -68,3 +68,29 @@ describe('fund activity', () => {
     expect(accountBalances([acc], txs.slice(0, 3)).get('chk')!.pots.get('p-hers')).toBe(act[0]!.after);
   });
 });
+
+import { bankMatchTx } from './fundmoves';
+import { TransactionSchema } from './schemas';
+import { duplicateCluster } from '../routes/DuplicateReview';
+
+describe('match the bank', () => {
+  const common = { accountId: 'sav', potId: 'p-mine', date: '2026-11-17', currency: 'CRC' as const, id: 'm', now: 1 };
+  it('₡70,000 missing from Mine, moved from checking → a savings deposit into Mine', () => {
+    const t = bankMatchTx({ ...common, diff: 7_000_000, mode: 'saved', spendingAccountId: 'chk', categoryId: 'mine' })!;
+    expect(TransactionSchema.parse(t)).toMatchObject({ kind: 'savings', direction: 'deposit', amount: 7_000_000, from: { accountId: 'chk' }, to: { accountId: 'sav', potId: 'p-mine' } });
+    const after = accountBalances([{ id: 'sav', name: 'S', type: 'savings', currency: 'CRC', openingBalance: 0, openingDate: '2026-01-01', archived: false, createdAt: 0, updatedAt: 0 } as never, { id: 'chk', name: 'C', type: 'checking', currency: 'CRC', openingBalance: 0, openingDate: '2026-01-01', archived: false, createdAt: 0, updatedAt: 0 } as never], [t]);
+    expect(after.get('sav')!.pots.get('p-mine')).toBe(7_000_000);
+  });
+  it('a correction is an adjustment on the fund; zero does nothing', () => {
+    expect(TransactionSchema.parse(bankMatchTx({ ...common, diff: -8, mode: 'correct' }))).toMatchObject({ kind: 'adjustment', signedAmount: -8, side: { accountId: 'sav', potId: 'p-mine' } });
+    expect(bankMatchTx({ ...common, diff: 0, mode: 'correct' })).toBeNull();
+  });
+});
+
+describe('duplicate cluster', () => {
+  const s = (id: string, date: string, amount = 7_000_000): Transaction => ({ id, kind: 'savings', direction: 'deposit', date, dateEstimated: false, currency: 'CRC', description: '', tags: [], notes: '', categoryId: 'mine', from: { accountId: 'chk' }, to: { accountId: 'sav' }, amount, createdAt: 0, updatedAt: 0 });
+  it('pulls in every same-amount entry within a day of the pair', () => {
+    const txs = [s('a', '2026-11-16'), s('b', '2026-11-16'), s('c', '2026-11-17'), s('d', '2026-11-20'), s('e', '2026-11-17', 5)];
+    expect(duplicateCluster(['a', 'c'], txs).map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
+});
