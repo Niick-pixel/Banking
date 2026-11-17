@@ -11,12 +11,12 @@ import { InfoTip } from '../design/components/InfoTip';
 import { hoursOfWork } from '../coach/forecast';
 import { guessCategory } from '../coach/autocat';
 import type { RateSource } from '../fx/rates';
-import { todayISO } from '../lib/dates';
+import { cuotaFirstDefault, todayISO } from '../lib/dates';
 import { TransactionSchema, type FxInfo, type Side, type Transaction } from '../domain/schemas';
-import { lastAuditId, newId, saveTransaction, undoAudit } from '../db/repo';
+import { lastAuditId, newId, saveInstallmentPlan, saveTransaction, undoAudit } from '../db/repo';
 
-type Kind = 'expense' | 'income' | 'transfer' | 'savings' | 'debt_payment';
-interface Ctx { open: (tx?: Transaction) => void }
+export type Kind = 'expense' | 'income' | 'transfer' | 'savings' | 'debt_payment' | 'tasa_cero';
+interface Ctx { open: (tx?: Transaction, kind?: Kind) => void }
 const QuickAddCtx = createContext<Ctx>({ open: () => {} });
 export const useQuickAdd = () => useContext(QuickAddCtx);
 
@@ -40,8 +40,8 @@ export function places(l: Ledger) {
 }
 
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ open: boolean; edit?: Transaction; n: number }>({ open: false, n: 0 });
-  const open = useCallback((tx?: Transaction) => setState((x) => ({ open: true, edit: tx, n: x.n + 1 })), []);
+  const [state, setState] = useState<{ open: boolean; edit?: Transaction; kind?: Kind; n: number }>({ open: false, n: 0 });
+  const open = useCallback((tx?: Transaction, kind?: Kind) => setState((x) => ({ open: true, edit: tx, kind, n: x.n + 1 })), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -54,18 +54,18 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   return (
     <QuickAddCtx.Provider value={{ open }}>
       {children}
-      <QuickAddForm key={state.n} open={state.open} edit={state.edit} onDone={() => setState((x) => ({ ...x, open: false }))} />
+      <QuickAddForm key={state.n} open={state.open} edit={state.edit} startKind={state.kind} onDone={() => setState((x) => ({ ...x, open: false }))} />
     </QuickAddCtx.Provider>
   );
 }
 
-function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transaction; onDone: () => void }) {
+function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?: Transaction; startKind?: Kind; onDone: () => void }) {
   const l = useLedger();
   const plc = useMemo(() => places(l), [l]);
   const spending = plc.find((p) => !p.savings && l.account.get(p.key.split('|')[0]!)?.type === 'checking')?.key ?? plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
   const firstSavings = plc.find((p) => p.savings)?.key ?? '';
 
-  const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : 'expense';
+  const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : startKind ?? 'expense';
   const [kind, setKind] = useState<Kind>(initKind);
   const [amountRaw, setAmountRaw] = useState(edit && 'amount' in edit ? String(edit.amount / 100) : '');
   const [description, setDescription] = useState(edit?.description ?? '');
@@ -77,6 +77,8 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
   const [debtId, setDebtId] = useState(edit?.kind === 'debt_payment' ? edit.debtId : l.debts.find((d) => d.status === 'active')?.id ?? '');
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(false);
+  const [months, setMonths] = useState(6);
+  const [firstCharge, setFirstCharge] = useState(cuotaFirstDefault(todayISO()));
   const [toast, setToast] = useState<{ msg: string; auditId?: number } | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const coach = useCoach();
@@ -107,18 +109,19 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
 
   const amount = usdMode ? converted : parseAmountInput(amountRaw, 'CRC');
   const wantGroups: Record<Kind, string[]> = {
-    expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], income: ['Income'], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
+    expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], tasa_cero: ['Fixed', 'Living', 'Discretionary'], income: ['Income'], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
   };
   const cats = l.categories.filter((c) => !c.archived && wantGroups[kind].includes(c.group));
+  const txKind: Transaction['kind'] = kind === 'tasa_cero' ? 'expense' : kind;
   // Learned from your history: ≥ 90% sure → picked for you; 60–90% → suggested first.
-  const guess = useMemo(() => (description.trim().length >= 3 ? guessCategory(l.transactions, description, kind) : null), [l.transactions, description, kind]);
+  const guess = useMemo(() => (description.trim().length >= 3 ? guessCategory(l.transactions, description, txKind) : null), [l.transactions, description, txKind]);
   const [autoPicked, setAutoPicked] = useState(false);
   useEffect(() => {
     if (edit || !guess || guess.mode !== 'auto' || !cats.some((c) => c.id === guess.categoryId)) return;
     if (!categoryId || autoPicked) { setCategoryId(guess.categoryId); setAutoPicked(true); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guess?.categoryId, guess?.mode]);
-  const suggested = suggestCategories(l.transactions, description, kind).filter((id) => cats.some((c) => c.id === id)).slice(0, 5);
+  const suggested = suggestCategories(l.transactions, description, txKind).filter((id) => cats.some((c) => c.id === id)).slice(0, 5);
 
   // A transfer between spending money and a fund/savings account is really saving: offer to record it as such.
   const keepPlaces = useRef<string | null>(null);
@@ -147,6 +150,16 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
     if (usdMode && !usd) { setError('Enter the amount in dollars, e.g. 19.99'); amountRef.current?.focus(); return; }
     if (usdMode && !rate) { setError('Enter the exchange rate (colones per dollar)'); return; }
     if (!amount) { setError('Enter an amount, e.g. 12500 or 12.5k'); amountRef.current?.focus(); return; }
+    if (kind === 'tasa_cero') {
+      const card = l.account.get(from.split('|')[0]!);
+      if (card?.type !== 'credit_card') { setError('Pick the card it was bought with'); return; }
+      if (!categoryId) { setError('Pick a category'); return; }
+      const now0 = Date.now();
+      await saveInstallmentPlan({ id: newId(), cardAccountId: card.id, description: description.trim() || l.category.get(categoryId)?.name || 'Tasa Cero purchase', merchant: '', categoryId, currency: 'CRC', total: amount, months, purchaseDate: date, firstChargeDate: firstCharge, status: 'active', notes: '', createdAt: now0, updatedAt: now0 });
+      if (again) { setAmountRaw(''); setDescription(''); setCategoryId(''); setToast({ msg: `Tasa Cero saved: ${months} cuotas of ${formatMoney(Math.round(amount / months), 'CRC')}` }); amountRef.current?.focus(); }
+      else onDone();
+      return;
+    }
     const fx: FxInfo | undefined = usdMode && usd && rate ? {
       currency: 'USD', amount: usd, rate,
       rateDate: quote && quote.source !== 'manual' ? quote.rateDate : date,
@@ -189,12 +202,13 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
   }
 
   // What's still unanswered, in the order you'd answer it.
-  const needsCategory = kind !== 'transfer' && !(kind === 'expense');
+  const needsCategory = kind !== 'transfer' && kind !== 'expense';
   const missing = [
     !amount ? (usdMode ? 'amount in dollars' : 'amount') : null,
     usdMode && !rate ? 'rate' : null,
     kind !== 'transfer' && !categoryId && (needsCategory || kind === 'expense') ? 'category' : null,
     kind === 'debt_payment' && !debtId ? 'debt' : null,
+    kind === 'tasa_cero' && l.account.get(from.split('|')[0]!)?.type !== 'credit_card' ? 'card' : null,
     (kind === 'transfer' || kind === 'savings') && (!to || to === from) ? 'where it goes' : null,
   ].filter(Boolean) as string[];
   const tryCommit = (again: boolean) => {
@@ -212,7 +226,7 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
   const simAvg = similar.length ? Math.round(similar.reduce((s0, t) => s0 + ('amount' in t ? t.amount : 0), 0) / similar.length) : 0;
   const KINDS: { value: Kind; label: string; tone: 'loss' | 'win' | 'save' | 'accent' | 'amber' }[] = [
     { value: 'expense', label: 'Expense', tone: 'loss' }, { value: 'income', label: 'Income', tone: 'win' }, { value: 'savings', label: 'Savings', tone: 'save' },
-    { value: 'transfer', label: 'Transfer', tone: 'accent' }, { value: 'debt_payment', label: 'Debt payment', tone: 'amber' },
+    { value: 'transfer', label: 'Transfer', tone: 'accent' }, { value: 'debt_payment', label: 'Debt payment', tone: 'amber' }, { value: 'tasa_cero', label: 'Tasa Cero', tone: 'amber' },
   ];
   const kindLabel = KINDS.find((k) => k.value === kind)!.label;
 
@@ -221,7 +235,8 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
       <ChipGroup<string> inline size="sm" label={kind === 'income' ? 'Into' : 'From'}
         info={kind === 'income' ? 'The account the money landed in.' : 'Where the money came out of. Funds inside an account are offered in the right column for savings and transfers.'}
         value={`${from.split('|')[0]}|`} onChange={(v) => v && setFrom(v)}
-        options={accounts.map((p) => ({ value: p.key, label: placeLabel(p) }))} />
+        hiddenNote={kind === 'tasa_cero' ? 'only credit cards: Tasa Cero is a card plan' : undefined}
+        options={accounts.map((p) => ({ value: p.key, label: placeLabel(p), hidden: kind === 'tasa_cero' && l.account.get(p.key.split('|')[0]!)?.type !== 'credit_card' }))} />
       <ChipGroup<string> inline size="sm" compact label="Date" value={dateChoice} onChange={(v) => { if (v === 'today') setDate(dayChip(0)); else if (v === 'yesterday') setDate(dayChip(1)); else if (v === 'two') setDate(dayChip(2)); }}
         options={[{ value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'two', label: '2 days ago' }, ...(dateChoice === 'other' ? [{ value: 'other', label: date.split('-').reverse().join('/') }] : [])]} />
       <input className="input qa-date" type="date" aria-label="Another date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
@@ -242,7 +257,7 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
 
   return (
     <Sheet open={open} onClose={onDone} wide dirty={dirty} title={edit ? 'Edit movement' : 'Add a movement'} caption={kindLabel}
-      actions={<span className="small faint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><kbd>Tab</kbd> next <kbd>1–9</kbd> pick <kbd>Esc</kbd> close</span>}
+      actions={<span className="small faint key-hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><kbd>Tab</kbd> next <kbd>1–9</kbd> pick <kbd>Esc</kbd> close</span>}
       strip={strip} footer={footer}>
       {!l.accounts.length ? <p className="muted">Add an account or import your workbook first.</p> : (
       <form className="qa-grid" onSubmit={(e) => { e.preventDefault(); tryCommit(false); }}
@@ -340,6 +355,15 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
               info="Paying from a fund (e.g. Hers) takes it out of the fund and lowers the debt in one step, counted once."
               options={l.debts.filter((d) => d.status !== 'paid').map((d) => ({ value: d.id, label: d.creditor }))} hiddenNote={l.debts.some((d) => d.status === 'paid') ? 'paid-off debts are not offered' : undefined} />
           )}
+          {kind === 'tasa_cero' && (<>
+            <ChipGroup<number> size="sm" label="Cuotas" value={months} onChange={(v) => v && setMonths(v)} info="How many monthly payments the bank splits it into, at 0% interest."
+              options={[3, 6, 10, 12, 18, 24, 36, 48].map((n) => ({ value: n, label: String(n) }))} />
+            <div className="field">
+              <label htmlFor="qa-first">First cuota on <InfoTip text="The date the first cuota is charged, usually your next statement. The rest follow on the same day each month; each one posts to Activity by itself on its date." /></label>
+              <input id="qa-first" className="input" type="date" value={firstCharge} onChange={(e) => e.target.value && setFirstCharge(e.target.value)} />
+            </div>
+            {!accounts.some((p) => l.account.get(p.key.split('|')[0]!)?.type === 'credit_card') && <p className="small" style={{ margin: 0, color: 'var(--debt)' }}>Add your card first in Debts & cards → Balance check-in.</p>}
+          </>)}
           {(kind === 'expense' || kind === 'income') && (
             <div className="qa-note group">
               <span className="label">{kind === 'income' ? 'Into' : 'Paid from'} · from the strip</span>
@@ -352,6 +376,7 @@ function QuickAddForm({ open, edit, onDone }: { open: boolean; edit?: Transactio
             <span className="qa-big money" style={{ color: kind === 'income' ? 'var(--income)' : kind === 'expense' ? 'var(--expense)' : kind === 'savings' ? 'var(--savings)' : kind === 'debt_payment' ? 'var(--debt)' : 'var(--text)' }}>{amount ? formatMoney(amount, 'CRC') : '₡—'}</span>
             <span className="small faint">{kindLabel} · {date.split('-').reverse().join('/')} · {plc.find((p) => p.key === from)?.label ?? '—'}{(kind === 'transfer' || kind === 'savings') && to ? ` → ${plc.find((p) => p.key === to)?.label}` : ''}</span>
             <span className="small faint">{categoryId ? l.category.get(categoryId)?.name : kind === 'transfer' ? 'No category · derived' : 'No category yet'}</span>
+            {kind === 'tasa_cero' && amount ? <span className="small">{months} cuotas of <b className="money">{formatMoney(Math.round(amount / months), 'CRC')}</b> <span className="derived">· derived</span>, {firstCharge.split('-').reverse().join('/')} to {(() => { const [y, m, d] = firstCharge.split('-').map(Number) as [number, number, number]; const i = y * 12 + m - 1 + months - 1; return `${String(d).padStart(2, '0')}/${String((i % 12) + 1).padStart(2, '0')}/${Math.floor(i / 12)}`; })()}</span> : null}
           </div>
         </div>
         <button type="submit" hidden aria-hidden tabIndex={-1} />

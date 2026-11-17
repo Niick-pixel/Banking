@@ -144,6 +144,9 @@ function AppearancePanel() {
         <Row label="Transparency" hint="Crisp: still background and panels, the sharpest text on Windows (ClearType). Frosted: blurred moving glass, softer text. Solid: fully opaque panels.">
           <Segmented<Appearance['transparency']> label="Transparency" value={a.transparency} onChange={(transparency) => set({ transparency })} options={[{ value: 'auto', label: 'Crisp' }, { value: 'frosted', label: 'Frosted' }, { value: 'reduced', label: 'Solid' }]} />
         </Row>
+        <Row label="Keyboard hints" hint="Small keycaps next to buttons and chips (N, Enter, 1–9, Ctrl K). The shortcuts work either way.">
+          <Segmented<'on' | 'off'> label="Keyboard hints" value={a.keyHints ? 'on' : 'off'} onChange={(v) => set({ keyHints: v === 'on' })} options={[{ value: 'off', label: 'Hide' }, { value: 'on', label: 'Show' }]} />
+        </Row>
         <Row label="Animations" hint="Smooth: slow, soft transitions everywhere. Quick: the same, faster. Off: instant.">
           <Segmented<Appearance['motion']> label="Animations" value={a.motion} onChange={(motion) => set({ motion })} options={[{ value: 'smooth', label: 'Smooth' }, { value: 'quick', label: 'Quick' }, { value: 'off', label: 'Off' }]} />
         </Row>

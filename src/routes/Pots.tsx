@@ -4,7 +4,7 @@ import { useLedger } from '../app/data';
 import { useCssVar } from '../app/theme';
 import { Glass, Money, Pill, Segmented } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
-import { debtStatus, potsByMonth } from '../domain/ledger';
+import { accountBalances, debtStatus, potsByMonth } from '../domain/ledger';
 import { fundProgress } from '../domain/debts';
 import { budgetFor } from '../domain/tracker';
 import { newId, saveTransaction } from '../db/repo';
@@ -12,6 +12,7 @@ import type { Debt, Pot } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
 import { PayDebtForm } from './PayDebt';
+import { InfoTip } from '../design/components/InfoTip';
 import { FundMovesFix } from './FundMovesFix';
 import { asSavings, crossesSavings } from '../domain/fundmoves';
 import type { FlowContext } from '../domain/ledger';
@@ -88,9 +89,10 @@ export default function Pots() {
         );
       })}
 
-      <Glass strong style={{ display: 'grid', gap: 12 }}>
+      <div className="funds-charts">
+      <Glass strong pad={16} style={{ display: 'grid', gap: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Month by month</h2>
+          <h2 className="card-h" style={{ margin: 0 }}>Funds month by month</h2>
           <div style={{ display: 'flex', gap: 10 }}>
             <select className="input" style={{ width: 110, height: 36 }} aria-label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
               {[...new Set([...l.transactions.map((t) => Number(t.date.slice(0, 4))), Number(today.slice(0, 4))])].sort().map((y) => <option key={y}>{y}</option>)}
@@ -125,6 +127,9 @@ export default function Pots() {
           </div>
         )}
       </Glass>
+
+      <AssociationCard year={year} />
+      </div>
 
       <Sheet open={!!pay} onClose={() => setPay(null)} title={pay ? `Pay ${pay.creditor}` : ''}>
         {pay && <PayDebtForm debt={pay} onDone={() => setPay(null)} />}
@@ -175,5 +180,53 @@ function MoveForm({ onDone }: { onDone: () => void }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Move</button></div>
       <Pill tone="neutral">{crosses ? 'Counts as saving, not spending' : 'Not income or spending'}</Pill>
     </form>
+  );
+}
+
+/** The Asociación Solidarista accounts (your savings plan and the cesantía reserve), month by month. */
+function AssociationCard({ year }: { year: number }) {
+  const l = useLedger();
+  const today = todayISO();
+  const [c1, c2, grid, axis] = useCssVar(['--chart-1', '--chart-3', '--chart-grid', '--chart-axis']);
+  const accs = l.accounts.filter((a) => !a.archived && (a.type === 'association_voluntary' || a.type === 'association_cesantia'));
+  const data = useMemo(() => M.map((m, i) => {
+    const end = new Date(Date.UTC(year, i + 1, 0)).toISOString().slice(0, 10);
+    if (end.slice(0, 7) > today.slice(0, 7)) return { month: m };
+    const asOf = end > today ? today : end;
+    const bal = accountBalances(l.accounts, l.transactions, asOf);
+    const row: Record<string, number | string> = { month: m };
+    for (const a of accs) {
+      const snap = l.snapshots.filter((x) => x.accountId === a.id && x.date.slice(0, 7) === end.slice(0, 7)).at(-1);
+      row[a.id] = snap ? snap.balance : a.openingDate <= asOf ? bal.get(a.id)?.total ?? 0 : 0;
+    }
+    return row;
+  }), [l, year, today, accs]);
+  if (!accs.length) return <Glass strong pad={16}><h2 className="card-h" style={{ margin: 0 }}>Association savings</h2><p className="small faint">No Asociación Solidarista accounts yet. Add them in Wealth → Accounts.</p></Glass>;
+  const total = accs.reduce((s0, a) => s0 + (l.balances.get(a.id)?.total ?? 0), 0);
+  const first = data.find((d) => accs.some((a) => typeof d[a.id] === 'number' && (d[a.id] as number) > 0));
+  const start = first ? accs.reduce((s0, a) => s0 + ((first[a.id] as number) ?? 0), 0) : 0;
+  const colors = [c1, c2];
+  return (
+    <Glass strong pad={16} style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+        <h2 className="card-h" style={{ margin: 0 }}>Association savings <span className="n">n {accs.length}</span><InfoTip text="Your Asociación Solidarista accounts: your savings plan and the cesantía reserve. Month-end statement figures where you have them; otherwise the app's balance. Payroll contributions add to them each quincena." /></h2>
+        <span className="small faint">{year}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${accs.length + 1}, minmax(0, 1fr))`, gap: 12 }}>
+        <div className="stat"><span className="stat-label">Total now</span><span className="stat-value money">{formatMoney(total, 'CRC')}</span>{start > 0 && <span className="stat-cap">{total >= start ? '+' : ''}{formatMoney(total - start, 'CRC')} since {first!.month as string} <span className="derived">· derived</span></span>}</div>
+        {accs.map((a, k) => <div key={a.id} className="stat"><span className="stat-label"><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: colors[k % 2] }} /> {a.name.replace(/^Association\s*-\s*/i, '').replace(/\s*\(.*\)$/, '')}</span><span className="money" style={{ fontWeight: 650 }}>{formatMoney(l.balances.get(a.id)?.total ?? 0, 'CRC')}</span></div>)}
+      </div>
+      <div style={{ height: 170 }} role="img" aria-label={`Association balances by month: ${data.filter((d) => accs.some((a) => d[a.id] !== undefined)).map((d) => `${d.month} ${accs.map((a) => formatMoney((d[a.id] as number) ?? 0, 'CRC')).join(' + ')}`).join('; ')}`}>
+        <ResponsiveContainer>
+          <BarChart data={data} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke={grid} />
+            <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 11 }} />
+            <YAxis tickFormatter={(v: number) => `₡${Math.round(v / 100_000)}k`} tickLine={false} axisLine={false} width={52} tick={{ fill: axis, fontSize: 11 }} />
+            <Tooltip formatter={(v: number) => formatMoney(v, 'CRC')} contentStyle={{ background: 'var(--solid-surface)', border: '1px solid var(--glass-border)', borderRadius: 12 }} cursor={{ fill: 'var(--accent-soft)' }} />
+            {accs.map((a, k) => <Bar key={a.id} dataKey={a.id} name={a.name} stackId="a" fill={colors[k % 2]} radius={k === accs.length - 1 ? [4, 4, 0, 0] : undefined} />)}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Glass>
   );
 }

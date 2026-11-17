@@ -26,6 +26,7 @@ const CheckIn = lazy(() => import('./routes/CheckIn'));
 const Categories = lazy(() => import('./routes/Categories'));
 const NetWorth = lazy(() => import('./routes/NetWorth'));
 const Goals = lazy(() => import('./routes/Goals'));
+const Wealth = lazy(() => import('./routes/Wealth'));
 const Calculators = lazy(() => import('./routes/Calculators'));
 const Reports = lazy(() => import('./routes/Reports'));
 const Bills = lazy(() => import('./routes/Bills'));
@@ -55,7 +56,8 @@ const router = createBrowserRouter([
       { path: '/check-in', element: page(CheckIn) },
       { path: '/categories', element: page(Categories) },
       { path: '/pots', element: <Navigate to="/funds" replace /> },
-      { path: '/net-worth', element: page(NetWorth) },
+      { path: '/net-worth', element: page(Wealth) },
+      { path: '/net-worth/months', element: page(NetWorth) },
       { path: '/goals', element: page(Goals) },
       { path: '/calculators', element: page(Calculators) },
       { path: '*', element: <Navigate to="/" replace /> },

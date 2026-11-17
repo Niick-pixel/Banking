@@ -128,7 +128,7 @@ export default function NetWorth() {
   );
 }
 
-function SnapshotForm({ onDone }: { onDone: () => void }) {
+export function SnapshotForm({ onDone }: { onDone: () => void }) {
   const l = useLedger();
   const t = todayISO();
   const [y, m] = t.split('-').map(Number) as [number, number];
