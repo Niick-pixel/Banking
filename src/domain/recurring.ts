@@ -7,7 +7,7 @@ import type { Account, Category, Debt, InstallmentPlan, RecurringRule, SelfLoan,
 import { TransactionSchema } from './schemas';
 import { cuotaDate, schedule as cuotaSchedule } from './installments';
 import { amortize, nextPaymentDate, selfLoanProgress } from './debts';
-import { accountBalances, debtStatus } from './ledger';
+import { debtStatus, balancesNow } from './ledger';
 import type { Payroll } from './prefs';
 import { daysInMonth, lastDayOfMonth, parseISO, toISO, type ISODate } from '../lib/dates';
 
@@ -111,7 +111,7 @@ export function calendarEvents(inp: CalendarInput, from: ISODate, to: ISODate, t
     const a = amortize(st.balance, d.annualRateBps, d.plannedMonthlyPayment!, nextPaymentDate(d, today));
     for (const row of a.rows) if (row.date >= from && row.date <= to) ev.push({ date: row.date, title: `Pay ${d.creditor}`, amount: row.payment, tone: 'debt', source: 'debt', status: 'upcoming', to: '/debts' });
   }
-  const bal = accountBalances(inp.accounts, inp.transactions, today);
+  const bal = balancesNow(inp.accounts, inp.transactions, today);
   for (const a of inp.accounts.filter((x) => x.type === 'credit_card' && x.cardDueDay && !x.archived)) {
     const owed = Math.max(0, -(bal.get(a.id)?.total ?? 0));
     let first = true;

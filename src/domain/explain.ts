@@ -4,7 +4,7 @@
  * statement figures, so a gap points at the month (and the movements) to look at.
  */
 import type { Account, BalanceSnapshot, Transaction } from './schemas';
-import { accountBalances } from './ledger';
+import { balancesNow } from './ledger';
 import { monthKey, type ISODate } from '../lib/dates';
 
 export interface ExplainMonth {
@@ -56,7 +56,7 @@ export function explainBalance(account: Account, accounts: Account[], txs: Trans
     const st = snaps.filter((s) => s.date.startsWith(m)).at(-1);
     const row: ExplainMonth = { month: m, in: inn, out: outt, appEnd: running };
     if (st) {
-      const appAt = accountBalances(accounts, txs, st.date).get(account.id)?.total ?? 0;
+      const appAt = balancesNow(accounts, txs, st.date).get(account.id)?.total ?? 0;
       row.statement = { date: st.date, balance: st.balance };
       row.gap = st.balance - appAt;
       if (prevStmt !== undefined) { row.bankChange = st.balance - prevStmt; row.loggedChange = inn - outt; }

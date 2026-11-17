@@ -696,8 +696,18 @@ h2 { font-size: 15px; }
 .dup-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .dup-actions { display: flex; gap: 8px; margin-top: auto; }
 .dup-del { color: rgb(var(--loss)); }
-/* Inline text button (looks like a link). */
-.link-btn { border: 0; background: none; padding: 0; font: inherit; color: rgb(var(--accent)); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-.link-btn:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 4px; }
-.loose-box { margin-top: 6px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--amber) / .08); border: 1px solid rgb(var(--amber) / .25); }
-.loose-box .fund-act-what .faint { font-size: 11px; }
+/* Funds fits the window: two columns; long lists scroll inside their own cards. */
+.funds-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
+.funds-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.funds-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; flex: none; }
+.fund-activity { flex: 1 1 0; min-height: 160px; display: flex; flex-direction: column; gap: 10px; }
+.fund-activity .fund-acts { flex: 1 1 0; min-height: 0; }
+.fund-activity .fund-act { min-height: 0; }
+.fund-activity .fund-act-list { flex: 1 1 0; min-height: 0; max-height: none; }
+.funds-month { flex: 1 1 0; min-height: 200px; display: flex; flex-direction: column; gap: 10px; }
+.funds-month-body { flex: 1 1 0; min-height: 0; }
+@media (max-width: 1000px) { .funds-grid { grid-template-columns: 1fr; overflow-y: auto; } .fund-activity, .funds-month { flex: none; min-height: 360px; } }
+.fund-debt { display: grid; gap: 8px; flex: none; }
+.fund-debt-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.fund-debt-stats b { font-size: 15px; }
+@media (max-width: 1350px) { .fund-debt-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

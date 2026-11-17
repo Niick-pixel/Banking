@@ -3,7 +3,7 @@ import { useLedger } from '../app/data';
 import { Glass, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
 import { ACCOUNT_TYPES, type Account, type Pot } from '../domain/schemas';
-import { accountBalances, debtStatus } from '../domain/ledger';
+import { debtStatus, balancesNow } from '../domain/ledger';
 import { newId, saveAccount, saveCategory, savePot, saveSnapshot, saveTransaction } from '../db/repo';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { TransactionSchema } from '../domain/schemas';
@@ -80,7 +80,7 @@ export default function Accounts() {
                 const b = l.balances.get(a.id);
                 const snaps = l.snapshots.filter((x) => x.accountId === a.id && x.date <= todayISO());
                 const last = snaps.at(-1);
-                const ledgerAtSnap = last ? accountBalances(l.accounts, l.transactions, last.date).get(a.id)?.total ?? 0 : 0;
+                const ledgerAtSnap = last ? balancesNow(l.accounts, l.transactions, last.date).get(a.id)?.total ?? 0 : 0;
                 const diff = last ? last.balance - ledgerAtSnap : 0;
                 const pots = l.pots.filter((p) => p.accountId === a.id && !p.archived);
                 const unassigned = b?.unassigned ?? 0;

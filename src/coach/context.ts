@@ -157,17 +157,9 @@ export function buildContext(input: CoachInput): Ctx {
   const salaryMonths = incomeMonths.map((mk) => past.filter((t) => t.kind === 'income' && t.date.startsWith(mk) && isSalaryCategory(cat.get(t.categoryId))).reduce((s, t) => s + (t.kind === 'income' ? t.amount : 0), 0)).filter((x) => x > 0);
   const avgSalaryPerQuincena = salaryMonths.length ? median(salaryMonths) / 2 : 0;
 
+  // Same balance as every other screen: everything that has happened (check-ins add adjustments to match the bank).
   const balances = accountBalances(accounts, past);
-  // Best known balance: the latest statement on/before today plus movements after it; else the ledger.
-  const known = new Map<string, number>();
-  for (const a of accounts) {
-    const snap = (input.snapshots ?? []).filter((s) => s.accountId === a.id && s.date <= today).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
-    if (!snap) { known.set(a.id, balances.get(a.id)?.total ?? 0); continue; }
-    let v = snap.balance;
-    // A balance you typed already includes everything logged before it, including undated rows of that month.
-    for (const t of past) if (t.date > snap.date && !(t.dateEstimated && t.date.slice(0, 7) <= snap.date.slice(0, 7))) for (const l of legs(t)) if (l.accountId === a.id) v += l.amount;
-    known.set(a.id, v);
-  }
+  const known = new Map<string, number>([...balances].map(([id, b]) => [id, b.total]));
   // Spending accounts with activity but no statement: their balance is a guess, so balance-based rules stay quiet.
   const used = new Set(past.flatMap((t) => legs(t).map((l) => l.accountId)));
   const spendingAccounts = accounts.filter((a) => !a.archived && a.currency === 'CRC' && ['checking', 'cash'].includes(a.type) && (used.has(a.id) || a.openingBalance));
