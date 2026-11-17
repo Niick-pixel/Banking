@@ -86,6 +86,17 @@ describe('every rule: fires / does not fire', () => {
     expect(fired(input(broke, '2026-11-21'), 'R6')).toHaveLength(1);
     expect(fired(input(base, '2026-11-21'), 'R6')).toHaveLength(0);
   });
+  it('R6 with checking below zero asks for the balance instead of saying "short"', () => {
+    const broke = [...base, ex('2026-11-20', 'pers', 1_200_000, 'Laptop')];
+    const inp = input(broke, '2026-11-21');
+    const below = fired(inp, 'R6')[0]!;
+    expect(runCoach(inp).safe.balance).toBeLessThan(0);
+    expect(below.action?.kind).toBe('update_balance');
+    expect(below.title).toMatch(/below zero/);
+    // Still above zero, only short of the cushion: the usual "short" message.
+    const tight = fired(input([...base, ex('2026-11-20', 'pers', 1_000_000, 'Laptop')], '2026-11-21'), 'R6')[0]!;
+    expect(tight.title).toMatch(/short/);
+  });
   it('R7 cash-flow dip', () => {
     const low = [...base, ex('2026-11-10', 'pers', 1_000_000, 'Big purchase')];
     expect(fired(input(low, '2026-11-11'), 'R7')).toHaveLength(1);

@@ -21,6 +21,7 @@ import type { Insight, Severity } from '../coach/types';
 import type { SplitLine } from '../coach/windfall';
 import { usePersisted } from '../app/persist';
 import { DuplicateReview } from './DuplicateReview';
+import { legs as legsOf } from '../domain/ledger';
 
 const crc = (n: number) => formatMoney(Math.round(n) as Minor, 'CRC', { decimals: 0 });
 
@@ -157,6 +158,7 @@ function SplitPreview({ lines, onApply }: { lines: SplitLine[]; onApply: (l: Spl
 export function SafeToSpendCard() {
   const { run, updateBalance } = useCoach();
   const l = useLedger();
+  const qa = useQuickAdd();
   if (!run) return null;
   const s = run.safe;
   const tone = s.tone === 'negative' ? 'var(--expense)' : s.tone === 'tight' ? 'var(--debt)' : 'var(--income)';
@@ -172,14 +174,41 @@ export function SafeToSpendCard() {
       </div>
     );
   }
+  const z = s.belowZero[0];
+  if (z) {
+    // The app has a debit account below zero: that's a stale balance or a wrong entry, not "you're short".
+    const since = l.transactions.filter((t) => (!z.asOf || t.date > z.asOf) && t.date <= todayISO() && legsOf(t).some((x) => x.accountId === z.accountId && x.amount < 0))
+      .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+    return (
+      <div className="safe" style={{ display: 'grid', gap: 8 }}>
+        <span className="small muted">Safe to spend until payday ({until})</span>
+        <b style={{ fontSize: 22 }}>Check {z.name} first</b>
+        <p className="small" style={{ margin: 0 }}>The app has it at <b className="money" style={{ color: 'var(--debt)' }}>{crc(z.balance)}</b>. A debit account can't go below zero, so this isn't money you're short: {z.asOf ? <>it's the balance you entered on {formatDateCR(z.asOf).slice(0, 5)} minus what you logged after it, and something there is off.</> : <>no bank balance was ever entered for it.</>} Type what BAC shows today.</p>
+        <MoneyInput label={`${z.name} balance today`} cta="Save balance" onSubmit={(v) => updateBalance(z.accountId, v)} />
+        {since.length > 0 && (
+          <div style={{ display: 'grid', gap: 2 }}>
+            <span className="small muted">Taken out of {z.name}{z.asOf ? ` since ${formatDateCR(z.asOf).slice(0, 5)}` : ''}: is one of these wrong?</span>
+            {since.map((t) => (
+              <button key={t.id} type="button" className="fund-act-row" onClick={() => qa.open(t)}>
+                <span className="muted">{formatDateCR(t.date).slice(0, 5)}</span>
+                <span className="fund-act-what">{t.description || l.category.get((t as { categoryId?: string }).categoryId ?? '')?.name || t.kind}</span>
+                <span className="money" style={{ color: 'var(--expense)' }}>{crc(legsOf(t).filter((x) => x.accountId === z.accountId).reduce((a, x) => a + x.amount, 0))}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+  const cushion = s.value < 0 && s.balance + s.income - s.bills - s.savings >= 0;
   return (
     <div className="safe" style={{ display: 'grid', gap: 6 }}>
       <span className="small muted">Safe to spend until payday ({until})</span>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <b className="money" style={{ fontSize: 40, lineHeight: 1.05, color: tone }}>{s.value < 0 ? crc(s.value) : crc(s.perDay)}</b>
-        <span className="muted">{s.value < 0 ? 'short before payday' : `per day · ${crc(s.value)} total over ${s.days} days`}</span>
+        <span className="muted">{cushion ? 'into your cushion' : s.value < 0 ? 'short before payday' : `per day · ${crc(s.value)} total over ${s.days} days`}</span>
       </div>
-      <p style={{ margin: 0 }}>{s.value < 0 ? `Bills and savings before ${until} need more than you have.` : `You can spend ${crc(s.perDay)} per day until the ${Number(s.until.slice(8))}${['st', 'nd', 'rd'][((Number(s.until.slice(8)) + 90) % 100 - 10) % 10 - 1] ?? 'th'}.`} <span className="small muted">Your usual day-to-day: {crc(s.typicalDaily)}/day.</span></p>
+      <p style={{ margin: 0 }}>{cushion ? `Your bills and savings are covered, but you're ${crc(-s.value)} into the ${crc(s.buffer)} cushion you keep for surprises.` : s.value < 0 ? `Bills, savings and your ${crc(s.buffer)} cushion before ${until} need more than you have.` : `You can spend ${crc(s.perDay)} per day until the ${Number(s.until.slice(8))}${['st', 'nd', 'rd'][((Number(s.until.slice(8)) + 90) % 100 - 10) % 10 - 1] ?? 'th'}.`} <span className="small muted">Your usual day-to-day: {crc(s.typicalDaily)}/day.</span></p>
       <dl className="safe-break small">
         <div><dt>Balance{run.ctx.balanceAsOf ? ` (from ${formatDateCR(run.ctx.balanceAsOf).slice(0, 5)})` : ''}</dt><dd className="money">{crc(s.balance)}</dd></div>
         <div><dt>+ income before payday</dt><dd className="money">{crc(s.income)}</dd></div>

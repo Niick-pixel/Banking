@@ -63,6 +63,12 @@ function salaryEvents(ctx: Ctx, from: string, to: string, events: CashEvent[]): 
   return out;
 }
 
+function belowZero(ctx: Ctx): SafeToSpend['belowZero'] {
+  return ctx.accounts
+    .filter((a) => !a.archived && a.currency === 'CRC' && a.type === 'checking' && (ctx.known.get(a.id) ?? 0) < 0)
+    .map((a) => ({ accountId: a.id, name: a.name, balance: ctx.known.get(a.id) ?? 0, asOf: (ctx.snapshots ?? []).filter((x) => x.accountId === a.id && x.date <= ctx.today).map((x) => x.date).sort().at(-1) }));
+}
+
 // ── C. Safe-to-spend ─────────────────────────────────────────────────────
 export interface SafeToSpend {
   value: number; perDay: number; until: string; days: number;
@@ -71,6 +77,11 @@ export interface SafeToSpend {
   /** False when a spending account has no statement yet (balance unknown). */
   known: boolean;
   items: CashEvent[];
+  /**
+   * Spending accounts the app has below zero. A debit account can't be, so the balance
+   * (or something logged after the last check-in) is wrong; safe-to-spend means nothing until it's fixed.
+   */
+  belowZero: { accountId: string; name: string; balance: number; asOf?: string }[];
 }
 
 /**
@@ -87,7 +98,7 @@ export function safeToSpend(ctx: Ctx): SafeToSpend {
   const days = Math.max(1, diffDays(ctx.today, until));
   const perDay = Math.round(value / days);
   const typicalDaily = Math.round(VARIABLE_GROUPS.flatMap((g) => ctx.categories.filter((c) => c.group === g)).reduce((s, c) => s + (ctx.baselines.get(c.id)?.median ?? 0), 0) / 30);
-  return { value, perDay, until, days, balance: ctx.spendable, income, bills, savings, buffer: ctx.prefs.buffer, typicalDaily, tone: value < 0 ? 'negative' : perDay >= typicalDaily ? 'good' : 'tight', items: events, known: ctx.unknownBalance.length === 0 };
+  return { value, perDay, until, days, balance: ctx.spendable, income, bills, savings, buffer: ctx.prefs.buffer, typicalDaily, tone: value < 0 ? 'negative' : perDay >= typicalDaily ? 'good' : 'tight', items: events, known: ctx.unknownBalance.length === 0, belowZero: belowZero(ctx) };
 }
 
 // ── D. Forecast ──────────────────────────────────────────────────────────

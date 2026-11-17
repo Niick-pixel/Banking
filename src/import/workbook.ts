@@ -8,7 +8,7 @@ import type {
 } from '../domain/schemas';
 import { CATEGORY_GROUPS, TransactionSchema } from '../domain/schemas';
 import { isISODate, lastDayOfMonth, toISO, type ISODate, type MonthKey } from '../lib/dates';
-import { monthlyFlows } from '../domain/ledger';
+import { accountBalances, monthlyFlows } from '../domain/ledger';
 import type { CellValue, Grid, Sheet } from './grid';
 
 export type Level = 'error' | 'warning' | 'info';
@@ -445,3 +445,58 @@ export function remapCategory(plan: ImportPlan, source: string, target: Category
 }
 
 export const RECON_GROUPS = CATEGORY_GROUPS;
+
+// ── Starting balance of an account that holds funds ─────────────────────────
+// The workbook's first month-end balance becomes the account's opening balance, but it
+// says nothing about whose money that was, so it would sit "not in a fund" forever.
+export interface OpeningFund {
+  accountId: string; accountName: string; amount: number; date: ISODate;
+  /** Pot id to move it into, or 'drop' (the savings rows already contain it). */
+  suggestion: string;
+  /** Why that suggestion, in words. */
+  why: string;
+}
+
+export function openingFunds(plan: ImportPlan, today: ISODate, existingAccountIds: Set<string> = new Set()): OpeningFund[] {
+  const out: OpeningFund[] = [];
+  for (const a of plan.accounts) {
+    const pots = plan.pots.filter((p) => p.accountId === a.id && !p.archived);
+    if (!pots.length || a.openingBalance <= 0 || existingAccountIds.has(a.id)) continue;
+    const fallback = (pots.find((p) => p.owner === 'mine') ?? pots[0]!).id;
+    // Which reading of the workbook matches the bank? Check against the latest month-end balance after the start.
+    const snap = plan.snapshots.filter((s) => s.accountId === a.id && s.date >= a.openingDate && s.date <= today).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
+    let suggestion = fallback;
+    let why = 'Most likely your own savings.';
+    if (snap) {
+      const withIt = accountBalances(plan.accounts, plan.transactions.filter((t) => t.date <= snap.date)).get(a.id)?.total ?? 0;
+      const without = withIt - a.openingBalance;
+      const fmt = (n: number) => `₡${Math.round(n / 100).toLocaleString('en')}`;
+      if (Math.abs(snap.balance - without) < Math.abs(snap.balance - withIt)) {
+        suggestion = 'drop';
+        why = `Your savings rows alone come to ${fmt(without)} by ${snap.date.slice(8)}/${snap.date.slice(5, 7)}, close to the ${fmt(snap.balance)} the workbook shows then, so they already include it.`;
+      } else {
+        why = `With it, the app has ${fmt(withIt)} on ${snap.date.slice(8)}/${snap.date.slice(5, 7)}, close to the ${fmt(snap.balance)} the workbook shows then, so it's real money.`;
+      }
+    }
+    out.push({ accountId: a.id, accountName: a.name, amount: a.openingBalance, date: a.openingDate, suggestion, why });
+  }
+  return out;
+}
+
+/** Apply the choices: move the starting balance into a fund, drop it, or leave it ('leave'). */
+export function withOpeningFunds(plan: ImportPlan, choices: Record<string, string>, newId: () => string, now: number): ImportPlan {
+  const extra: Transaction[] = [];
+  const accounts = plan.accounts.map((a) => {
+    const c = choices[a.id];
+    if (!c || c === 'leave') return a;
+    if (c === 'drop') return { ...a, openingBalance: 0 };
+    const pot = plan.pots.find((p) => p.id === c && p.accountId === a.id);
+    if (pot && a.openingBalance > 0) extra.push(TransactionSchema.parse({
+      id: newId(), kind: 'transfer', date: a.openingDate, dateEstimated: false, currency: a.currency,
+      description: `Starting balance into ${pot.name}`, tags: ['opening-balance'], notes: '',
+      from: { accountId: a.id }, to: { accountId: a.id, potId: pot.id }, amount: a.openingBalance, createdAt: now, updatedAt: now,
+    }));
+    return a;
+  });
+  return { ...plan, accounts, transactions: [...extra, ...plan.transactions] };
+}

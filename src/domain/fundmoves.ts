@@ -122,3 +122,22 @@ export function bankMatchTx(o: {
   }
   return { ...base, kind: 'adjustment', side: fund, signedAmount: o.diff, reason: 'Matched to the bank balance', description: 'Matched to the bank' } as Transaction;
 }
+
+export interface UnassignedPart { kind: 'opening' | 'entry'; date: string; amount: number; tx?: Transaction }
+
+/**
+ * What "not in a fund" is made of: the account's starting balance (it never belongs to a
+ * fund unless you move it into one) plus every movement in this account without a fund.
+ * The parts add up to the ledger's `unassigned`. Newest first, starting balance last.
+ */
+export function unassignedParts(account: { id: string; openingBalance: number; openingDate: string }, txs: Transaction[]): UnassignedPart[] {
+  const out: UnassignedPart[] = [];
+  for (const tx of txs) {
+    if (tx.date < account.openingDate) continue;
+    const amount = legs(tx).filter((g) => g.accountId === account.id && !g.potId).reduce((n, g) => n + g.amount, 0);
+    if (amount !== 0) out.push({ kind: 'entry', date: tx.date, amount, tx });
+  }
+  out.sort((a, b) => b.date.localeCompare(a.date) || (b.tx!.createdAt - a.tx!.createdAt));
+  if (account.openingBalance) out.push({ kind: 'opening', date: account.openingDate, amount: account.openingBalance });
+  return out;
+}
