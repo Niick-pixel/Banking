@@ -8,6 +8,16 @@ export const R6 = rule({
     const s = safeToSpend(ctx);
     if (!s.known) return [];
     if (s.value >= 0) return [];
+    const z = s.belowZero[0];
+    if (z) return [make({
+      ruleId: 'R6', severity: 'warning', title: `${z.name} is below zero in the app (${crc(z.balance)})`,
+      body: ctx.say(`A debit account can't go below zero, so the app's balance is off: it is ${z.asOf ? `your balance from ${ddmm(z.asOf)} plus everything logged after it` : 'the ledger total'}. Type what BAC shows today, or fix an entry that came out of this account by mistake. Safe-to-spend will be right after that.`,
+        `The app has ${z.name} below zero, which can't be right. Type what BAC shows today and safe-to-spend will be right again.`),
+      why: { formula: z.asOf ? 'last balance you entered + movements logged after it' : 'opening balance + every movement', inputs: { balance: crc(z.balance), ...(z.asOf ? { since: ddmm(z.asOf) } : {}) }, threshold: '< ₡0' },
+      impactCRC: -z.balance, actWithinDays: 2, confidence: 0.9,
+      action: { label: 'Enter balance', kind: 'update_balance', payload: { accountId: z.accountId } },
+      dedupeKey: `R6:below:${z.accountId}:${z.asOf ?? ''}`,
+    })];
     const flexible = ctx.categories.filter((c) => ['Living', 'Discretionary'].includes(c.group)).map((c) => ({ c, v: ctx.spent.get(c.id) ?? 0 })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 3);
     return [make({
       ruleId: 'R6', severity: 'critical', title: `You're ${crc(-s.value)} short until payday (${ddmm(s.until)})`,

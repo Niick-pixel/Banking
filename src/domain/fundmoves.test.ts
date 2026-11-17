@@ -94,3 +94,20 @@ describe('duplicate cluster', () => {
     expect(duplicateCluster(['a', 'c'], txs).map((t) => t.id)).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('not in a fund, broken down', () => {
+  const acc = { id: 'sav', name: 'Ahorro', institution: '', type: 'savings' as const, currency: 'CRC' as const, openingBalance: 41_434_900, openingDate: '2026-09-01', isLiquid: false, archived: false, createdAt: now, updatedAt: now };
+  const txs = [
+    tr('in-fund', { accountId: 'chk' }, { accountId: 'sav', potId: 'p-m' }, 7_000_000),
+    tr('loose', { accountId: 'chk' }, { accountId: 'sav' }, 7_749_900),
+    { ...tr('old', { accountId: 'chk' }, { accountId: 'sav' }, 5), date: '2026-08-01' },
+  ];
+  it('is the starting balance plus entries with no fund, and adds up to the ledger', async () => {
+    const { unassignedParts } = await import('./fundmoves');
+    const { accountBalances } = await import('./ledger');
+    const parts = unassignedParts(acc, txs);
+    expect(parts.map((p) => p.kind)).toEqual(['entry', 'opening']);
+    expect(parts[0]!.tx!.id).toBe('loose');
+    expect(parts.reduce((n, p) => n + p.amount, 0)).toBe(accountBalances([acc, { ...acc, id: 'chk', openingBalance: 0 }], txs).get('sav')!.unassigned);
+  });
+});

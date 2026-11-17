@@ -10,7 +10,7 @@ import { ChipGroup } from '../design/components/ChipGroup';
 import { InfoTip } from '../design/components/InfoTip';
 import { Sheet } from '../ui/Sheet';
 import { newId, saveSnapshot, saveTransaction } from '../db/repo';
-import { bankMatchTx, savingsCategoryFor } from '../domain/fundmoves';
+import { bankMatchTx, savingsCategoryFor, unassignedParts } from '../domain/fundmoves';
 import { TransactionSchema, type Account } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
@@ -20,6 +20,7 @@ const short = (n: string) => n.replace(/\s*\((checking|savings)\)$/i, '');
 export function BankMatchCard({ account }: { account: Account }) {
   const l = useLedger();
   const [open, setOpen] = useState(false);
+  const [loose, setLoose] = useState(false);
   const b = l.balances.get(account.id);
   const total = b?.total ?? 0;
   const inFunds = total - (b?.unassigned ?? 0);
@@ -31,7 +32,8 @@ export function BankMatchCard({ account }: { account: Account }) {
     <Glass pad={20} style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
       <div style={{ fontWeight: 750, fontSize: 13 }} className="muted">{short(account.name).toUpperCase()} <InfoTip text="Everything in this account in the app: your funds plus anything not in a fund. Compare it with what your bank shows; Match my bank puts any difference into the right fund." /></div>
       <div className="money" style={{ fontSize: 32, fontWeight: 800, lineHeight: 1.1 }}>{formatMoney(total, account.currency)}</div>
-      <div className="small muted">In funds {formatMoney(inFunds, account.currency)}{b?.unassigned ? <> · <span style={{ color: 'rgb(var(--amber))' }}>not in a fund {formatMoney(b.unassigned, account.currency)}</span></> : ''}</div>
+      <div className="small muted">In funds {formatMoney(inFunds, account.currency)}{b?.unassigned ? <> · <button type="button" className="link-btn" aria-expanded={loose} onClick={() => setLoose((x) => !x)} style={{ color: 'rgb(var(--amber))' }}>not in a fund {formatMoney(b.unassigned, account.currency)} {loose ? '▴' : '▾'}</button></> : ''}</div>
+      {loose && !!b?.unassigned && <LooseBreakdown account={account} onMatch={() => setOpen(true)} />}
       <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
         {snap && !recent ? <span className="faint">Last checked against the bank {formatDateCR(snap.date)}</span> : snap ? (gap === 0
           ? <span style={{ color: 'rgb(var(--win))' }}>✓ Matches the bank ({formatDateCR(snap.date).slice(0, 5)})</span>
@@ -43,6 +45,33 @@ export function BankMatchCard({ account }: { account: Account }) {
         {open && <MatchForm account={account} onDone={() => setOpen(false)} />}
       </Sheet>
     </Glass>
+  );
+}
+
+/** "Not in a fund", taken apart: the starting balance plus each entry that has no fund. */
+function LooseBreakdown({ account, onMatch }: { account: Account; onMatch: () => void }) {
+  const l = useLedger();
+  const qa = useQuickAdd();
+  const parts = unassignedParts(account, l.transactions);
+  const m = (n: number) => formatMoney(n, account.currency);
+  return (
+    <div className="loose-box small" role="region" aria-label="What is not in a fund">
+      <p style={{ margin: '0 0 6px' }}>Money the app has in this account that no fund (Mine, Hers…) owns. It adds up from:</p>
+      {parts.map((p, i) => p.kind === 'opening' ? (
+        <div key="opening" className="fund-act-row" style={{ cursor: 'default' }}>
+          <span className="muted">{formatDateCR(p.date).slice(0, 5)}</span>
+          <span className="fund-act-what"><span>Starting balance</span><span className="faint">What the account had when the app starts counting (your import's first month-end balance)</span></span>
+          <span className="money">{m(p.amount)}</span>
+        </div>
+      ) : (
+        <button key={p.tx!.id + i} type="button" className="fund-act-row" onClick={() => qa.open(p.tx!)}>
+          <span className="muted">{formatDateCR(p.date).slice(0, 5)}</span>
+          <span className="fund-act-what"><span>{p.tx!.description || l.category.get((p.tx as { categoryId?: string }).categoryId ?? '')?.name || p.tx!.kind}</span><span className="faint">Saved here without a fund. Open it and pick one.</span></span>
+          <span className="money" style={{ color: p.amount < 0 ? 'rgb(var(--loss))' : undefined }}>{p.amount > 0 ? '+' : ''}{m(p.amount)}</span>
+        </button>
+      ))}
+      <p style={{ margin: '8px 0 0' }} className="muted">If your bank doesn't have this money (your funds alone already match it), it was counted twice. <button type="button" className="link-btn" onClick={onMatch}>Match my bank</button> removes it, nothing counts as spending. If it is real, open an entry and choose the fund, or let Match move it into one.</p>
+    </div>
   );
 }
 

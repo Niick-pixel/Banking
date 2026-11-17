@@ -4,10 +4,11 @@ import { useLedger } from '../app/data';
 import { Glass, Pill } from '../design/components';
 import { PageHeader } from '../ui/Sheet';
 import { gridFromXlsx } from '../import/grid';
-import { parseWorkbook, remapCategory, type ImportPlan } from '../import/workbook';
+import { openingFunds, parseWorkbook, remapCategory, withOpeningFunds, type ImportPlan } from '../import/workbook';
+import { ChipGroup } from '../design/components/ChipGroup';
 import { commitImport, newId, undoImport, UndoBlockedError } from '../db/repo';
 import { formatMoney } from '../lib/money';
-import { todayISO } from '../lib/dates';
+import { formatDateCR, todayISO } from '../lib/dates';
 import { getEngine } from '../sync';
 import type { ImportBatch } from '../domain/schemas';
 
@@ -21,6 +22,7 @@ export default function Import() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [batch, setBatch] = useState<ImportBatch | null>(null);
+  const [opening, setOpening] = useState<Record<string, string>>({});
 
   async function onFile(file: File) {
     setErr(''); setBusy(true);
@@ -34,13 +36,16 @@ export default function Import() {
   async function confirm() {
     if (!plan) return;
     setBusy(true);
-    try { await getEngine()?.backupNow('pre-import'); setBatch(await commitImport(plan)); setStep('done'); } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+    const offers = openingFunds(plan, todayISO(), new Set(l.accounts.map((a) => a.id)));
+    const choices = Object.fromEntries(offers.map((o) => [o.accountId, opening[o.accountId] ?? o.suggestion]));
+    try { await getEngine()?.backupNow('pre-import'); setBatch(await commitImport(withOpeningFunds(plan, choices, newId, Date.now()))); setStep('done'); } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
   async function undo(id: string) {
     setErr('');
     try { await undoImport(id); } catch (e) { setErr(e instanceof UndoBlockedError ? e.message : String(e)); }
   }
 
+  const offers = plan ? openingFunds(plan, todayISO(), new Set(l.accounts.map((a) => a.id))) : [];
   const errors = plan?.issues.filter((i) => i.level === 'error') ?? [];
   const reconOk = plan?.reconciliation.every((r) => r.imported.income === r.tracker.income && r.imported.expenses === r.tracker.expenses && r.imported.saved === r.tracker.saved);
   const alreadyImported = l.batches.some((b) => b.status === 'committed' && b.kind === 'workbook');
@@ -111,6 +116,18 @@ export default function Import() {
               </table>
             </div>
           </Glass>
+
+          {offers.map((o) => {
+            const pots = plan.pots.filter((p) => p.accountId === o.accountId && !p.archived);
+            return (
+              <Glass strong key={o.accountId} style={{ display: 'grid', gap: 10 }}>
+                <h2 style={{ margin: 0, fontSize: 18 }}>Starting balance of {o.accountName}</h2>
+                <p className="small muted" style={{ margin: 0, maxWidth: 720 }}>Your Net Worth sheet says this account had {formatMoney(o.amount, 'CRC')} when the app starts counting it ({formatDateCR(o.date)}). The workbook doesn't say whose money that was, so without an answer it would show as "not in a fund". {o.why}</p>
+                <ChipGroup<string> label={`Where do those ${formatMoney(o.amount, 'CRC')} belong?`} value={opening[o.accountId] ?? o.suggestion} onChange={(v) => v && setOpening((x) => ({ ...x, [o.accountId]: v }))}
+                  options={[...pots.map((p) => ({ value: p.id, label: `In ${p.name}` })), { value: 'drop', label: 'Already in my savings rows: leave it out' }, { value: 'leave', label: 'Not sure: keep it outside the funds' }]} />
+              </Glass>
+            );
+          })}
 
           <Glass strong>
             <h2 style={{ marginTop: 0, fontSize: 18 }}>Validation report</h2>

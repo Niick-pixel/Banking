@@ -125,3 +125,22 @@ describe.runIf(existsSync(REAL))('real workbook (local only)', () => {
     for (const r of plan.reconciliation) expect({ m: r.month, ...r.imported }).toEqual({ m: r.month, ...r.tracker });
   });
 });
+
+describe('starting balance of a fund account', () => {
+  it('is offered, and moving it into a fund leaves nothing outside a fund', async () => {
+    const { openingFunds, withOpeningFunds } = await import('./workbook');
+    const { accountBalances } = await import('../domain/ledger');
+    let k = 0;
+    const plan = parseWorkbook(synthetic(), { ...opts, newId: () => `o${++k}` });
+    const offers = openingFunds(plan, '2026-11-14');
+    const sav = plan.accounts.find((a) => /ahorro/i.test(a.name))!;
+    expect(offers.map((o) => o.accountId)).toEqual([sav.id]);
+    expect(offers[0]!.amount).toBe(sav.openingBalance);
+    const mine = plan.pots.find((p) => p.owner === 'mine')!;
+    const moved = withOpeningFunds(plan, { [sav.id]: mine.id }, () => 'x1', 0);
+    expect(accountBalances(moved.accounts, moved.transactions).get(sav.id)!.unassigned).toBe(0);
+    const dropped = withOpeningFunds(plan, { [sav.id]: 'drop' }, () => 'x2', 0);
+    expect(dropped.accounts.find((a) => a.id === sav.id)!.openingBalance).toBe(0);
+    expect(openingFunds(plan, '2026-11-14', new Set([sav.id]))).toEqual([]);
+  });
+});
