@@ -141,7 +141,17 @@ export function CoachProvider({ children }: { children: ReactNode }) {
       },
       setCap: (categoryId, month, dailyCap) => patchState({ caps: [...s().caps.filter((c) => !(c.categoryId === categoryId && c.month === month)), { categoryId, month, dailyCap, setOn: today }] }),
       clearCap: (categoryId, month) => patchState({ caps: s().caps.filter((c) => !(c.categoryId === categoryId && c.month === month)) }),
-      updateBalance: async (accountId, balance) => { await saveSnapshot(accountId, today, balance); },
+      // Same as a check-in: remember what the bank shows and correct the app's balance to it.
+      updateBalance: async (accountId, balance) => {
+        await saveSnapshot(accountId, today, balance);
+        const acc = l.account.get(accountId);
+        const diff = balance - (l.balances.get(accountId)?.total ?? 0);
+        if (acc && diff) {
+          const now = Date.now();
+          await saveTransaction(TransactionSchema.parse({ id: newId(), kind: 'adjustment', date: today, dateEstimated: false, currency: acc.currency, tags: ['check-in'], notes: '', createdAt: now, updatedAt: now,
+            side: { accountId }, signedAmount: diff, reason: 'Balance check-in: match the bank', description: 'Balance check-in adjustment' }));
+        }
+      },
       saveTo,
       applySplit: async (lines, fromAccountId, sourceKey) => {
         for (const line of lines) if (line.amount > 0 && line.target !== 'free' && (line.potId || line.accountId)) await saveTo({ amount: line.amount, potId: line.potId, accountId: line.accountId, fromAccountId, target: line.target, note: `Windfall → ${line.label}` });

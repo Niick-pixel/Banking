@@ -4,7 +4,7 @@ import { useLedger } from '../app/data';
 import { useCssVar } from '../app/theme';
 import { Glass, Money, Pill, Segmented } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
-import { accountBalances, debtStatus, potsByMonth } from '../domain/ledger';
+import { debtStatus, potsByMonth, balancesNow } from '../domain/ledger';
 import { fundProgress } from '../domain/debts';
 import { budgetFor } from '../domain/tracker';
 import { newId, saveTransaction } from '../db/repo';
@@ -15,7 +15,6 @@ import { PayDebtForm } from './PayDebt';
 import { InfoTip } from '../design/components/InfoTip';
 import { FundMovesFix } from './FundMovesFix';
 import { FundActivity } from './FundActivity';
-import { BankMatchCard } from './BankMatch';
 import { asSavings, crossesSavings } from '../domain/fundmoves';
 import type { FlowContext } from '../domain/ledger';
 import { usePersisted } from '../app/persist';
@@ -46,21 +45,22 @@ export default function Pots() {
   }
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Funds" sub="Money set aside inside your accounts, by whose it is. Fully automatic from your movements.">
         <button className="btn" onClick={() => setMove(true)}>Move between funds</button>
       </PageHeader>
       <FundMovesFix />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="funds-grid fill">
+      <div className="funds-col">
+      <div className="funds-tiles">
         {(['hers', 'mine', ...(hasShared ? ['shared'] as const : [])] as const).map((o) => (
-          <Glass key={o} pad={20}>
+          <Glass key={o} pad={16}>
             <div style={{ color: `var(--${o})`, fontWeight: 750, fontSize: 13 }}>● {OWNER_LABEL[o].toUpperCase()}</div>
-            <Money amount={byOwner[o]} size={32} weight={800} tone="auto" />
+            <Money amount={byOwner[o]} size={28} weight={800} tone="auto" />
             <div className="small muted">{o === 'hers' ? 'Not yours to spend' : o === 'mine' ? 'Your own savings' : 'Shared'}</div>
           </Glass>
         ))}
-        {[...new Set(l.pots.filter((p) => !p.archived).map((p) => p.accountId))].map((id) => l.account.get(id)).filter((a) => !!a).map((a) => <BankMatchCard key={a!.id} account={a!} />)}
       </div>
 
       {funded.map((d) => {
@@ -71,28 +71,29 @@ export default function Pots() {
         const plan = (hersCat ? budgetFor(l.budgets, hersCat.id, today.slice(0, 7)) : 0) || d.plannedMonthlyPayment || 0;
         const f = fundProgress(Math.max(0, st.balance), setAside, plan, today);
         return (
-          <Glass key={d.id} strong style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>Paying back: {d.creditor}</h2>
-              <button className="btn btn-primary" disabled={setAside <= 0} onClick={() => setPay(d)}>Pay from {pot.name}</button>
+          <Glass key={d.id} strong pad={14} className="fund-debt">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-h" style={{ margin: 0 }}>Paying back: {d.creditor}</h2>
+              <button className="btn btn-primary btn-sm" disabled={setAside <= 0} onClick={() => setPay(d)}>Pay from {pot.name}</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }} className="small">
-              <div><div className="muted">Still owed</div><b className="money" style={{ fontSize: 18 }}>{formatMoney(f.owed, 'CRC')}</b></div>
-              <div><div className="muted">Set aside</div><b className="money" style={{ fontSize: 18, color: `var(--${pot.owner})` }}>{formatMoney(f.setAside, 'CRC')}</b></div>
-              <div><div className="muted">Still to set aside</div><b className="money" style={{ fontSize: 18 }}>{formatMoney(f.toSetAside, 'CRC')}</b></div>
-              <div><div className="muted">Monthly set-aside</div><b className="money" style={{ fontSize: 18 }}>{plan ? formatMoney(plan, 'CRC') : '—'}</b></div>
-              <div><div className="muted">Can pay in full by</div><b style={{ fontSize: 18 }}>{f.payInFullBy ? formatDateCR(f.payInFullBy) : '—'}</b></div>
+            <div className="fund-debt-stats small">
+              <div><div className="muted">Still owed</div><b className="money">{formatMoney(f.owed, 'CRC')}</b></div>
+              <div><div className="muted">Set aside</div><b className="money" style={{ color: `var(--${pot.owner})` }}>{formatMoney(f.setAside, 'CRC')}</b></div>
+              <div><div className="muted">Still to set aside</div><b className="money">{formatMoney(f.toSetAside, 'CRC')}</b></div>
+              <div><div className="muted">Monthly set-aside</div><b className="money">{plan ? formatMoney(plan, 'CRC') : '—'}</b></div>
+              <div><div className="muted">Can pay in full by</div><b>{f.payInFullBy ? formatDateCR(f.payInFullBy) : '—'}</b></div>
             </div>
-            <div className="bar" style={{ height: 12 }} role="img" aria-label={`${Math.round(f.covered * 100)}% covered`}><span style={{ width: `${f.covered * 100}%`, background: `var(--chart-${pot.owner === 'hers' ? 'hers' : 'mine'})` }} /></div>
-            <div className="small muted">{Math.round(f.covered * 100)}% covered. Paying from the fund lowers both the fund and the debt in one step, so it's never counted as spending twice.</div>
+            <div className="bar" style={{ height: 8 }} role="img" aria-label={`${Math.round(f.covered * 100)}% covered`}><span style={{ width: `${f.covered * 100}%`, background: `var(--chart-${pot.owner === 'hers' ? 'hers' : 'mine'})` }} /></div>
+            <div className="small muted">{Math.round(f.covered * 100)}% covered <InfoTip text="Paying from the fund lowers both the fund and the debt in one step, so it's never counted as spending twice." /></div>
           </Glass>
         );
       })}
 
       <FundActivity />
+      </div>
 
-      <div className="funds-charts">
-      <Glass strong pad={16} style={{ display: 'grid', gap: 12 }}>
+      <div className="funds-col">
+      <Glass strong pad={16} className="funds-month">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h2 className="card-h" style={{ margin: 0 }}>Funds month by month</h2>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -103,7 +104,7 @@ export default function Pots() {
           </div>
         </div>
         {view === 'chart' ? (
-          <div style={{ height: 280 }} role="img" aria-label="Money added to funds each month, Hers and Mine stacked. Switch to Table for exact values.">
+          <div className="funds-month-body" role="img" aria-label="Money added to funds each month, Hers and Mine stacked. Switch to Table for exact values.">
             <ResponsiveContainer>
               <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} stackOffset="sign">
                 <CartesianGrid vertical={false} stroke={grid} />
@@ -118,7 +119,7 @@ export default function Pots() {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="funds-month-body scroll-box" tabIndex={0}>
             <table className="table">
               <thead><tr><th>Month</th><th className="num">Hers</th><th className="num">Mine</th>{hasShared && <th className="num">Shared</th>}<th className="num">Total</th><th className="num">Balance</th></tr></thead>
               <tbody>{months.map((m, i) => (
@@ -132,6 +133,7 @@ export default function Pots() {
 
       <AssociationCard year={year} />
       </div>
+      </div>
 
       <Sheet open={!!pay} onClose={() => setPay(null)} title={pay ? `Pay ${pay.creditor}` : ''}>
         {pay && <PayDebtForm debt={pay} onDone={() => setPay(null)} />}
@@ -139,7 +141,7 @@ export default function Pots() {
       <Sheet open={move} onClose={() => setMove(false)} title="Move money between funds">
         {move && <MoveForm onDone={() => setMove(false)} />}
       </Sheet>
-    </>
+    </div>
   );
 }
 
@@ -195,10 +197,10 @@ function AssociationCard({ year }: { year: number }) {
     const end = new Date(Date.UTC(year, i + 1, 0)).toISOString().slice(0, 10);
     if (end.slice(0, 7) > today.slice(0, 7)) return { month: m };
     const asOf = end > today ? today : end;
-    const bal = accountBalances(l.accounts, l.transactions, asOf);
+    const bal = balancesNow(l.accounts, l.transactions, asOf);
     const row: Record<string, number | string> = { month: m };
     for (const a of accs) {
-      const snap = l.snapshots.filter((x) => x.accountId === a.id && x.date.slice(0, 7) === end.slice(0, 7)).at(-1);
+      const snap = end.slice(0, 7) === today.slice(0, 7) ? undefined : l.snapshots.filter((x) => x.accountId === a.id && x.date.slice(0, 7) === end.slice(0, 7)).at(-1);
       row[a.id] = snap ? snap.balance : a.openingDate <= asOf ? bal.get(a.id)?.total ?? 0 : 0;
     }
     return row;

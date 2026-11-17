@@ -6,7 +6,7 @@
  * the money is gone.
  */
 import type { Account, BalanceSnapshot, Debt, InstallmentPlan, Pot, Transaction } from './schemas';
-import { accountBalances, debtStatus } from './ledger';
+import { debtStatus, balancesNow } from './ledger';
 import { planProgress } from './installments';
 import { lastDayOfMonth, type ISODate } from '../lib/dates';
 
@@ -31,9 +31,10 @@ export function balanceSheet(inp: NetWorthInput, year: number, month: number, to
   const asOf = monthEnd < today ? monthEnd : today;
   const live = inp.accounts.filter((a) => a.openingDate <= monthEnd);
   if (!live.length) return null;
-  const ledger = accountBalances(inp.accounts, inp.transactions.filter((t) => t.date <= asOf), asOf);
+  const ledger = balancesNow(inp.accounts, inp.transactions, asOf);
   const accounts: AccountMonth[] = live.map((a) => {
-    const snap = inp.snapshots.filter((s) => s.accountId === a.id && s.date.startsWith(mk)).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
+    // This month: the live balance (same as every screen). Past months: the month-end statement if there is one.
+    const snap = mk === today.slice(0, 7) ? undefined : inp.snapshots.filter((s) => s.accountId === a.id && s.date.startsWith(mk)).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
     return snap ? { accountId: a.id, balance: snap.balance, source: 'statement' } : { accountId: a.id, balance: ledger.get(a.id)?.total ?? 0, source: 'ledger' };
   });
   const isCard = new Set(live.filter((a) => a.type === 'credit_card').map((a) => a.id));

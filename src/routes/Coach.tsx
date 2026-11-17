@@ -177,17 +177,17 @@ export function SafeToSpendCard() {
   const z = s.belowZero[0];
   if (z) {
     // The app has a debit account below zero: that's a stale balance or a wrong entry, not "you're short".
-    const since = l.transactions.filter((t) => (!z.asOf || t.date > z.asOf) && t.date <= todayISO() && legsOf(t).some((x) => x.accountId === z.accountId && x.amount < 0))
+    const since = l.transactions.filter((t) => (!z.asOf || t.date >= z.asOf) && t.date <= todayISO() && legsOf(t).some((x) => x.accountId === z.accountId && x.amount < 0))
       .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
     return (
       <div className="safe" style={{ display: 'grid', gap: 8 }}>
         <span className="small muted">Safe to spend until payday ({until})</span>
         <b style={{ fontSize: 22 }}>Check {z.name} first</b>
-        <p className="small" style={{ margin: 0 }}>The app has it at <b className="money" style={{ color: 'var(--debt)' }}>{crc(z.balance)}</b>. A debit account can't go below zero, so this isn't money you're short: {z.asOf ? <>it's the balance you entered on {formatDateCR(z.asOf).slice(0, 5)} minus what you logged after it, and something there is off.</> : <>no bank balance was ever entered for it.</>} Type what BAC shows today.</p>
+        <p className="small" style={{ margin: 0 }}>The app has it at <b className="money" style={{ color: 'var(--debt)' }}>{crc(z.balance)}</b> (the same figure as Balance check-in). A debit account can't go below zero, so this isn't money you're short: an entry below is wrong or doubled, or a deposit isn't logged. Type what BAC shows today and the app corrects itself.</p>
         <MoneyInput label={`${z.name} balance today`} cta="Save balance" onSubmit={(v) => updateBalance(z.accountId, v)} />
         {since.length > 0 && (
           <div style={{ display: 'grid', gap: 2 }}>
-            <span className="small muted">Taken out of {z.name}{z.asOf ? ` since ${formatDateCR(z.asOf).slice(0, 5)}` : ''}: is one of these wrong?</span>
+            <span className="small muted">Taken out of {z.name}{z.asOf ? ` since your last check-in (${formatDateCR(z.asOf).slice(0, 5)})` : ''}: is one of these wrong or doubled?</span>
             {since.map((t) => (
               <button key={t.id} type="button" className="fund-act-row" onClick={() => qa.open(t)}>
                 <span className="muted">{formatDateCR(t.date).slice(0, 5)}</span>

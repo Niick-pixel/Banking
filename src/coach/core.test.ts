@@ -109,9 +109,12 @@ describe('real-data quirks', () => {
     const ctx = buildContext(input(['2026-06', '2026-07', '2026-08'].map(sum), '2026-11-15'));
     expect(ctx.baselines.get('groc')!.curve).toBeNull();
   });
-  it('a balance you enter already includes undated rows of that month', () => {
-    const snap = { id: 's2', accountId: 'chk', date: '2026-11-15', balance: crcK(245_000), source: 'statement' as const, createdAt: 0, updatedAt: 0 };
-    const ctx = buildContext(input([ex('2026-11-30', 'groc', 50_000, 'Walmart', true), ex('2026-11-15', 'groc', 1_000, 'same day')], '2026-11-15', { snapshots: [snap] }));
-    expect(ctx.spendable).toBe(crcK(245_000));
+  it('Coach uses the same balance as every screen (opening + everything that happened, incl. undated rows of this month)', async () => {
+    const { balancesNow } = await import('../domain/ledger');
+    const inp = input([ex('2026-11-30', 'groc', 50_000, 'Walmart', true), ex('2026-11-15', 'groc', 1_000, 'same day'), ex('2026-11-20', 'groc', 9_000, 'future')], '2026-11-15');
+    const ctx = buildContext(inp);
+    const now = balancesNow(inp.accounts, inp.transactions, '2026-11-15').get('chk')!.total;
+    expect(ctx.known.get('chk')).toBe(now);
+    expect(ctx.spendable).toBe(now);
   });
 });

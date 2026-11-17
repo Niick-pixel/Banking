@@ -43,6 +43,23 @@ export interface AccountBalance {
   unassigned: number;
 }
 
+/**
+ * Has this movement happened by `today`? Dated rows: on/before today. Undated workbook rows
+ * sit on their month's last day but were logged during that month, so they count from the month's start.
+ */
+export function happened(t: Transaction, today: ISODate): boolean {
+  return t.date <= today || (!!t.dateEstimated && t.date.slice(0, 7) <= today.slice(0, 7));
+}
+
+/**
+ * THE balance of every account right now, used by every screen (Funds, Check-in, Coach,
+ * Accounts, Wealth, Dashboard): opening balance + every movement that has happened.
+ * A check-in that differs from the bank adds an adjustment, so this always lands on the bank figure.
+ */
+export function balancesNow(accounts: Account[], txs: Transaction[], today: ISODate): Map<string, AccountBalance> {
+  return accountBalances(accounts, txs.filter((t) => happened(t, today)));
+}
+
 /** Balance = opening balance + every posting dated on/after the opening date (and ≤ asOf). */
 export function accountBalances(accounts: Account[], txs: Transaction[], asOf?: ISODate): Map<string, AccountBalance> {
   const out = new Map<string, AccountBalance>();

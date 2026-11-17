@@ -3,7 +3,7 @@
  * pure function over the ledger; the Dashboard shows a badge, Settings the list.
  */
 import type { Account, BalanceSnapshot, Budget, Category, Debt, Pot, SelfLoan, Transaction } from './schemas';
-import { accountBalances, debtStatus, monthlyFlows } from './ledger';
+import { debtStatus, monthlyFlows, balancesNow } from './ledger';
 import { selfLoanProgress } from './debts';
 import { uncountedFundMoves } from './fundmoves';
 import { daysBetween, monthKey, type ISODate } from '../lib/dates';
@@ -59,7 +59,7 @@ export function dataHealth(inp: HealthInput, today: ISODate): HealthIssue[] {
   if (dups.length) issues.push({ id: 'duplicates', level: 'warn', title: `${dups.length} possible duplicate pair(s)`, detail: dups.slice(0, 3).map(([a]) => `${fmt(a.kind === 'adjustment' ? a.signedAmount : a.amount)} "${a.description || '—'}" on ${a.date}`).join(' · '), to: '/transactions' });
 
   // 3. Negative pots / non-card accounts below zero
-  const bal = accountBalances(inp.accounts, inp.transactions);
+  const bal = balancesNow(inp.accounts, inp.transactions, today);
   for (const p of inp.pots) {
     const b = bal.get(p.accountId)?.pots.get(p.id) ?? 0;
     if (b < 0) issues.push({ id: `pot-${p.id}`, level: 'error', title: `Fund "${p.name}" is negative (${fmt(b)})`, detail: 'More was taken out than was put in. Check the movements into this fund.', to: '/funds' });
@@ -75,7 +75,7 @@ export function dataHealth(inp: HealthInput, today: ISODate): HealthIssue[] {
   for (const a of inp.accounts) {
     const last = inp.snapshots.filter((s) => s.accountId === a.id && s.date <= today).sort((x, y) => x.date.localeCompare(y.date)).at(-1);
     if (!last) continue;
-    const ledger = accountBalances(inp.accounts, inp.transactions, last.date).get(a.id)?.total ?? 0;
+    const ledger = balancesNow(inp.accounts, inp.transactions, last.date).get(a.id)?.total ?? 0;
     const diff = last.balance - ledger;
     if (diff !== 0) issues.push({ id: `stmt-${a.id}`, level: 'warn', title: `${a.name}: statement and ledger differ by ${fmt(diff)}`, detail: `Statement ${last.date}: ${fmt(last.balance)}, ledger: ${fmt(ledger)}. Movements are missing or an opening balance is off.`, to: '/accounts' });
   }

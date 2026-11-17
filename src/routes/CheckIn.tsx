@@ -9,7 +9,6 @@ import { rateForDay } from '../app/fx';
 import { Glass, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
 import { checkInStatus, quincenaStart, statementBalance } from '../domain/checkin';
-import { accountBalances } from '../domain/ledger';
 import { TransactionSchema, type Account } from '../domain/schemas';
 import { newId, saveAccount, saveSnapshot, saveTransaction } from '../db/repo';
 import { formatMoney, parseAmountInput } from '../lib/money';
@@ -38,7 +37,7 @@ export default function CheckIn() {
   }, [hasCards, today]);
 
   const rate = parseAmountInput(rateRaw, 'CRC');
-  const ledgerNow = useMemo(() => accountBalances(l.accounts, l.transactions, today), [l.accounts, l.transactions, today]);
+  const ledgerNow = l.balances; // the same balance every other screen shows
   const spendCats = l.categories.filter((c) => !c.archived && ['Living', 'Discretionary', 'Fixed'].includes(c.group));
   const otherCat = spendCats.find((c) => /^other/i.test(c.name))?.id ?? spendCats[0]?.id ?? '';
 

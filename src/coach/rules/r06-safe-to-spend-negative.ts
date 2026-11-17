@@ -11,9 +11,9 @@ export const R6 = rule({
     const z = s.belowZero[0];
     if (z) return [make({
       ruleId: 'R6', severity: 'warning', title: `${z.name} is below zero in the app (${crc(z.balance)})`,
-      body: ctx.say(`A debit account can't go below zero, so the app's balance is off: it is ${z.asOf ? `your balance from ${ddmm(z.asOf)} plus everything logged after it` : 'the ledger total'}. Type what BAC shows today, or fix an entry that came out of this account by mistake. Safe-to-spend will be right after that.`,
+      body: ctx.say(`A debit account can't go below zero, so an entry is wrong or doubled, or a deposit isn't logged${z.asOf ? ` since your check-in on ${ddmm(z.asOf)}` : ''}. Type what BAC shows today and the app corrects itself; safe-to-spend follows.`,
         `The app has ${z.name} below zero, which can't be right. Type what BAC shows today and safe-to-spend will be right again.`),
-      why: { formula: z.asOf ? 'last balance you entered + movements logged after it' : 'opening balance + every movement', inputs: { balance: crc(z.balance), ...(z.asOf ? { since: ddmm(z.asOf) } : {}) }, threshold: '< ₡0' },
+      why: { formula: 'opening balance + every movement so far (same as Balance check-in)', inputs: { balance: crc(z.balance), ...(z.asOf ? { since: ddmm(z.asOf) } : {}) }, threshold: '< ₡0' },
       impactCRC: -z.balance, actWithinDays: 2, confidence: 0.9,
       action: { label: 'Enter balance', kind: 'update_balance', payload: { accountId: z.accountId } },
       dedupeKey: `R6:below:${z.accountId}:${z.asOf ?? ''}`,

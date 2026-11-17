@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useSyncExternalStore } from 'react';
 import { db } from '../db/db';
-import { accountBalances, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
+import { balancesNow, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
 import type { Account, Budget, SelfLoan, Goal, RecurringRule, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
 
 export interface Ledger {
@@ -54,7 +54,7 @@ export function useLedger(): Ledger {
     let balances = new Map<string, AccountBalance>();
     let flows = new Map<string, MonthFlow>();
     try {
-      balances = accountBalances(r.accounts, r.transactions);
+      balances = balancesNow(r.accounts, r.transactions, todayISO());
       flows = monthlyFlows(r.transactions.filter((t) => t.currency === 'CRC'), { accountType: (id) => account.get(id)?.type });
     } catch (e) { console.error(e); }
     r.transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt));

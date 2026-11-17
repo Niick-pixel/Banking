@@ -1,10 +1,10 @@
-import { accountBalances } from '../../domain/ledger';
+import { balancesNow } from '../../domain/ledger';
 import { shiftMonth, type Ctx } from '../context';
 import { crc, make, rule } from './rule';
 import { lastDayOfMonth } from '../../lib/dates';
 
 function coverage(ctx: Ctx, asOf: string, essentials: number) {
-  const bal = accountBalances(ctx.accounts, ctx.transactions, asOf);
+  const bal = balancesNow(ctx.accounts, ctx.transactions, asOf);
   let liquid = 0;
   for (const a of ctx.accounts) if (a.isLiquid && a.type !== 'credit_card' && a.currency === 'CRC') liquid += bal.get(a.id)?.total ?? 0;
   for (const p of ctx.pots) if (p.owner === 'hers') liquid -= Math.max(0, bal.get(p.accountId)?.pots.get(p.id) ?? 0);
