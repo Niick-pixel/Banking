@@ -157,6 +157,7 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
     if (keepPlaces.current !== null) { setCategoryId(keepPlaces.current); keepPlaces.current = null; return; }
     if (kind === 'savings') { setFrom(direction === 'deposit' ? spending : firstSavings); setTo(direction === 'deposit' ? firstSavings : spending); }
     else if (kind === 'transfer') { setFrom(spending); setTo(plc.find((p) => p.key !== spending)?.key ?? ''); }
+    else if (kind === 'tasa_cero') { const c = l.accounts.find((a) => a.type === 'credit_card' && !a.archived); setFrom(c ? `${c.id}|` : spending); }
     else { setFrom(spending); }
     setCategoryId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -235,8 +236,9 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const dirty = !!(amountRaw || usdRaw || description || (categoryId && !edit));
   const dayChip = (n: number) => { const d = new Date(Date.parse(`${todayISO()}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10); return d; };
   const dateChoice = date === dayChip(0) ? 'today' : date === dayChip(1) ? 'yesterday' : date === dayChip(2) ? 'two' : 'other';
-  const accounts = plc.filter((p) => !p.key.split('|')[1]);
-  const placeLabel = (p: (typeof plc)[number]) => p.label.replace(/\s*\((checking|savings)\)/i, '');
+  const RANK: Record<string, number> = { checking: 0, cash: 1, credit_card: 2, savings: 3, goal_savings: 3, loan_fund: 4, association_voluntary: 5, association_cesantia: 6, investment: 7 };
+  const accounts = plc.filter((p) => !p.key.split('|')[1]).sort((a, b) => (RANK[l.account.get(a.key.split('|')[0]!)?.type ?? ''] ?? 9) - (RANK[l.account.get(b.key.split('|')[0]!)?.type ?? ''] ?? 9) || a.label.localeCompare(b.label));
+  const placeLabel = (p: (typeof plc)[number]) => p.label.replace(/\s*\((checking|savings|obrero \+ patronal)\)/i, '').replace(/^Association\s*-\s*/i, 'Assoc. ').replace(/Investments \/ Trading/i, 'Investments');
   const ORDER = ['Income', 'Fixed', 'Living', 'Discretionary', 'Debt Service', 'Savings'];
   const groups = [...new Set(cats.map((c) => c.group))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   const similar = description.trim().length >= 3 ? l.transactions.filter((t) => t.kind === kind && t.description.toLowerCase().includes(description.trim().toLowerCase()) && t.id !== edit?.id) : [];
@@ -247,13 +249,27 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   ];
   const kindLabel = KINDS.find((k) => k.value === kind)!.label;
 
+  // Which accounts make sense on each side, per kind. Others are hidden (not disabled), and the label says why.
+  const accOf = (k: string) => k.split('|')[0] ?? '';
+  const typeOf = (k: string) => l.account.get(accOf(k))?.type ?? 'checking';
+  type AT = NonNullable<ReturnType<typeof typeOf>>;
+  const SPENDING: AT[] = ['checking', 'cash', 'credit_card'];
+  const SAVINGS: AT[] = ['savings', 'goal_savings', 'loan_fund', 'association_voluntary', 'association_cesantia', 'investment'];
+  const ALL: AT[] = [...SPENDING, ...SAVINGS];
+  const fromTypes: AT[] = kind === 'tasa_cero' ? ['credit_card'] : kind === 'expense' ? SPENDING : kind === 'income' ? ['checking', 'cash', ...SAVINGS] : kind === 'debt_payment' ? ['checking', 'cash', ...SAVINGS]
+    : kind === 'savings' ? (direction === 'deposit' ? ['checking', 'cash'] : SAVINGS) : ALL;
+  const toTypes: AT[] = kind === 'savings' ? (direction === 'deposit' ? SAVINGS : ['checking', 'cash']) : ALL;
+  const hasTo = kind === 'transfer' || kind === 'savings';
+  const fromLabel = kind === 'income' ? 'Into' : kind === 'tasa_cero' ? 'Card' : kind === 'savings' && direction === 'withdrawal' ? 'Take from' : 'From';
+  const fromInfo = kind === 'income' ? 'The account the money landed in.' : kind === 'tasa_cero' ? 'The card the purchase was made with.' : 'Where the money came out of. Card purchases: pick the card, so its balance stays right.';
+  const fromNote = kind === 'tasa_cero' ? 'only credit cards' : kind === 'expense' ? 'savings accounts: use Savings → Take out' : kind === 'savings' ? (direction === 'deposit' ? 'only everyday accounts' : 'only savings accounts') : undefined;
+  const toNote = kind === 'savings' ? (direction === 'deposit' ? 'only savings accounts' : 'only everyday accounts') : undefined;
+  const fromFunds = (kind === 'savings' && direction === 'withdrawal') || kind === 'transfer' || kind === 'debt_payment' || (kind === 'income' && l.pots.some((p) => p.accountId === accOf(from)))
+    ? l.pots.filter((p) => p.accountId === accOf(from) && !p.archived) : [];
+  const toFunds = hasTo ? l.pots.filter((p) => p.accountId === accOf(to) && !p.archived) : [];
+
   const strip = l.accounts.length ? (
     <div className="qa-strip">
-      <ChipGroup<string> inline size="sm" label={kind === 'income' ? 'Into' : 'From'}
-        info={kind === 'income' ? 'The account the money landed in.' : 'Where the money came out of. Funds inside an account are offered in the right column for savings and transfers.'}
-        value={`${from.split('|')[0]}|`} onChange={(v) => v && setFrom(v)}
-        hiddenNote={kind === 'tasa_cero' ? 'only credit cards: Tasa Cero is a card plan' : undefined}
-        options={accounts.map((p) => ({ value: p.key, label: placeLabel(p), hidden: kind === 'tasa_cero' && l.account.get(p.key.split('|')[0]!)?.type !== 'credit_card' }))} />
       <ChipGroup<string> inline size="sm" compact label="Date" value={dateChoice} onChange={(v) => { if (v === 'today') setDate(dayChip(0)); else if (v === 'yesterday') setDate(dayChip(1)); else if (v === 'two') setDate(dayChip(2)); }}
         options={[{ value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'two', label: '2 days ago' }, ...(dateChoice === 'other' ? [{ value: 'other', label: date.split('-').reverse().join('/') }] : [])]} />
       <input className="input qa-date" type="date" aria-label="Another date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
@@ -357,16 +373,24 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
 
         {/* Column 3: where it goes */}
         <div className="qa-col">
-          {(kind === 'transfer' || kind === 'savings' || kind === 'debt_payment') && l.pots.some((p) => p.accountId === from.split('|')[0]) && (
-            <ChipGroup<string> size="sm" label="From fund" info="Which part of the account the money comes from. Unassigned is the part not set aside in any fund."
-              value={from} onChange={(v) => v && setFrom(v)}
-              options={[{ value: `${from.split('|')[0]}|`, label: 'Unassigned' }, ...l.pots.filter((p) => p.accountId === from.split('|')[0] && !p.archived).map((p) => ({ value: `${p.accountId}|${p.id}`, label: p.name }))]} />
+          <ChipGroup<string> size="sm" label={fromLabel} value={accOf(from) ? `${accOf(from)}|` : null} onChange={(v) => v && setFrom(v)} flash={flash}
+            info={fromInfo} hiddenNote={fromNote}
+            options={accounts.map((p) => ({ value: p.key, label: placeLabel(p), hidden: !fromTypes.includes(typeOf(p.key)) }))} />
+          {fromFunds.length > 0 && (
+            <ChipGroup<string> size="sm" label={direction === 'deposit' && kind === 'savings' ? 'From fund' : kind === 'income' ? 'Into fund' : 'From fund'} value={from} onChange={(v) => v && setFrom(v)}
+              info="Which part of the account. Unassigned is the part not set aside in any fund."
+              options={[{ value: `${accOf(from)}|`, label: 'Unassigned' }, ...fromFunds.map((p) => ({ value: `${p.accountId}|${p.id}`, label: p.name }))]} />
           )}
-          {(kind === 'transfer' || kind === 'savings') && (
-            <ChipGroup<string> size="sm" label={kind === 'savings' && direction === 'withdrawal' ? 'Back into' : 'To'} value={to || null} onChange={(v) => v && setTo(v)} flash={flash}
-              required info="Where the money went. Funds (Mine, Hers…) are parts of an account." hiddenNote={from ? 'the account it comes from is not offered' : undefined}
-              options={plc.map((p) => ({ value: p.key, label: placeLabel(p), hidden: p.key === from }))} />
-          )}
+          {hasTo && (<>
+            <ChipGroup<string> size="sm" label={kind === 'savings' && direction === 'withdrawal' ? 'Back into' : 'To'} value={accOf(to) ? `${accOf(to)}|` : null} onChange={(v) => v && setTo(v)} flash={flash}
+              required info="Where the money went." hiddenNote={toNote}
+              options={accounts.map((p) => ({ value: p.key, label: placeLabel(p), hidden: !toTypes.includes(typeOf(p.key)) || (kind === 'transfer' && accOf(p.key) === accOf(from) && !fromFunds.length) }))} />
+            {toFunds.length > 0 && (
+              <ChipGroup<string> size="sm" label="Into fund" value={to} onChange={(v) => v && setTo(v)}
+                info="Mine, Hers… are parts of the account. The savings category picks the matching fund for you."
+                options={[{ value: `${accOf(to)}|`, label: 'Unassigned' }, ...toFunds.map((p) => ({ value: `${p.accountId}|${p.id}`, label: p.name }))]} />
+            )}
+          </>)}
           {kind === 'debt_payment' && (
             <ChipGroup<string> size="sm" label="Debt" required value={debtId || null} onChange={(v) => setDebtId(v ?? '')} flash={flash}
               info="Paying from a fund (e.g. Hers) takes it out of the fund and lowers the debt in one step, counted once."
@@ -381,13 +405,6 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
             </div>
             {!accounts.some((p) => l.account.get(p.key.split('|')[0]!)?.type === 'credit_card') && <p className="small" style={{ margin: 0, color: 'var(--debt)' }}>Add your card first in Debts & cards → Balance check-in.</p>}
           </>)}
-          {(kind === 'expense' || kind === 'income') && (
-            <div className="qa-note group">
-              <span className="label">{kind === 'income' ? 'Into' : 'Paid from'} · from the strip</span>
-              <span className="small">{plc.find((p) => p.key === from)?.label ?? '—'}</span>
-              <span className="small faint">Change it in the row above. Card purchases: pick the card, so its balance stays right.</span>
-            </div>
-          )}
           <div className="qa-summary group fill">
             <span className="label">This movement</span>
             <span className="qa-big money" style={{ color: kind === 'income' ? 'var(--income)' : kind === 'expense' ? 'var(--expense)' : kind === 'savings' ? 'var(--savings)' : kind === 'debt_payment' ? 'var(--debt)' : 'var(--text)' }}>{amount ? formatMoney(amount, 'CRC') : '₡—'}</span>
