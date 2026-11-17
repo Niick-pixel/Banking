@@ -36,11 +36,11 @@ export default function Categories() {
   const update = (c: Category, patch: Partial<Category>) => void saveCategory({ ...c, ...patch });
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Categories" sub="What your money goes to. Add, rename or regroup here; new categories show up in the Tracker straight away.">
         <label className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived</label>
       </PageHeader>
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div className="scroll-box fill" tabIndex={0} aria-label="List" style={{ display: 'grid', alignContent: 'start', paddingRight: 4, gap: 16 }}>
         {CATEGORY_GROUPS.map((g) => {
           const cats = l.categories.filter((c) => c.group === g && (showArchived || !c.archived)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
           return (
@@ -83,7 +83,7 @@ export default function Categories() {
       <Sheet open={!!merging} onClose={() => setMerging(null)} title={merging ? `Merge “${merging.name}” into…` : ''}>
         {merging && <MergeForm from={merging} uses={uses.get(merging.id) ?? 0} onDone={() => setMerging(null)} />}
       </Sheet>
-    </>
+    </div>
   );
 }
 

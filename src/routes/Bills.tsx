@@ -9,6 +9,7 @@ import { ChipGroup } from '../design/components/ChipGroup';
 import { describeSchedule, occurrences, suggestRecurring, templateAmount, type CalendarEvent, type Schedule } from '../domain/recurring';
 import { confirmOccurrence, newId, saveRecurring, skipOccurrence } from '../db/repo';
 import { usePref } from '../app/prefs';
+import { usePersisted } from '../app/persist';
 import type { RecurringRule } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { daysInMonth, formatDateCR, lastDayOfMonth, todayISO, toISO } from '../lib/dates';
@@ -17,7 +18,7 @@ const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'Aug
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** ₡185k, ₡1.2M: fits in a calendar cell. */
 const short = (v: number) => { const c = Math.abs(v) / 100; return c >= 1_000_000 ? `₡${(c / 1_000_000).toFixed(c >= 10_000_000 ? 0 : 1)}M` : c >= 1000 ? `₡${Math.round(c / 1000)}k` : `₡${Math.round(c)}`; };
-const TONE: Record<CalendarEvent['tone'], string> = { income: 'var(--income)', expense: 'var(--expense)', savings: 'var(--savings)', debt: 'var(--debt)', card: 'var(--accent)', info: 'var(--text-3)' };
+const TONE: Record<CalendarEvent['tone'], string> = { income: 'var(--income)', expense: 'var(--expense)', savings: 'var(--savings)', debt: 'var(--debt)', card: 'rgb(var(--accent))', info: 'var(--text-3)' };
 const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
 export default function Bills() {
@@ -26,6 +27,7 @@ export default function Bills() {
   const [ym, setYm] = useState(today.slice(0, 7));
   const [day, setDay] = useState<string | null>(today);
   const [edit, setEdit] = useState<RecurringRule | 'new' | null>(null);
+  const [tab, setTab] = usePersisted<'day' | 'next' | 'rec' | 'sug'>('bills.tab', 'day');
   const [payroll] = usePref('payroll');
   const pending = usePendingReminders();
   const [y, m] = ym.split('-').map(Number) as [number, number];
@@ -70,21 +72,21 @@ export default function Bills() {
   const outflow = next60.filter((e) => ['expense', 'debt', 'card', 'savings'].includes(e.tone) && e.source !== 'tasa_cero').reduce((s, e) => s + (e.amount ?? 0), 0);
 
   return (
-    <>
+    <div className="fit">
       <PageHeader title="Bills & recurring" sub="Everything that comes back: pay, bills, savings, cuotas and card due dates.">
         <button className="btn btn-primary" onClick={() => setEdit('new')}>+ Recurring</button>
       </PageHeader>
 
       {pending.length > 0 && (
-        <Glass strong style={{ display: 'grid', gap: 10, marginBottom: 16, borderColor: 'var(--debt)' }} role="region" aria-label="Waiting for confirmation">
+        <Glass strong pad={12} style={{ display: 'grid', gap: 6, flex: 'none', maxHeight: '26vh', overflow: 'auto', borderColor: 'var(--debt)' }} role="region" aria-label="Waiting for confirmation">
           <h2 className="card-h">To confirm ({pending.length})</h2>
           <p className="small muted" style={{ margin: 0 }}>Reminders don't post by themselves. Check the real amount, then confirm or skip.</p>
           {pending.map((p) => <PendingRow key={`${p.rule.id}${p.date}`} p={p} />)}
         </Glass>
       )}
 
-      <div className="bills-grid">
-        <Glass strong style={{ display: 'grid', gap: 10 }}>
+      <div className="bills-grid fill">
+        <Glass strong pad={14} className="bills-cal">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button className="btn btn-sm" aria-label="Previous month" onClick={() => shift(-1)}>‹</button>
             <h2 className="card-h">{MN[m - 1]} {y}</h2>
@@ -102,18 +104,19 @@ export default function Bills() {
               if (!d) return <div key={`x${i}`} className="cal-cell empty" />;
               const evs = byDay.get(d) ?? [];
               return (
-                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} aria-label={`${Number(d.slice(8))}${evs[0] ? ` ${evs[0].title}` : ''}, ${formatDateCR(d)}${evs.length > 1 ? `, plus ${evs.slice(1).map((e) => e.title).join(', ')}` : evs.length ? '' : ', nothing scheduled'}`}>
+                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => { setDay(d); setTab('day'); }} >
                   <span className="cal-top"><span className="cal-num">{Number(d.slice(8))}</span>
                     {d <= today && spentByDay.get(d)?.out ? <span className="cal-spent" title="Spent that day">−{short(spentByDay.get(d)!.out)}</span> : null}</span>
                   {evs.slice(0, 3).map((e, k) => (
-                    <span key={k} className={`cal-ev ${e.status}`} style={{ borderLeftColor: TONE[e.tone] }} aria-hidden>
+                    <span key={k} className={`cal-ev ${e.status}`} style={{ borderLeftColor: TONE[e.tone] }}>
                       <span className="cal-ev-t">{e.title}</span>{e.amount ? <span className="cal-ev-a">{short(e.amount)}</span> : null}
                     </span>
                   ))}
-                  {evs.length > 3 && <span className="cal-more" aria-hidden>+{evs.length - 3} more</span>}
+                  {evs.length > 3 && <span className="cal-more">+{evs.length - 3} more</span>}
                   {evs.length < 3 && (suggestedByDay.get(d) ?? []).slice(0, 3 - evs.length).map((sg) => (
-                    <span key={sg.key} className="cal-ev suggested" aria-hidden><span className="cal-ev-t">{sg.name}?</span></span>
+                    <span key={sg.key} className="cal-ev suggested"><span className="cal-ev-t">{sg.name}?</span></span>
                   ))}
+                  <span className="sr-only">, {formatDateCR(d)}{evs.length ? '' : ', nothing scheduled'}</span>
                 </button>
               );
             })}
@@ -124,7 +127,10 @@ export default function Bills() {
           </div>
         </Glass>
 
-        <Glass strong style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+        <Glass strong pad={14} className="bills-side">
+          <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'day', label: day ? formatDateCR(day).slice(0, 5) : 'Day' }, { value: 'next', label: `Next 60 days · ${next60.length}` }, { value: 'rec', label: `Recurring · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />
+          <div className="scroll-box fill" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {tab === 'day' && (<>
           <h2 className="card-h">{day ? formatDateCR(day) : 'Pick a day'}</h2>
           {dayEvents.length === 0 && !dayTx.length && !daySuggested.length ? <p className="muted small" style={{ margin: 0 }}>Nothing on this day.</p> : dayEvents.length > 0 && <EventList events={dayEvents} onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />}
           {daySuggested.length > 0 && (<>
@@ -144,16 +150,18 @@ export default function Bills() {
               {dayTx.length > 12 && <li className="small muted">+{dayTx.length - 12} more in <Link to="/transactions">Transactions</Link></li>}
             </ul>
           </>)}
-          <hr style={{ border: 0, borderTop: '1px solid var(--glass-hairline)', width: '100%' }} />
-          <h2 className="card-h">Next 60 days</h2>
-          <div className="small" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}><span>In <b className="money" style={{ color: 'var(--income)' }}>{formatMoney(inflow, 'CRC')}</b></span><span>Out <b className="money" style={{ color: 'var(--expense)' }}>{formatMoney(outflow, 'CRC')}</b></span></div>
-          {next60.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled yet. Add recurring items below.</p> : <EventList events={next60.slice(0, 14)} showDate onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />}
-        </Glass>
-      </div>
-
-      <Glass strong style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-        <h2 className="card-h">Recurring items ({l.recurring.length})</h2>
-        {l.recurring.length === 0 ? <p className="muted small" style={{ margin: 0 }}>None yet. Start from the suggestions below, which come from your history and payroll settings.</p> : (
+            {dayEvents.length === 0 && !dayTx.length && (<>
+              <div className="label" style={{ marginTop: 6 }}>Coming next <span className="n">n {next60.length}</span></div>
+              {next60.length ? <EventList events={next60.slice(0, 12)} showDate onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />
+                : <><p className="small faint" style={{ margin: 0 }}>Nothing scheduled in the next 60 days.</p>{suggestions.slice(0, 6).map((sg) => <SuggestionRow key={sg.key} s={sg} />)}</>}
+            </>)}
+          </>)}
+          {tab === 'next' && (<>
+            <div className="small" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}><span>In <b className="money" style={{ color: 'var(--income)' }}>{formatMoney(inflow, 'CRC')}</b></span><span>Out <b className="money" style={{ color: 'var(--expense)' }}>{formatMoney(outflow, 'CRC')}</b></span><span className="n">n {next60.length}</span></div>
+            {next60.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Nothing scheduled yet. Add recurring items or take the suggestions.</p> : <EventList events={next60} showDate onEdit={(id) => setEdit(l.recurring.find((r) => r.id === id) ?? null)} />}
+          </>)}
+          {tab === 'rec' && (<>
+        {l.recurring.length === 0 ? <p className="muted small" style={{ margin: 0 }}>None yet. Start from the Suggested tab, which come from your history and payroll settings.</p> : (
           <div style={{ overflowX: 'auto' }}><table className="table">
             <thead><tr><th>Item</th><th>When</th><th className="num">Amount</th><th>How</th><th>Next</th><th /></tr></thead>
             <tbody>{l.recurring.map((r) => {
@@ -171,21 +179,19 @@ export default function Bills() {
             })}</tbody>
           </table></div>
         )}
-      </Glass>
-
-      {suggestions.length > 0 && (
-        <Glass strong style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-          <h2 className="card-h">Suggested from your history</h2>
-          <p className="small muted" style={{ margin: 0 }}>Each starts tomorrow, so your past isn't duplicated. "Auto" posts on the day; "reminds me" waits for you to confirm the real amount.</p>
-          {suggestions.map((s) => <SuggestionRow key={s.key} s={s} />)}
-          <p className="small muted" style={{ margin: 0 }}>Payroll amounts come from <Link to="/goals">Savings & goals → Automatic savings floor</Link>.</p>
+          </>)}
+          {tab === 'sug' && (<>
+            <p className="small faint" style={{ margin: 0 }}>Spotted in your history. Each starts tomorrow, so your past isn't duplicated. "Auto" posts on the day; "reminds me" waits for the real amount.</p>
+            {suggestions.length === 0 ? <p className="small muted" style={{ margin: 0 }}>Nothing new spotted.</p> : suggestions.map((sg) => <SuggestionRow key={sg.key} s={sg} />)}
+          </>)}
+          </div>
         </Glass>
-      )}
+      </div>
 
       <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit === 'new' ? 'New recurring item' : 'Edit recurring item'}>
         {edit && <RecurringForm rule={edit === 'new' ? undefined : edit} onDone={() => setEdit(null)} />}
       </Sheet>
-    </>
+    </div>
   );
 }
 

@@ -24,7 +24,7 @@ export function InfoTip({ text, label = 'What is this?' }: { text: string; label
     <>
       <button ref={btn} type="button" className="infotip" aria-label={label} aria-describedby={open ? id : undefined} aria-expanded={open}
         onMouseEnter={() => setOpen(true)} onMouseLeave={() => !pinned && setOpen(false)} onFocus={() => setOpen(true)} onBlur={() => !pinned && setOpen(false)}
-        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setPinned(!pinned); setOpen(!pinned); }}>?</button>
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setPinned(!pinned); setOpen(!pinned); }}>i</button>
       {open && r && createPortal(
         <div id={id} role="tooltip" className="infotip-pop" style={{ left, ...(below ? { top: r.bottom + 8 } : { bottom: window.innerHeight - r.top + 8 }) }}>{text}</div>,
         document.body)}

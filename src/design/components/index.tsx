@@ -1,5 +1,6 @@
 import { animate, useMotionValue, useReducedMotion, motion } from 'motion/react';
-import { useEffect, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { SPRING } from '../motion';
+import { useEffect, useId, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { formatMoney, type Currency, type FormatOptions, type Minor } from '../../lib/money';
 
 export function Aurora() {
@@ -69,10 +70,15 @@ export function Pill({ tone = 'neutral', children }: { tone?: Exclude<Tone, 'aut
 export function Segmented<T extends string>({ value, options, onChange, label }: {
   value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
 }) {
+  const id = useId();
+  const rm = useReducedMotion();
   return (
     <div className="segmented" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>{o.label}</button>
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>
+          {value === o.value && <motion.span layoutId={rm ? undefined : `${id}-seg`} className="seg-pill" transition={SPRING.snappy} />}
+          <span style={{ position: 'relative' }}>{o.label}</span>
+        </button>
       ))}
     </div>
   );
@@ -84,8 +90,8 @@ export function PressCard({ children, onClick, label }: { children: ReactNode; o
   return (
     <motion.button
       type="button" title={label} onClick={onClick}
-      whileTap={reduce ? undefined : { scale: 0.97 }} whileHover={reduce ? undefined : { y: -2 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+      whileTap={reduce ? undefined : { scale: 0.97 }}
+      transition={SPRING.snappy}
       className="glass" style={{ padding: 20, textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit', width: '100%' }}
     >
       {children}
