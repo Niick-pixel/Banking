@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { db } from '../db/db';
 import { accountBalances, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
 import type { Account, Budget, SelfLoan, Goal, RecurringRule, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
@@ -17,7 +17,22 @@ type Raw = Pick<Ledger, 'accounts' | 'pots' | 'categories' | 'transactions' | 'd
 /** Last loaded data, so forms that mount later start filled instead of empty for a frame. */
 let lastRaw: Raw | undefined;
 
+// One shared clock: every screen that reads the ledger refreshes each minute (and when the window
+// comes back into focus), so "today", due dates and month totals stay current while the app is open.
+// Changes you make (here or synced from another PC) already show up instantly through the live database query.
+let minute = 0;
+const listeners = new Set<() => void>();
+const bump = () => { minute++; for (const f of listeners) f(); };
+if (typeof window !== 'undefined') {
+  setInterval(bump, 60_000);
+  window.addEventListener('focus', bump);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) bump(); });
+}
+const subscribeMinute = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
+export const useMinute = () => useSyncExternalStore(subscribeMinute, () => minute, () => 0);
+
 export function useLedger(): Ledger {
+  const tick = useMinute();
   const raw = useLiveQuery(async (): Promise<Raw> => ({
     accounts: await db.accounts.toArray(),
     pots: await db.pots.toArray(),
@@ -49,7 +64,8 @@ export function useLedger(): Ledger {
       pot: new Map(r.pots.map((p) => [p.id, p])),
       category: new Map(r.categories.map((c) => [c.id, c])),
     };
-  }, [raw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw, tick]);
 }
 
 /** Learned suggestions: most-used category for words in the description, then overall frequency. */

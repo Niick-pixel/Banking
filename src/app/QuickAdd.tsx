@@ -4,7 +4,7 @@ import { Segmented } from '../design/components';
 import { useLedger, suggestCategories, type Ledger } from './data';
 import { convert, formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { rateForDay } from './fx';
-import { crossesSavings, savingsCategoryFor } from '../domain/fundmoves';
+import { crossesSavings, ownerOfCategory, savingsCategoryFor } from '../domain/fundmoves';
 import { useCoach } from './coach';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { InfoTip } from '../design/components/InfoTip';
@@ -63,7 +63,9 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const l = useLedger();
   const plc = useMemo(() => places(l), [l]);
   const spending = plc.find((p) => !p.savings && l.account.get(p.key.split('|')[0]!)?.type === 'checking')?.key ?? plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
-  const firstSavings = plc.find((p) => p.savings)?.key ?? '';
+  // Default savings destination: your own fund if you have one, else the first everyday savings account (not the association).
+  const minePot = l.pots.find((p) => p.owner === 'mine' && !p.archived);
+  const firstSavings = minePot ? `${minePot.accountId}|${minePot.id}` : plc.find((p) => p.savings && ['savings', 'goal_savings'].includes(l.account.get(p.key.split('|')[0]!)?.type ?? ''))?.key ?? plc.find((p) => p.savings)?.key ?? '';
 
   const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : startKind ?? 'expense';
   const [kind, setKind] = useState<Kind>(initKind);
@@ -133,6 +135,21 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
     keepPlaces.current = savingsCategoryFor(l.categories, l.pots.find((p) => p.id === fundSide.potId)?.owner)?.id ?? '';
     if (direction === crosses) { setKind('savings'); } else { setDirection(crosses); setKind('savings'); }
   }
+
+  // Savings: the category says whose money it is, so put it into that fund (Mine / Hers) when the account has funds.
+  useEffect(() => {
+    if (kind !== 'savings' || !categoryId) return;
+    const owner = ownerOfCategory(l.category.get(categoryId));
+    const sideKeyNow = direction === 'deposit' ? to : from;
+    const acc = sideKeyNow.split('|')[0];
+    // That fund in the same account, or else the fund of that owner wherever it is.
+    const pot = owner ? l.pots.find((p) => p.accountId === acc && p.owner === owner && !p.archived) ?? l.pots.find((p) => p.owner === owner && !p.archived) : undefined;
+    if (!pot) return;
+    const k = `${pot.accountId}|${pot.id}`;
+    if (direction === 'deposit' && to !== k) setTo(k);
+    if (direction === 'withdrawal' && from !== k) setFrom(k);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, categoryId, direction, to.split('|')[0], from.split('|')[0]]);
 
   // Keep from/to sensible when switching kind.
   useEffect(() => {

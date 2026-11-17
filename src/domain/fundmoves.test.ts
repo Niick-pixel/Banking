@@ -36,3 +36,14 @@ describe('transfers into funds', () => {
     expect(asSavings(out as Extract<Transaction, { kind: 'transfer' }>, ctx, cats, pots)).toMatchObject({ direction: 'withdrawal', categoryId: 'hers' });
   });
 });
+
+import { intoFund, unfundedSavings } from './fundmoves';
+describe('savings that missed their fund', () => {
+  it('a ₡70,000 "Savings - Mine" deposit into the account (not the fund) is found and put into Mine', () => {
+    const mine = { id: 'p-mine', accountId: 'sav', name: 'Mine', owner: 'mine', purpose: '', archived: false, createdAt: 0, updatedAt: 0 } as Pot;
+    const t = { id: 's1', kind: 'savings', direction: 'deposit', date: '2026-11-17', dateEstimated: false, currency: 'CRC', description: '', tags: [], notes: '', from: { accountId: 'chk' }, to: { accountId: 'sav' }, amount: 7_000_000, categoryId: 'mine', createdAt: 0, updatedAt: 0 } as Transaction;
+    const found = unfundedSavings([t], [mine], cats);
+    expect(found).toHaveLength(1);
+    expect(intoFund(found[0]!.tx, found[0]!.pot).to).toEqual({ accountId: 'sav', potId: 'p-mine' });
+  });
+});
