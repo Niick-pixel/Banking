@@ -2,18 +2,18 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useSyncExternalStore } from 'react';
 import { db } from '../db/db';
 import { balancesNow, monthlyFlows, type AccountBalance, type MonthFlow } from '../domain/ledger';
-import type { Account, Budget, SelfLoan, Goal, RecurringRule, Category, Debt, InstallmentPlan, Pot, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
+import type { Account, Budget, SelfLoan, Goal, RecurringRule, Category, Debt, InstallmentPlan, Lending, Pot, Product, Transaction, BalanceSnapshot, ImportBatch } from '../domain/schemas';
 
 export interface Ledger {
   ready: boolean;
   accounts: Account[]; pots: Pot[]; categories: Category[]; transactions: Transaction[];
-  debts: Debt[]; installments: InstallmentPlan[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[]; budgets: Budget[]; selfLoans: SelfLoan[]; goals: Goal[]; recurring: RecurringRule[];
+  debts: Debt[]; installments: InstallmentPlan[]; products: Product[]; lendings: Lending[]; snapshots: BalanceSnapshot[]; batches: ImportBatch[]; budgets: Budget[]; selfLoans: SelfLoan[]; goals: Goal[]; recurring: RecurringRule[];
   account: Map<string, Account>; pot: Map<string, Pot>; category: Map<string, Category>;
   balances: Map<string, AccountBalance>;
   flows: Map<string, MonthFlow>;
 }
 
-type Raw = Pick<Ledger, 'accounts' | 'pots' | 'categories' | 'transactions' | 'debts' | 'installments' | 'snapshots' | 'batches' | 'budgets' | 'selfLoans' | 'goals' | 'recurring'>;
+type Raw = Pick<Ledger, 'accounts' | 'pots' | 'categories' | 'transactions' | 'debts' | 'installments' | 'products' | 'lendings' | 'snapshots' | 'batches' | 'budgets' | 'selfLoans' | 'goals' | 'recurring'>;
 /** Last loaded data, so forms that mount later start filled instead of empty for a frame. */
 let lastRaw: Raw | undefined;
 
@@ -40,6 +40,8 @@ export function useLedger(): Ledger {
     transactions: await db.transactions.orderBy('date').reverse().toArray(),
     debts: await db.debts.toArray(),
     installments: await db.installments.toArray(),
+    products: await db.products.toArray(),
+    lendings: await db.lendings.toArray(),
     snapshots: await db.snapshots.orderBy('date').toArray(),
     batches: await db.importBatches.orderBy('importedAt').reverse().toArray(),
     budgets: await db.budgets.toArray(),
@@ -49,7 +51,7 @@ export function useLedger(): Ledger {
   }), [], lastRaw);
   if (raw) lastRaw = raw;
   return useMemo(() => {
-    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], snapshots: [], batches: [], budgets: [], selfLoans: [], goals: [], recurring: [] };
+    const r = raw ?? { accounts: [], pots: [], categories: [], transactions: [], debts: [], installments: [], products: [], lendings: [], snapshots: [], batches: [], budgets: [], selfLoans: [], goals: [], recurring: [] };
     const account = new Map(r.accounts.map((a) => [a.id, a]));
     let balances = new Map<string, AccountBalance>();
     let flows = new Map<string, MonthFlow>();

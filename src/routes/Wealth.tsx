@@ -13,7 +13,7 @@ import { usePref } from '../app/prefs';
 import { Glass } from '../design/components';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { InfoTip } from '../design/components/InfoTip';
-import { PageHeader, Sheet } from '../ui/Sheet';
+import { EmbedHead, Sheet } from '../ui/Sheet';
 import { emergencyFund, netWorthSeries } from '../domain/networth';
 import { cardsSummary } from '../domain/cards';
 import { formatMoney } from '../lib/money';
@@ -24,7 +24,7 @@ const MS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'
 const short = (v: number) => { const a = Math.abs(v) / 100; const s = a >= 1_000_000 ? `${(a / 1_000_000).toFixed(1)}M` : a >= 1000 ? `${Math.round(a / 1000)}k` : `${Math.round(a)}`; return `${v < 0 ? '-' : ''}₡${s}`; };
 const KIND: Record<string, string> = { checking: 'Everyday', cash: 'Everyday', savings: 'Savings', goal_savings: 'Savings', loan_fund: 'Savings', association_voluntary: 'Association', association_cesantia: 'Association', investment: 'Investments' };
 
-export default function Wealth() {
+export default function Wealth({ embedded }: { embedded?: boolean } = {}) {
   const l = useLedger();
   const today = todayISO();
   const years = useMemo(() => [...new Set([...l.transactions.map((t) => Number(t.date.slice(0, 4))), Number(today.slice(0, 4))])].sort(), [l.transactions, today]);
@@ -66,11 +66,10 @@ export default function Wealth() {
 
   return (
     <div className="fit">
-      <PageHeader title="Wealth" sub="What you own minus what you owe. Statement balances you enter win over the app's own figures.">
+      <EmbedHead embedded={embedded} title="Wealth" sub="What you own minus what you owe. Statement balances you enter win over the app's own figures.">
         <ChipGroup<number> inline size="sm" label="Year" value={year} onChange={(v) => v && setYear(v)} options={years.map((y) => ({ value: y, label: String(y) }))} />
-        <Link className="btn" to="/accounts">Accounts</Link>
         <button className="btn btn-primary" onClick={() => setEntry(true)}>Enter statement balances</button>
-      </PageHeader>
+      </EmbedHead>
 
       <div className="wealth-kpis">
         <Glass pad={14} className="stat">

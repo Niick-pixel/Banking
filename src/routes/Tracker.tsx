@@ -16,6 +16,7 @@ import { InfoTip } from '../design/components/InfoTip';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { usePersisted } from '../app/persist';
 import { PageHeader } from '../ui/Sheet';
+import Categories from './Categories';
 import { budgetAlerts, budgetFor, computeTracker, type TrackerRow } from '../domain/tracker';
 import { CATEGORY_GROUPS, type Category } from '../domain/schemas';
 import { formatMoney, parseAmountInput } from '../lib/money';
@@ -32,15 +33,18 @@ const short = (v: number) => { const a = Math.abs(v) / 100; const s = a >= 1_000
 const shiftMonth = (mk: string, d: number) => { const [y, m] = mk.split('-').map(Number) as [number, number]; const i = y * 12 + m - 1 + d; return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`; };
 const SLOT = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5'];
 
-export default function Tracker() {
-  const [view, setView] = usePersisted<'overview' | 'year'>('budget.view2', 'overview');
+export default function Tracker({ initial }: { initial?: 'categories' } = {}) {
+  const [stored, setView] = usePersisted<'overview' | 'year' | 'categories'>('budget.view2', 'overview');
+  const [first, setFirst] = useState(initial);
+  const view = first ?? stored;
+  const pick = (v: typeof stored) => { setFirst(undefined); setView(v); };
   return (
     <div className="fit">
-      <PageHeader title="Budget" sub={view === 'overview' ? 'How your spending compares with your plan, month by month.' : 'The full year, laid out like your workbook.'}>
-        <Segmented label="View" value={view} onChange={setView} options={[{ value: 'overview', label: 'Overview' }, { value: 'year', label: 'Year table' }]} />
+      <PageHeader title="Budget" sub={view === 'overview' ? 'How your spending compares with your plan, month by month.' : view === 'year' ? 'The full year, laid out like your workbook.' : 'Your categories and their monthly budgets.'}>
+        <Segmented label="View" value={view} onChange={pick} options={[{ value: 'overview', label: 'Overview' }, { value: 'year', label: 'Year table' }, { value: 'categories', label: 'Categories' }]} />
       </PageHeader>
-      <FundMovesFix />
-      {view === 'overview' ? <Overview /> : <YearTable />}
+      {view !== 'categories' && <FundMovesFix />}
+      {view === 'overview' ? <Overview /> : view === 'year' ? <YearTable /> : <Categories embedded />}
     </div>
   );
 }

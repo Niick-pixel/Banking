@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
   Account, AuditEntry, BalanceSnapshot, Budget, Category, Debt, ExchangeRate, Goal,
-  ImportBatch, InstallmentPlan, Pot, RecurringRule, SelfLoan, Transaction,
+  ImportBatch, InstallmentPlan, Lending, Pot, Product, RecurringRule, SelfLoan, Transaction,
 } from '../domain/schemas';
 
 export interface Setting { key: string; value: unknown }
@@ -34,6 +34,8 @@ export class AufwindDB extends Dexie {
   installments!: EntityTable<InstallmentPlan, 'id'>;
   tombstones!: Dexie.Table<Tombstone, [string, string]>;
   prefs!: EntityTable<Pref, 'id'>;
+  products!: EntityTable<Product, 'id'>;
+  lendings!: EntityTable<Lending, 'id'>;
 
   constructor(name = 'aufwind') {
     super(name);
@@ -62,6 +64,12 @@ export class AufwindDB extends Dexie {
     });
     this.version(3).stores({ tombstones: '[table+id], at' });
     this.version(4).stores({ prefs: 'id' });
+    this.version(5).stores({
+      products: 'id, code, archived',
+      lendings: 'id, status',
+      transactions:
+        'id, date, kind, categoryId, debtId, importBatchId, recurringId, linkId, installmentPlanId, productId, lendingId, from.accountId, to.accountId, *tags',
+    });
   }
 }
 

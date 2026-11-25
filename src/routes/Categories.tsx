@@ -18,7 +18,8 @@ type Group = Category['group'];
 const GROUP_LABEL: Record<Group, string> = { Income: 'Income', Fixed: 'Fixed costs', Living: 'Living / variable', Discretionary: 'Discretionary', 'Debt Service': 'Debt service', Savings: 'Savings' };
 const BUDGET_WORD: Record<Group, string> = { Income: 'Expected / month', Fixed: 'Budget / month', Living: 'Budget / month', Discretionary: 'Budget / month', 'Debt Service': 'Budget / month', Savings: 'Target / month' };
 
-export default function Categories() {
+/** Budget → Categories (a view of the Budget page, top right). */
+export default function Categories({ embedded }: { embedded?: boolean } = {}) {
   const l = useLedger();
   const month = todayISO().slice(0, 7);
   const [showArchived, setShowArchived] = usePersisted('categories.archived', false);
@@ -37,9 +38,15 @@ export default function Categories() {
 
   return (
     <div className="fit">
+      {embedded ? (
+        <div className="small muted" style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 'none' }}>
+          <span style={{ flex: 1 }}>What your money goes to. Add, rename, budget or regroup here; changes show up in the Budget straight away.</span>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived</label>
+        </div>
+      ) : (
       <PageHeader title="Categories" sub="What your money goes to. Add, rename or regroup here; new categories show up in the Tracker straight away.">
         <label className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived</label>
-      </PageHeader>
+      </PageHeader>)}
       <div className="scroll-box fill" tabIndex={0} aria-label="List" style={{ display: 'grid', alignContent: 'start', paddingRight: 4, gap: 16 }}>
         {CATEGORY_GROUPS.map((g) => {
           const cats = l.categories.filter((c) => c.group === g && (showArchived || !c.archived)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));

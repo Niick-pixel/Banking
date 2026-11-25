@@ -27,6 +27,8 @@ export const PREF_DEFAULTS = {
   /** Money Coach settings (spec §10.10) and its memory (dismissed, snoozed, votes, wants list…). */
   coach: COACH_DEFAULTS as CoachPrefs,
   coachState: EMPTY_STATE as CoachState,
+  /** Inventory: the margins that set each product's minimum and maximum price. */
+  storeMargins: { min: 0.2, max: 0.55 } as { min: number; max: number },
 };
 
 export interface FxPrefs {

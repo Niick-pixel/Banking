@@ -711,3 +711,65 @@ h2 { font-size: 15px; }
 .fund-debt-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .fund-debt-stats b { font-size: 15px; }
 @media (max-width: 1350px) { .fund-debt-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 620px) { .grid3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Inventory */
+.inv-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; flex: none; }
+.inv-kpis > * { display: grid; gap: 2px; align-content: start; }
+@media (max-width: 1100px) { .inv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.inv-margins { display: flex; gap: 10px; align-items: center; }
+.inv-margins label { display: flex; gap: 4px; align-items: center; font-size: 12px; }
+.inv-margins .input { width: 52px; height: 30px; padding: 0 6px; text-align: right; }
+.inv-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); gap: 12px; min-height: 0; }
+@media (max-width: 1100px) { .inv-grid { grid-template-columns: 1fr; overflow-y: auto; } }
+.inv-list, .inv-sales { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.inv-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: none; }
+.inv-tools .input[type=search] { flex: 1 1 220px; height: 34px; }
+.inv-table td { vertical-align: middle; }
+.inv-table thead th { position: sticky; top: 0; background: var(--bg-raised, var(--solid-surface)); z-index: 1; }
+.inv-name { display: grid; gap: 1px; text-align: left; border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.inv-name:hover b { text-decoration: underline; }
+.inv-out td { background: rgb(var(--shadow-rgb) / .04); }
+.inv-out .inv-name b { text-decoration: line-through; text-decoration-color: rgb(var(--loss) / .6); }
+.inv-stock { display: inline-flex; align-items: center; gap: 4px; }
+.inv-stock b { min-width: 22px; text-align: center; }
+.inv-stock .btn { width: 28px; height: 28px; padding: 0; }
+
+/* Quick Add → Sale */
+.qa-sale { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1 1 auto; }
+.qa-prod { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; text-align: left; width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--glass-stroke); background: none; color: inherit; font: inherit; cursor: pointer; margin-bottom: 6px; }
+.qa-prod .qa-prod-name { font-weight: 600; }
+.qa-prod .money { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+.qa-prod.on { border-color: rgb(var(--accent)); background: rgb(var(--accent) / .1); box-shadow: inset 0 0 0 1px rgb(var(--accent)); }
+.qa-prod:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+.qa-qty { display: flex; align-items: center; gap: 8px; flex: none; }
+.qa-qty b { min-width: 24px; text-align: center; font-size: 18px; }
+.bills-grid.bills-only { grid-template-columns: minmax(0, 1fr); }
+/* Coach: one window */
+.coach-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.coach-side > * { flex: none; }
+.coach-panel { scroll-margin-top: 8px; transition: box-shadow .3s; }
+.flash-panel { box-shadow: 0 0 0 3px rgb(var(--accent) / .55) !important; }
+.insight-plain { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--shadow-rgb) / .035); border: 1px solid var(--glass-stroke); }
+.insight-plain p { margin: 0; font-size: 13px; line-height: 1.45; }
+.insight-actions { flex-wrap: wrap; }
+.want-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--glass-stroke); }
+.coach-grid.fill { align-items: stretch; }
+/* Debts: what I owe | what others owe me */
+.debts-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; flex: none; }
+@media (max-width: 1000px) { .debts-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.debts-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 12px; min-height: 0; }
+.debts-left { display: grid; gap: 12px; align-content: start; min-height: 0; padding-right: 2px; }
+@media (max-width: 1000px) { .debts-grid { grid-template-columns: 1fr; overflow-y: auto; } .lend-panel { min-height: 420px; } }
+.lend-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.lend-total { display: grid; gap: 2px; flex: none; }
+.lend-people { display: flex; gap: 6px; flex-wrap: wrap; flex: none; }
+.lend-chip { border: 1px solid var(--glass-stroke); background: none; color: inherit; font: inherit; font-size: 12px; border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; gap: 6px; }
+.lend-chip:hover { background: rgb(var(--accent) / .08); }
+.lend-row { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--glass-stroke); background: rgb(var(--shadow-rgb) / .02); }
+.lend-row.closed { opacity: .65; }
+.lend-row-top { display: flex; gap: 10px; align-items: flex-start; }
+.embed-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: none; }
+.embed-bar > .small { flex: 1 1 260px; }
+.embed-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

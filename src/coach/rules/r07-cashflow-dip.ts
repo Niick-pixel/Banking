@@ -17,7 +17,7 @@ export const R7 = rule({
         `If things go as usual, the account gets low around ${ddmm(d.date)}${cause ? ` once ${cause.label} goes out` : ''}.`),
       why: { formula: 'spending balance + scheduled income − scheduled bills/savings − typical daily spend, day by day', inputs: { today: crc(ctx.spendable), dailySpend: crc(f.dailyVariable), lowestDay: f.min.date, lowest: crc(f.min.balance), buffer: crc(ctx.prefs.buffer) }, threshold: `below ${crc(ctx.prefs.buffer)} within ${p.horizonDays} days` },
       impactCRC: ctx.prefs.buffer - d.balance, actWithinDays: Math.max(0, Math.round((Date.parse(d.date) - Date.parse(ctx.today)) / 86_400_000)), confidence: 0.7,
-      action: { label: 'See the forecast', kind: 'open', payload: { to: '/coach?tab=forecast' } },
+      action: { label: 'See the forecast', kind: 'open', payload: { to: '/coach#forecast' } },
       dedupeKey: `R7:${d.date.slice(0, 7)}`,
     })];
   },

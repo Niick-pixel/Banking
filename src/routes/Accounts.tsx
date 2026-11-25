@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLedger } from '../app/data';
 import { Glass, Pill } from '../design/components';
-import { PageHeader, Sheet } from '../ui/Sheet';
+import { EmbedHead, Sheet } from '../ui/Sheet';
 import { ACCOUNT_TYPES, type Account, type Pot } from '../domain/schemas';
 import { debtStatus, balancesNow } from '../domain/ledger';
 import { newId, saveAccount, saveCategory, savePot, saveSnapshot, saveTransaction } from '../db/repo';
@@ -14,11 +14,11 @@ import { ExplainBalance } from './ExplainBalance';
 
 const TYPE_LABEL: Record<Account['type'], string> = {
   checking: 'Checking', savings: 'Savings', goal_savings: 'Goal savings', cash: 'Cash', credit_card: 'Credit card',
-  association_voluntary: 'Association savings plan', association_cesantia: 'Cesantía reserve', investment: 'Investments', loan_fund: 'Loan fund',
+  association_voluntary: 'Association savings plan', association_cesantia: 'Cesantía reserve', investment: 'Investments', loan_fund: 'Loan fund', receivable: 'Money I lent',
 };
 const GROUPS: [string, Account['type'][]][] = [
   ['Everyday', ['checking', 'cash']], ['Savings', ['savings', 'goal_savings', 'loan_fund']],
-  ['Asociación Solidarista', ['association_voluntary', 'association_cesantia']], ['Credit cards', ['credit_card']], ['Investments', ['investment']],
+  ['Asociación Solidarista', ['association_voluntary', 'association_cesantia']], ['Credit cards', ['credit_card']], ['Investments', ['investment']], ['Owed to me', ['receivable']],
 ];
 
 export function StartFresh() {
@@ -33,7 +33,7 @@ export function StartFresh() {
   return <button className="btn" onClick={() => void go()}>Start fresh</button>;
 }
 
-export default function Accounts() {
+export default function Accounts({ embedded }: { embedded?: boolean } = {}) {
   const l = useLedger();
   const [edit, setEdit] = useState<Account | 'new' | null>(null);
   const [potFor, setPotFor] = useState<Account | null>(null);
@@ -53,9 +53,9 @@ export default function Accounts() {
 
   return (
     <div className="fit">
-      <PageHeader title="Accounts" sub="Click a balance to see where it comes from. Set balance makes the app match your bank.">
+      <EmbedHead embedded={embedded} title="Accounts" sub="Click a balance to see where it comes from. Set balance makes the app match your bank.">
         <button className="btn btn-primary" onClick={() => setEdit('new')}>+ Account</button>
-      </PageHeader>
+      </EmbedHead>
 
       {health.length > 0 && (
         <Glass strong pad={12} style={{ flex: 'none', maxHeight: '18vh', overflow: 'auto', borderColor: 'var(--debt)' }} role="region" aria-label="Data health">
@@ -161,7 +161,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
           <div className="field"><label htmlFor="ac-st">Statement closes on day</label><input id="ac-st" className="input" type="number" min={1} max={31} value={a.cardStatementDay ?? ''} onChange={(e) => setA({ ...a, cardStatementDay: e.target.value ? Number(e.target.value) : undefined })} /></div>
           <div className="field"><label htmlFor="ac-due">Payment due on day</label><input id="ac-due" className="input" type="number" min={1} max={31} value={a.cardDueDay ?? ''} onChange={(e) => setA({ ...a, cardDueDay: e.target.value ? Number(e.target.value) : undefined })} /></div>
         </div>
-        <span className="small muted">The due date shows in Bills & calendar with what you owe, and can notify you.</span>
+        <span className="small muted">The due date shows in the Calendar with what you owe, and can notify you.</span>
       </>}
       {err && <p role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

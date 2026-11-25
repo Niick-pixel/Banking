@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
 import { PageHeader, Sheet } from '../ui/Sheet';
+import { LendingPanel } from './Lending';
 import { CardsWidget, useCards } from './CardsWidget';
 import { InfoTip } from '../design/components/InfoTip';
 import { debtStatus } from '../domain/ledger';
@@ -58,13 +59,13 @@ export default function Debts() {
   const stratBudget = parseAmountInput(budgetRaw, 'CRC') ?? planned + cardDebts.reduce((s, c) => s + c.minPayment, 0);
 
   return (
-    <>
-      <PageHeader title="Debts" sub="Loans and credit cards. Balances follow your payments and check-ins.">
+    <div className="fit">
+      <PageHeader title="Debts" sub="What you owe (loans and cards) on the left, what others owe you on the right.">
         <button className="btn" onClick={() => setSheet({ kind: 'loan' })}>+ Self-loan</button>
         <button className="btn btn-primary" onClick={() => setSheet({ kind: 'edit' })}>+ Debt</button>
       </PageHeader>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+      <div className="debts-kpis">
         <Glass pad={16}><div className="small muted">Total owed <InfoTip text="Your loans plus everything owed on your credit cards." /></div><Money amount={totalOwed + cards.totalOwed} size={26} weight={750} tone="debt" />
           {cards.totalOwed > 0 && <div className="small muted">{formatMoney(totalOwed, 'CRC')} loans + {formatMoney(cards.totalOwed, 'CRC')} cards</div>}</Glass>
         <Glass pad={16}><div className="small muted">Monthly debt service</div><Money amount={planned + cuotas} size={26} weight={750} />
@@ -76,7 +77,8 @@ export default function Debts() {
           {totalOwed > 0 && !debtFreeBy && <div className="small muted">Set a monthly payment on each debt</div>}</Glass>
       </div>
 
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div className="debts-grid fill">
+      <div className="scroll-box debts-left" tabIndex={0} aria-label="What I owe">
         <CardsWidget />
         {active.map((d, i) => <DebtCard key={d.id} debt={d} payoff={payoffs[i] ?? null} avgIncome={avgIncome} onSheet={setSheet} />)}
         {active.length === 0 && <Glass><p className="muted" style={{ margin: 0 }}>No active debts.</p></Glass>}
@@ -95,7 +97,7 @@ export default function Debts() {
           </Glass>
         )}
 
-        <Glass strong style={{ display: 'grid', gap: 12 }}>
+        {loans.length > 0 && <Glass strong style={{ display: 'grid', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Self-loans to replenish</h2>
           <p className="small muted" style={{ margin: 0 }}>Money borrowed from your own savings. Not counted as debt in net worth, because the savings balance already shows it's gone. Deposits in a "Replenish" savings category count toward the oldest open loan first.</p>
           {loans.length === 0 ? <p className="muted" style={{ margin: 0 }}>None.</p> : (
@@ -109,11 +111,13 @@ export default function Debts() {
                   <td><button className="btn btn-sm" onClick={() => setSheet({ kind: 'loan', loan: p.loan })}>Edit</button></td>
                 </tr>))}</tbody></table>
           )}
-        </Glass>
+        </Glass>}
 
         {l.debts.some((d) => d.status === 'paid') && (
           <Glass><b>Paid off</b><ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>{l.debts.filter((d) => d.status === 'paid').map((d) => <li key={d.id}>{d.creditor} · {formatMoney(d.originalAmount, 'CRC')}</li>)}</ul></Glass>
         )}
+      </div>
+      <LendingPanel />
       </div>
 
       <Sheet open={!!sheet} onClose={() => setSheet(null)} title={!sheet ? '' : sheet.kind === 'pay' ? `Pay ${sheet.debt.creditor}` : sheet.kind === 'edit' ? (sheet.debt ? 'Edit debt' : 'New debt') : sheet.kind === 'confirm' ? 'Confirm balance' : sheet.kind === 'adjust' ? 'Adjust balance' : sheet.loan ? 'Edit self-loan' : 'New self-loan'}>
@@ -123,7 +127,7 @@ export default function Debts() {
         {sheet?.kind === 'adjust' && <AdjustForm debt={sheet.debt} gap={sheet.gap} onDone={() => setSheet(null)} />}
         {sheet?.kind === 'loan' && <SelfLoanForm loan={sheet.loan} onDone={() => setSheet(null)} />}
       </Sheet>
-    </>
+    </div>
   );
 }
 
