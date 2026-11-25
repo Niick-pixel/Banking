@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertOctagon, AlertTriangle, BellOff, ChevronDown, Info, Lightbulb, ThumbsDown, Trophy, X } from 'lucide-react';
@@ -13,11 +13,8 @@ import { InfoTip } from '../design/components/InfoTip';
 import { Empty, PageHeader } from '../ui/Sheet';
 import { formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
-import { replay } from '../coach/replay';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { hoursOfWork } from '../coach/forecast';
-import { monthReport, weeklyCheckIn } from '../coach/reports';
-import { shiftMonth } from '../coach/context';
 import type { Insight, Severity } from '../coach/types';
 import type { SplitLine } from '../coach/windfall';
 import { usePersisted } from '../app/persist';
@@ -81,7 +78,7 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
   if (['R4', 'R3', 'R14'].includes(i.ruleId) && i.action?.kind !== 'cooling_off') extras.push({ label: 'Wait before buying (cooling-off)', run: () => jump('wants') });
   if (['R11', 'R12'].includes(i.ruleId) && primaryTo !== '/debts') extras.push({ label: 'Open Debts', run: () => nav('/debts') });
   if (['R16', 'R20'].includes(i.ruleId) && primaryTo !== '/goals') extras.push({ label: 'Open Goals', run: () => nav('/goals') });
-  if (['R8', 'R13', 'R19'].includes(i.ruleId) && primaryTo !== '/bills') extras.push({ label: 'Open Bills', run: () => nav('/bills') });
+  if (['R8', 'R13', 'R19'].includes(i.ruleId) && primaryTo !== '/bills') extras.push({ label: 'Open the calendar', run: () => nav('/calendar') });
   if (['R6', 'R7', 'R9', 'R19'].includes(i.ruleId)) extras.push({ label: 'Log something I forgot', run: () => qa.open() });
 
   async function act() {
@@ -249,7 +246,7 @@ export function SafeToSpendCard() {
         <div><dt>− savings due</dt><dd className="money">{crc(s.savings)}</dd></div>
         <div><dt>− buffer</dt><dd className="money">{crc(s.buffer)}</dd></div>
       </dl>
-      {!l.recurring.length && <p className="small muted" style={{ margin: 0 }}>Tip: add your bills in <Link to="/bills">Activity → Bills</Link> so they're counted here.</p>}
+      {!l.recurring.length && <p className="small muted" style={{ margin: 0 }}>Tip: add your bills in <Link to="/calendar">Reports → Calendar</Link> so they're counted here.</p>}
     </div>
   );
 }
@@ -334,7 +331,7 @@ function ForecastPanel() {
       </div>
       <details className="small">
         <summary>Scheduled ({events.length})</summary>
-        {events.length === 0 ? <p className="muted" style={{ margin: '6px 0 0' }}>No recurring items yet. Add them in <Link to="/bills">Activity → Bills</Link>.</p> : (
+        {events.length === 0 ? <p className="muted" style={{ margin: '6px 0 0' }}>No recurring items yet. Add them in <Link to="/calendar">Reports → Calendar</Link>.</p> : (
           <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }}>
             {events.slice(0, 20).map((e, k) => <li key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span><span className="muted">{formatDateCR(e.date).slice(0, 5)}</span> {e.label}</span><span className="money" style={{ color: e.amount < 0 ? 'var(--expense)' : 'var(--income)' }}>{crc(e.amount)}</span></li>)}
           </ul>
@@ -378,92 +375,6 @@ function WantsPanel() {
       })}
       <span className="small muted">Money not wasted so far: <b className="money" style={{ color: 'var(--income)' }}>{crc(state.moneyNotWasted)}</b></span>
     </Glass>
-  );
-}
-
-export function HistoryPage() {
-  const coach = useCoach();
-  const [open, setOpen] = useState<string | null>(null);
-  const months = useMemo(() => (coach.run ? replay({ ...coach.run.ctx, state: coach.state }).reverse() : []), [coach.run, coach.state]);
-  if (!coach.run) return null;
-  return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <p className="muted" style={{ margin: 0 }}>What the Coach would have told you at the end of each month, using only what was logged by then. Rows without a day count at month end, so pace alerts show what the month ended at.</p>
-      {months.map((m) => {
-        const by = (s: Severity) => m.insights.filter((i) => i.severity === s).length;
-        const isOpen = open === m.month;
-        return (
-          <Glass strong key={m.month} pad={0}>
-            <button className="month-head" style={{ width: '100%', padding: 16 }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : m.month)}>
-              <b>{new Date(`${m.month}-15T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
-              <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-                {(['critical', 'warning', 'heads_up', 'info', 'win'] as Severity[]).filter(by).map((s) => <span key={s} className="sev-count" style={{ '--sev': SEVERITY[s].color } as React.CSSProperties}>{SEVERITY[s].label} {by(s)}</span>)}
-              </span>
-            </button>
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
-                  <ul style={{ listStyle: 'none', margin: 0, padding: '0 16px 16px', display: 'grid', gap: 8 }}>
-                    {m.insights.map((i) => { const S = SEVERITY[i.severity]; return (
-                      <li key={i.dedupeKey} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 10 }}>
-                        <S.Icon size={16} style={{ color: S.color, marginTop: 3 }} aria-label={S.label} />
-                        <span><b>{i.title}</b><br /><span className="small muted">{i.body}</span></span>
-                      </li>); })}
-                  </ul>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Glass>
-        );
-      })}
-    </div>
-  );
-}
-
-export function ReportsPage() {
-  const { run } = useCoach();
-  const [mk, setMk] = useState(() => shiftMonth(todayISO().slice(0, 7), -1));
-  if (!run) return null;
-  const w = weeklyCheckIn(run.ctx, run.dispatch.inbox);
-  const r = monthReport(run.ctx, mk);
-  const months = [...run.ctx.flows.keys()].sort().reverse();
-  return (
-    <div className="coach-grid print-area">
-      <Glass strong style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <h2 className="card-h" style={{ marginRight: 'auto' }}>Month-end report card</h2>
-          <select className="input" style={{ width: 'auto' }} aria-label="Month" value={mk} onChange={(e) => setMk(e.target.value)}>{months.map((m) => <option key={m} value={m}>{new Date(`${m}-15T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</option>)}</select>
-          <button className="btn btn-sm no-print" onClick={() => window.print()}>Print / PDF</button>
-        </div>
-        {!r ? <p className="muted">No data for that month.</p> : <>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 650 }}>{r.verdict}</p>
-          <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-            {[['Savings rate', `${Math.round(r.savingsRate * 100)}%`, `target ${Math.round(r.target * 100)}%`, r.savingsRate >= r.target ? 'var(--income)' : 'var(--debt)'], ['Saved', crc(r.saved), '', 'var(--savings)'], ['Free cash', crc(r.freeCash), 'after saving', r.freeCash >= 0 ? 'var(--income)' : 'var(--expense)'], ['Avoidable', crc(r.avoidable), r.avoidableItems.map((x) => x.name).join(', '), 'var(--text)']].map(([k, v, s, c]) => (
-              <div key={k} className="glass" style={{ padding: 14, display: 'grid', gap: 2 }}><span className="small muted">{k}</span><b className="money" style={{ fontSize: 22, color: c }}>{v}</b>{s && <span className="small muted">{s}</span>}</div>
-            ))}
-          </div>
-          <h3 style={{ margin: '6px 0 0', fontSize: 15 }}>Cost the most vs budget</h3>
-          {r.worst.length === 0 ? <p className="small muted" style={{ margin: 0 }}>Every budgeted category stayed within budget.</p> : (
-            <table className="table"><thead><tr><th>Category</th><th style={{ textAlign: 'right' }}>Spent</th><th style={{ textAlign: 'right' }}>Budget</th><th style={{ textAlign: 'right' }}>Over</th></tr></thead>
-              <tbody>{r.worst.map((x) => <tr key={x.name}><td>{x.name}</td><td className="money" style={{ textAlign: 'right' }}>{crc(x.spent)}</td><td className="money" style={{ textAlign: 'right' }}>{crc(x.budget)}</td><td className="money" style={{ textAlign: 'right', color: 'var(--expense)' }}>{crc(x.over)} ({Math.round(x.pct * 100)}%)</td></tr>)}</tbody></table>
-          )}
-          {r.debts.length > 0 && <>
-            <h3 style={{ margin: '6px 0 0', fontSize: 15 }}>Debt progress</h3>
-            {r.debts.map((d) => <div key={d.name} className="small" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{d.name}</span><span>paid <b className="money">{crc(d.paid)}</b> · left <b className="money">{crc(d.balance)}</b></span></div>)}
-          </>}
-          <p className="small muted" style={{ margin: 0 }}>Income {crc(r.income)} · expenses {crc(r.expenses)} · net-worth change: see <Link to="/net-worth">Net worth</Link>.</p>
-        </>}
-      </Glass>
-      <Glass strong style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-        <h2 className="card-h">Weekly check-in</h2>
-        <span className="small muted">{formatDateCR(w.from).slice(0, 5)} – {formatDateCR(w.to).slice(0, 5)} · sent Sunday evenings when notifications are on</span>
-        <div><span className="small muted">Day-to-day spent</span><br /><b className="money" style={{ fontSize: 24 }}>{crc(w.spent)}</b> <span className="small muted">vs {crc(w.pace)} weekly pace</span></div>
-        <p style={{ margin: 0 }}>{w.line}</p>
-        {w.safeWeek !== null && <p style={{ margin: 0 }}>Coming week: about <b className="money">{crc(w.safeWeek)}</b> safe to spend ({crc(w.perDay ?? 0)}/day).</p>}
-        {w.top.length > 0 && <><b className="small">Top alerts</b>{w.top.map((i) => <div key={i.dedupeKey} className="small">• {i.title}</div>)}</>}
-        {w.bills.length > 0 && <><b className="small">Due this week</b>{w.bills.map((e, k) => <div key={k} className="small" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{formatDateCR(e.date).slice(0, 5)} {e.label}</span><span className="money">{crc(-e.amount)}</span></div>)}</>}
-      </Glass>
-    </div>
   );
 }
 

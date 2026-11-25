@@ -40,7 +40,7 @@ export function sales(txs: Transaction[], products: Map<string, Product>): SaleR
     const product = products.get(t.productId!);
     const qty = t.qty ?? 1;
     const revenue = t.kind === 'income' ? t.amount : 0;
-    const cost = product ? (product.unitCost + product.shipping) * qty : 0;
+    const cost = (t.costEach ?? (product ? product.unitCost + product.shipping : 0)) * qty;
     return { tx: t, product, qty, revenue, cost, profit: revenue - cost };
   }).sort((a, b) => b.tx.date.localeCompare(a.tx.date) || b.tx.createdAt - a.tx.createdAt);
 }
@@ -103,7 +103,18 @@ export function mergeImported(rows: ImportedProduct[], existing: Product[], sold
       return { ...match, code: r.code || match.code, name: r.name, category: r.category, unitCost: r.unitCost, shipping: r.shipping, price: r.price, stockIn, notes: r.notes || match.notes, archived: false, updatedAt: now };
     }
     added++;
-    return { id: newId(), code: r.code, name: r.name, category: r.category, currency: 'CRC' as const, unitCost: r.unitCost, shipping: r.shipping, price: r.price, stockIn: r.stock, stockOut: 0, notes: r.notes, archived: false, createdAt: now, updatedAt: now };
+    return { id: newId(), code: r.code, name: r.name, category: r.category, currency: 'CRC' as const, unitCost: r.unitCost, shipping: r.shipping, price: r.price, stockIn: r.stock, stockOut: 0, notes: r.notes, archived: false, restocks: [], createdAt: now, updatedAt: now };
   });
   return { products, added, updated };
+}
+
+/** A new shipment: units in, and the cost per unit from now on (the new price, or the average with what's on the shelf). */
+export function restock(p: Product, onHand: number, r: { date: string; qty: number; unitCost: number; shipping: number }, mode: 'new' | 'average'): Product {
+  const avg = (old: number, nu: number) => Math.round((old * Math.max(0, onHand) + nu * r.qty) / (Math.max(0, onHand) + r.qty));
+  return {
+    ...p, stockIn: p.stockIn + r.qty,
+    unitCost: mode === 'average' ? avg(p.unitCost, r.unitCost) : r.unitCost,
+    shipping: mode === 'average' ? avg(p.shipping, r.shipping) : r.shipping,
+    restocks: [...(p.restocks ?? []), r],
+  };
 }

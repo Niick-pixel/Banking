@@ -125,6 +125,8 @@ const TxBase = {
   /** A product from the inventory sold in this movement, and how many units. */
   productId: Id.optional(),
   qty: z.number().int().positive().optional(),
+  /** What one unit cost (cost + shipping) when it was sold, so later cost changes don't rewrite past profit. */
+  costEach: z.number().int().nonnegative().optional(),
   /** Money lent to someone (or repaid by them): the lending it belongs to. */
   lendingId: Id.optional(),
   ...Timestamps,
@@ -365,6 +367,8 @@ export const ProductSchema = z.object({
   stockOut: z.number().int().nonnegative().default(0),
   notes: z.string().default(''),
   archived: z.boolean().default(false),
+  /** Each shipment you received: how many, and what each unit cost then. */
+  restocks: z.array(z.object({ date: ISODateSchema, qty: z.number().int().positive(), unitCost: z.number().int().nonnegative(), shipping: z.number().int().nonnegative() })).default([]),
   ...Timestamps,
 });
 export type Product = z.infer<typeof ProductSchema>;

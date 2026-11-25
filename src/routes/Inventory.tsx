@@ -1,21 +1,22 @@
 /**
- * Inventory: the products you sell, what's in stock, prices and margins, and sales.
- * Stock goes down by itself when you log a Sale (Add a movement → Sale) and comes
- * back if you delete it. Use − / + for anything else (restock, damaged, gift).
+ * Inventory: your product list, edited like the spreadsheet. Click any cell to change it
+ * (code, product, category, unit cost, shipping, price, stock, notes); the totals, margins and
+ * price range recalculate as you type. Restock logs a new shipment with its own cost.
+ * Stock goes down by itself when you log a Sale and comes back if you delete it.
  */
-import { useMemo, useState } from 'react';
-import { Minus, Plus, ShoppingBag, Upload } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Columns3, Minus, PackagePlus, Plus, ShoppingBag, Trash2, Upload } from 'lucide-react';
 import { useLedger } from '../app/data';
 import { usePref } from '../app/prefs';
 import { usePersisted } from '../app/persist';
 import { useQuickAdd } from '../app/QuickAdd';
-import { Glass, Pill } from '../design/components';
+import { Glass } from '../design/components';
 import { ChipGroup } from '../design/components/ChipGroup';
 import { InfoTip } from '../design/components/InfoTip';
 import { PageHeader, Sheet, Toast } from '../ui/Sheet';
-import { adjustStock, newId, saveProduct } from '../db/repo';
-import { mergeImported, parseInventory, productMath, sales, stockOf, unitsSold } from '../domain/inventory';
-import { ProductSchema, type Product } from '../domain/schemas';
+import { adjustStock, newId, saveProduct, saveTransaction } from '../db/repo';
+import { mergeImported, parseInventory, productMath, restock, sales, stockOf, unitsSold } from '../domain/inventory';
+import { ProductSchema, TransactionSchema, type Product } from '../domain/schemas';
 import { gridFromXlsx } from '../import/grid';
 import { formatMoney, parseAmountInput } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
@@ -24,20 +25,57 @@ const crc = (n: number) => formatMoney(n, 'CRC');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 type Show = 'all' | 'in' | 'out';
 
+/** Columns like the workbook. `edit` columns are typed into; the rest are calculated. */
+const COLS = [
+  { id: 'code', label: 'Code', edit: true },
+  { id: 'name', label: 'Product', edit: true, always: true },
+  { id: 'category', label: 'Category', edit: true },
+  { id: 'unitCost', label: 'Unit cost', edit: true, num: true },
+  { id: 'shipping', label: 'Shipping / unit', edit: true, num: true },
+  { id: 'totalCost', label: 'Total cost', num: true },
+  { id: 'price', label: 'Sale price', edit: true, num: true },
+  { id: 'margin', label: 'Margin ₡', num: true },
+  { id: 'marginPct', label: 'Margin %', num: true },
+  { id: 'minPrice', label: 'Min price', num: true },
+  { id: 'maxPrice', label: 'Max price', num: true },
+  { id: 'stock', label: 'In stock', edit: true, num: true, always: true },
+  { id: 'value', label: 'Stock value', num: true },
+  { id: 'sold', label: 'Sold', num: true },
+  { id: 'notes', label: 'Notes', edit: true },
+] as const;
+type ColId = (typeof COLS)[number]['id'];
+const DEFAULT_COLS: ColId[] = ['code', 'name', 'category', 'unitCost', 'shipping', 'totalCost', 'price', 'margin', 'marginPct', 'minPrice', 'maxPrice', 'stock', 'notes'];
+
 export default function Inventory() {
   const l = useLedger();
   const qa = useQuickAdd();
   const [margins, setMargins] = usePref('storeMargins');
   const [show, setShow] = usePersisted<Show>('inv.show', 'all');
+  const [cols, setCols] = usePersisted<ColId[]>('inv.cols', DEFAULT_COLS);
+  const [sort, setSort] = usePersisted<{ by: ColId; desc: boolean }>('inv.sort', { by: 'code', desc: false });
+  const [cat, setCat] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [edit, setEdit] = useState<Product | 'new' | null>(null);
+  const [pickCols, setPickCols] = useState(false);
+  const [restockOf, setRestockOf] = useState<Product | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [err, setErr] = useState('');
+  const [focusId, setFocusId] = useState<string | null>(null);
   const sold = useMemo(() => unitsSold(l.transactions), [l.transactions]);
   const products = l.products.filter((p) => !p.archived);
-  const rows = products.map((p) => ({ p, stock: stockOf(p, sold), m: productMath(p, margins) }))
-    .filter((r) => (show === 'all' || (show === 'in' ? r.stock > 0 : r.stock <= 0)) && (!q.trim() || `${r.p.code} ${r.p.name} ${r.p.category}`.toLowerCase().includes(q.trim().toLowerCase())))
-    .sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0) || a.p.code.localeCompare(b.p.code) || a.p.name.localeCompare(b.p.name));
+  const categories = [...new Set(products.map((p) => p.category.trim()).filter(Boolean))].sort();
+  const visible = COLS.filter((c) => ('always' in c && c.always) || cols.includes(c.id));
+
+  const rows = products.map((p) => {
+    const stock = stockOf(p, sold), m = productMath(p, margins);
+    const v: Record<ColId, number | string> = { code: p.code, name: p.name, category: p.category, unitCost: p.unitCost, shipping: p.shipping, totalCost: m.totalCost, price: p.price, margin: m.margin, marginPct: m.marginPct, minPrice: m.minPrice, maxPrice: m.maxPrice, stock, value: Math.max(0, stock) * m.totalCost, sold: sold.get(p.id) ?? 0, notes: p.notes };
+    return { p, stock, m, v };
+  }).filter((r) => (show === 'all' || (show === 'in' ? r.stock > 0 : r.stock <= 0)) && (!cat || r.p.category.trim() === cat)
+    && (!q.trim() || `${r.p.code} ${r.p.name} ${r.p.category} ${r.p.notes}`.toLowerCase().includes(q.trim().toLowerCase())))
+    .sort((a, b) => {
+      const x = a.v[sort.by], y = b.v[sort.by];
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+      return (sort.desc ? -c : c) || a.p.name.localeCompare(b.p.name);
+    });
   const all = products.map((p) => ({ p, stock: Math.max(0, stockOf(p, sold)) }));
   const units = all.reduce((s, r) => s + r.stock, 0);
   const atCost = all.reduce((s, r) => s + r.stock * (r.p.unitCost + r.p.shipping), 0);
@@ -48,6 +86,25 @@ export default function Inventory() {
   const monthSales = saleRows.filter((r) => r.tx.date.startsWith(month));
   const mRev = monthSales.reduce((s, r) => s + r.revenue, 0), mProfit = monthSales.reduce((s, r) => s + r.profit, 0);
 
+  async function patch(p: Product, field: ColId, raw: string, stockNow: number) {
+    const amt = (s: string) => Math.max(0, parseAmountInput(s, 'CRC') ?? 0);
+    let next: Product = p;
+    if (field === 'name') { if (!raw.trim()) return; next = { ...p, name: raw.trim() }; }
+    else if (field === 'code' || field === 'category' || field === 'notes') next = { ...p, [field]: raw.trim() };
+    else if (field === 'unitCost' || field === 'shipping' || field === 'price') next = { ...p, [field]: amt(raw) };
+    else if (field === 'stock') {
+      const want = Math.max(0, Math.round(Number(raw.replace(/[^\d.-]/g, '')) || 0));
+      if (want !== stockNow) await adjustStock(p.id, want - stockNow);
+      return;
+    }
+    if (JSON.stringify(next) !== JSON.stringify(p)) await saveProduct(ProductSchema.parse(next));
+  }
+  async function addRow() {
+    const now = Date.now();
+    const p = ProductSchema.parse({ id: newId(), name: 'New product', category: cat ?? '', createdAt: now, updatedAt: now });
+    await saveProduct(p);
+    setShow('all'); setQ(''); setFocusId(p.id);
+  }
   async function importFile(f: File) {
     setErr('');
     try {
@@ -59,14 +116,25 @@ export default function Inventory() {
       setToast(`Imported from "${r.sheet}": ${added} new, ${updated} updated${r.margins ? `, margins ${pct(r.margins.min)}–${pct(r.margins.max)}` : ''}`);
     } catch (e) { setErr(`Couldn't read this file: ${e instanceof Error ? e.message : e}`); }
   }
+  const cell = (r: (typeof rows)[number], c: (typeof COLS)[number]) => {
+    const v = r.v[c.id];
+    if ('edit' in c && c.edit) {
+      const shown = c.id === 'stock' ? String(r.stock) : 'num' in c && c.num ? String((v as number) / 100) : String(v);
+      return <EditCell key={`${r.p.id}:${c.id}:${shown}`} value={shown} num={'num' in c && !!c.num} money={'num' in c && c.id !== 'stock'} wide={c.id === 'name' || c.id === 'notes'} autoFocus={focusId === r.p.id && c.id === 'name'}
+        label={`${c.label} of ${r.p.name}`} onCommit={(s) => { if (focusId) setFocusId(null); void patch(r.p, c.id, s, r.stock); }} />;
+    }
+    if (c.id === 'marginPct') return <span style={{ color: r.m.marginPct < margins.min ? 'rgb(var(--loss))' : r.m.marginPct > margins.max ? 'rgb(var(--amber))' : 'rgb(var(--win))' }}>{pct(r.m.marginPct)}</span>;
+    if (c.id === 'sold') return <span>{v}</span>;
+    return <span className="money">{crc(v as number)}</span>;
+  };
 
   return (
     <div className="fit">
-      <PageHeader title="Inventory" sub="What you sell and what's in stock. Log a sale from here or with Add → Sale: stock goes down by itself.">
+      <PageHeader title="Inventory" sub="Click any cell to change it, like in Excel. Costs, margins and price range update by themselves.">
         <label className="btn" style={{ cursor: 'pointer' }}><Upload size={15} /> Import Excel
           <input type="file" accept=".xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFile(f); }} />
         </label>
-        <button className="btn btn-primary" onClick={() => setEdit('new')}><Plus size={15} /> Product</button>
+        <button className="btn btn-primary" onClick={() => void addRow()}><Plus size={15} /> Product</button>
       </PageHeader>
       {err && <Glass strong pad={12} role="alert" style={{ color: 'var(--expense)', flex: 'none' }}>{err}</Glass>}
 
@@ -74,7 +142,7 @@ export default function Inventory() {
         <Glass pad={14}><span className="stat-label">In stock</span><b className="stat-value">{all.filter((r) => r.stock > 0).length} <span className="small faint">of {products.length} products</span></b><span className="small faint">{units} units</span></Glass>
         <Glass pad={14}><span className="stat-label">Stock value <InfoTip text="What the units on hand cost you (cost + shipping), and what they'd bring in at your sale prices." /></span><b className="stat-value money">{crc(atCost)}</b><span className="small faint">sells for {crc(atPrice)} · profit {crc(atPrice - atCost)}</span></Glass>
         <Glass pad={14}><span className="stat-label">Sales this month</span><b className="stat-value money" style={{ color: 'var(--income)' }}>{crc(mRev)}</b><span className="small faint">{monthSales.reduce((s, r) => s + r.qty, 0)} units · profit {crc(mProfit)}</span></Glass>
-        <Glass pad={14}><span className="stat-label">Margins <InfoTip text="Minimum and maximum margin. They set each product's lowest and highest sensible price: cost ÷ (1 − margin)." /></span>
+        <Glass pad={14}><span className="stat-label">Margins <InfoTip text="Minimum and maximum margin. They set each product's lowest and highest sensible price: cost ÷ (1 − margin). Margin % turns red below the minimum and amber above the maximum." /></span>
           <span className="inv-margins">
             <label>Min <input className="input" inputMode="decimal" aria-label="Minimum margin %" defaultValue={Math.round(margins.min * 100)} onBlur={(e) => { const v = Number(e.target.value) / 100; if (v >= 0 && v < 1) void setMargins({ ...margins, min: v }); }} />%</label>
             <label>Max <input className="input" inputMode="decimal" aria-label="Maximum margin %" defaultValue={Math.round(margins.max * 100)} onBlur={(e) => { const v = Number(e.target.value) / 100; if (v >= 0 && v < 1) void setMargins({ ...margins, max: v }); }} />%</label>
@@ -85,35 +153,60 @@ export default function Inventory() {
       <div className="inv-grid fill">
         <Glass strong pad={14} className="inv-list">
           <div className="inv-tools">
-            <input className="input" type="search" placeholder="Search code, product, category…" aria-label="Search products" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="input" type="search" placeholder="Search code, product, category, notes…" aria-label="Search products" value={q} onChange={(e) => setQ(e.target.value)} />
             <ChipGroup<Show> inline compact size="sm" label="Show" value={show} onChange={(v) => v && setShow(v)}
               options={[{ value: 'all', label: `All ${products.length}` }, { value: 'in', label: 'In stock' }, { value: 'out', label: 'Out of stock' }]} />
+            <span style={{ position: 'relative' }}>
+              <button className="btn btn-sm" aria-expanded={pickCols} onClick={() => setPickCols((x) => !x)}><Columns3 size={14} /> Columns</button>
+              {pickCols && (
+                <div className="inv-colpick glass glass-strong" role="group" aria-label="Columns to show">
+                  {COLS.filter((c) => !('always' in c && c.always)).map((c) => (
+                    <label key={c.id}><input type="checkbox" checked={cols.includes(c.id)} onChange={(e) => setCols(e.target.checked ? [...cols, c.id] : cols.filter((x) => x !== c.id))} /> {c.label}</label>
+                  ))}
+                  <button className="btn btn-sm btn-ghost" onClick={() => setCols(DEFAULT_COLS)}>Reset</button>
+                </div>
+              )}
+            </span>
           </div>
+          {categories.length > 1 && <ChipGroup<string> inline compact size="sm" label="Category" value={cat} allowNone onChange={setCat} options={categories.map((c) => ({ value: c, label: c }))} />}
           {products.length === 0 ? (
             <div className="bell-empty"><ShoppingBag size={28} /><b>No products yet</b><span className="small">Import your store Excel (sheet "Inventario") or add a product.</span></div>
           ) : (
             <div className="scroll-box fill" tabIndex={0} aria-label="Products">
               <table className="table inv-table">
-                <thead><tr><th>Product</th><th className="num">Cost <InfoTip text="Unit cost + shipping per unit." /></th><th className="num">Price</th><th className="num">Margin</th><th className="num">Min – max</th><th className="num">In stock</th><th /></tr></thead>
-                <tbody>{rows.map(({ p, stock, m }) => (
-                  <tr key={p.id} className={stock <= 0 ? 'inv-out' : ''}>
-                    <td><button type="button" className="inv-name" onClick={() => setEdit(p)} title="Edit product"><b>{p.name}</b><span className="small faint">{[p.code, p.category].filter(Boolean).join(' · ')}{p.notes ? ` · ${p.notes}` : ''}</span></button></td>
-                    <td className="num money">{crc(m.totalCost)}</td>
-                    <td className="num money">{crc(p.price)}</td>
-                    <td className="num"><span className="money">{crc(m.margin)}</span><br /><span className="small" style={{ color: m.marginPct < margins.min ? 'rgb(var(--loss))' : m.marginPct > margins.max ? 'rgb(var(--amber))' : 'rgb(var(--win))' }}>{pct(m.marginPct)}</span></td>
-                    <td className="num small faint money">{crc(m.minPrice)} – {crc(m.maxPrice)}</td>
-                    <td className="num">
-                      <span className="inv-stock">
-                        <button type="button" className="btn btn-sm btn-ghost" aria-label={`Take one ${p.name} out of stock`} disabled={stock <= 0} onClick={() => void adjustStock(p.id, -1)}><Minus size={14} /></button>
-                        {stock > 0 ? <b>{stock}</b> : <Pill tone="expense">Out</Pill>}
-                        <button type="button" className="btn btn-sm btn-ghost" aria-label={`Add one ${p.name} to stock`} onClick={() => void adjustStock(p.id, 1)}><Plus size={14} /></button>
-                      </span>
+                <thead><tr>
+                  {visible.map((c) => (
+                    <th key={c.id} className={'num' in c && c.num ? 'num' : ''} aria-sort={sort.by === c.id ? (sort.desc ? 'descending' : 'ascending') : undefined}>
+                      <button type="button" className="inv-th" onClick={() => setSort({ by: c.id, desc: sort.by === c.id ? !sort.desc : false })}>
+                        {c.label}{sort.by === c.id && (sort.desc ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
+                      </button>
+                    </th>
+                  ))}
+                  <th><span className="sr-only">Actions</span></th>
+                </tr></thead>
+                <tbody>{rows.map((r) => (
+                  <tr key={r.p.id} className={r.stock <= 0 ? 'inv-out' : ''}>
+                    {visible.map((c) => (
+                      <td key={c.id} className={`${'num' in c && c.num ? 'num' : ''} ${c.id === 'stock' ? 'inv-stock-cell' : ''}`}>
+                        {c.id === 'stock' ? (
+                          <span className="inv-stock">
+                            <button type="button" className="btn btn-sm btn-ghost" aria-label={`Take one ${r.p.name} out of stock`} disabled={r.stock <= 0} onClick={() => void adjustStock(r.p.id, -1)}><Minus size={13} /></button>
+                            {cell(r, c)}
+                            <button type="button" className="btn btn-sm btn-ghost" aria-label={`Add one ${r.p.name} to stock`} onClick={() => void adjustStock(r.p.id, 1)}><Plus size={13} /></button>
+                          </span>
+                        ) : cell(r, c)}
+                      </td>
+                    ))}
+                    <td className="inv-actions">
+                      <button type="button" className="btn btn-sm btn-primary" disabled={r.stock <= 0} onClick={() => qa.open(undefined, 'sale', r.p.id)}>Sell</button>
+                      <button type="button" className="btn btn-sm" title="A new shipment: units and what they cost" onClick={() => setRestockOf(r.p)}><PackagePlus size={14} /> Restock</button>
+                      <button type="button" className="btn btn-sm btn-ghost" aria-label={`Remove ${r.p.name}`} title="Remove product (sales history stays)" onClick={() => { if (confirm(`Remove "${r.p.name}"? Its past sales stay in Activity.`)) void saveProduct({ ...r.p, archived: true }); }}><Trash2 size={14} /></button>
                     </td>
-                    <td className="num"><button type="button" className="btn btn-sm btn-primary" disabled={stock <= 0} onClick={() => qa.open(undefined, 'sale', p.id)}>Sell</button></td>
                   </tr>
                 ))}</tbody>
               </table>
               {rows.length === 0 && <p className="small muted" style={{ padding: 12 }}>Nothing matches.</p>}
+              <button type="button" className="btn btn-ghost btn-sm" style={{ margin: 8 }} onClick={() => void addRow()}><Plus size={14} /> Add a row</button>
             </div>
           )}
         </Glass>
@@ -134,58 +227,78 @@ export default function Inventory() {
         </Glass>
       </div>
 
-      <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit === 'new' ? 'New product' : 'Edit product'}>
-        {edit && <ProductForm product={edit === 'new' ? undefined : edit} stock={edit === 'new' ? 0 : stockOf(edit, sold)} onDone={() => setEdit(null)} />}
+      <Sheet open={!!restockOf} onClose={() => setRestockOf(null)} title={restockOf ? `Restock ${restockOf.name}` : ''}>
+        {restockOf && <RestockForm product={restockOf} onHand={stockOf(restockOf, sold)} onDone={(msg) => { setRestockOf(null); if (msg) setToast(msg); }} />}
       </Sheet>
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   );
 }
 
-function ProductForm({ product, stock, onDone }: { product?: Product; stock: number; onDone: () => void }) {
-  const [margins] = usePref('storeMargins');
-  const m = (n?: number) => (n ? String(n / 100) : '');
-  const [f, setF] = useState({ code: product?.code ?? '', name: product?.name ?? '', category: product?.category ?? '', unitCost: m(product?.unitCost), shipping: m(product?.shipping), price: m(product?.price), notes: product?.notes ?? '', stock: String(stock) });
+/** A spreadsheet cell: shows the value, edits in place, saves on Enter or when you click away (Esc cancels). */
+function EditCell({ value, onCommit, num, money, wide, label, autoFocus }: { value: string; onCommit: (v: string) => void; num?: boolean; money?: boolean; wide?: boolean; label: string; autoFocus?: boolean }) {
+  const [v, setV] = useState(value);
+  const cancel = useRef(false);
+  const shown = money && v !== '' && Number.isFinite(Number(v)) ? formatMoney(Math.round(Number(v) * 100), 'CRC') : v;
+  const [editing, setEditing] = useState(!!autoFocus);
+  return editing ? (
+    <input className={`inv-cell ${num ? 'num' : ''} ${wide ? 'wide' : ''}`} aria-label={label} autoFocus value={v} inputMode={num ? 'decimal' : undefined}
+      onFocus={(e) => e.target.select()} onChange={(e) => setV(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { cancel.current = true; setV(value); (e.target as HTMLInputElement).blur(); } }}
+      onBlur={() => { setEditing(false); if (cancel.current) { cancel.current = false; return; } if (v !== value) onCommit(v); }} />
+  ) : (
+    <button type="button" className={`inv-cell-btn ${num ? 'num' : ''} ${wide ? 'wide' : ''} ${!v ? 'empty' : ''}`} aria-label={`${label}: ${shown || 'empty'}. Click to edit`} onClick={() => setEditing(true)}>
+      {wide && label.startsWith('Product') ? <b>{shown}</b> : shown || <span className="faint">—</span>}
+    </button>
+  );
+}
+
+function RestockForm({ product, onHand, onDone }: { product: Product; onHand: number; onDone: (msg?: string) => void }) {
+  const l = useLedger();
+  const m = (n: number) => String(n / 100);
+  const [qty, setQty] = useState('1');
+  const [cost, setCost] = useState(m(product.unitCost));
+  const [ship, setShip] = useState(m(product.shipping));
+  const [date, setDate] = useState(todayISO());
+  const [mode, setMode] = useState<'new' | 'average'>('new');
+  const payFrom = l.accounts.filter((a) => !a.archived && ['checking', 'cash', 'credit_card'].includes(a.type));
+  const [log, setLog] = useState<string>('none');
+  const expenseCats = l.categories.filter((c) => !c.archived && ['Fixed', 'Living', 'Discretionary'].includes(c.group));
+  const [catId, setCatId] = useState(expenseCats.find((c) => /store|tienda|inventory|inventario|stock|mercader/i.test(c.name))?.id ?? '');
   const [err, setErr] = useState('');
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const amt = (s: string) => parseAmountInput(s, 'CRC') ?? 0;
-  const math = productMath({ unitCost: amt(f.unitCost), shipping: amt(f.shipping), price: amt(f.price) }, margins);
+  const n = Math.max(0, Math.round(Number(qty) || 0));
+  const uc = parseAmountInput(cost, 'CRC') ?? 0, sh = parseAmountInput(ship, 'CRC') ?? 0;
+  const preview = n ? restock(product, onHand, { date, qty: n, unitCost: uc, shipping: sh }, mode) : null;
   async function save() {
-    if (!f.name.trim()) return setErr('Give it a name');
-    const want = Math.max(0, Math.round(Number(f.stock) || 0));
-    const now = Date.now();
-    const base: Product = product ?? { id: newId(), code: '', name: '', category: '', currency: 'CRC', unitCost: 0, shipping: 0, price: 0, stockIn: 0, stockOut: 0, notes: '', archived: false, createdAt: now, updatedAt: now };
-    // "In stock" is what you see on the shelf: move stockIn so on-hand equals it, keeping the sales history intact.
-    const stockIn = base.stockIn + (want - stock);
-    const next = { ...base, code: f.code.trim(), name: f.name.trim(), category: f.category.trim(), unitCost: amt(f.unitCost), shipping: amt(f.shipping), price: amt(f.price), notes: f.notes.trim(),
-      stockIn: stockIn >= 0 ? stockIn : base.stockIn, stockOut: stockIn >= 0 ? base.stockOut : base.stockOut - stockIn };
-    const r = ProductSchema.safeParse(next);
-    if (!r.success) return setErr(r.error.issues[0]?.message ?? 'Check the fields');
-    await saveProduct(r.data);
-    onDone();
+    if (!n) return setErr('How many units arrived?');
+    if (log !== 'none' && !catId) return setErr('Pick a category for the expense');
+    await saveProduct(ProductSchema.parse(restock(product, onHand, { date, qty: n, unitCost: uc, shipping: sh }, mode)));
+    if (log !== 'none' && (uc + sh) * n > 0) {
+      const now = Date.now();
+      await saveTransaction(TransactionSchema.parse({ id: newId(), kind: 'expense', date, dateEstimated: false, currency: 'CRC', description: `Stock: ${n} × ${product.name}`, tags: ['inventory'], notes: '', from: { accountId: log }, amount: (uc + sh) * n, categoryId: catId, createdAt: now, updatedAt: now }));
+    }
+    onDone(`${n} × ${product.name} added to stock`);
   }
   return (
     <form style={{ display: 'grid', gap: 12 }} onSubmit={(e) => { e.preventDefault(); void save(); }}>
-      <div className="grid2">
-        <div className="field"><label htmlFor="pf-n">Product</label><input id="pf-n" data-autofocus className="input" value={f.name} onChange={set('name')} /></div>
-        <div className="field"><label htmlFor="pf-c">Code</label><input id="pf-c" className="input" value={f.code} onChange={set('code')} placeholder="SKU-007" /></div>
-      </div>
-      <div className="grid2">
-        <div className="field"><label htmlFor="pf-cat">Category</label><input id="pf-cat" className="input" value={f.category} onChange={set('category')} /></div>
-        <div className="field"><label htmlFor="pf-s">In stock now</label><input id="pf-s" className="input" inputMode="numeric" value={f.stock} onChange={set('stock')} /></div>
-      </div>
+      <p className="small muted" style={{ margin: 0 }}>{onHand} in stock now, at {crc(product.unitCost)} + {crc(product.shipping)} shipping each.</p>
       <div className="grid3">
-        <div className="field"><label htmlFor="pf-u">Unit cost</label><input id="pf-u" className="input" inputMode="decimal" value={f.unitCost} onChange={set('unitCost')} /></div>
-        <div className="field"><label htmlFor="pf-sh">Shipping per unit</label><input id="pf-sh" className="input" inputMode="decimal" value={f.shipping} onChange={set('shipping')} /></div>
-        <div className="field"><label htmlFor="pf-p">Sale price</label><input id="pf-p" className="input" inputMode="decimal" value={f.price} onChange={set('price')} /></div>
+        <div className="field"><label htmlFor="rs-q">Units arrived</label><input id="rs-q" data-autofocus className="input" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+        <div className="field"><label htmlFor="rs-c">Unit cost</label><input id="rs-c" className="input" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
+        <div className="field"><label htmlFor="rs-s">Shipping per unit</label><input id="rs-s" className="input" inputMode="decimal" value={ship} onChange={(e) => setShip(e.target.value)} /></div>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>Total cost <b className="money">{crc(math.totalCost)}</b> · margin <b className="money">{crc(math.margin)}</b> ({pct(math.marginPct)}) · sensible price {crc(math.minPrice)} – {crc(math.maxPrice)} <span className="derived">· derived</span></p>
-      <div className="field"><label htmlFor="pf-no">Notes</label><input id="pf-no" className="input" value={f.notes} onChange={set('notes')} /></div>
+      <div className="field" style={{ maxWidth: 200 }}><label htmlFor="rs-d">Date</label><input id="rs-d" className="input" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} /></div>
+      {(uc !== product.unitCost || sh !== product.shipping) && onHand > 0 && (
+        <ChipGroup<'new' | 'average'> size="sm" label="Cost from now on" value={mode} onChange={(v) => v && setMode(v)} info="New: every unit is valued at this shipment's cost. Average: blends it with the units already on the shelf (weighted by how many)."
+          options={[{ value: 'new', label: `This shipment's cost` }, { value: 'average', label: 'Average with what I have' }]} />
+      )}
+      {preview && <p className="small" style={{ margin: 0 }}>After: <b>{onHand + n}</b> in stock, cost <b className="money">{crc(preview.unitCost)}</b> + <b className="money">{crc(preview.shipping)}</b> shipping, margin <b>{pct(productMath(preview).marginPct)}</b> at {crc(product.price)}.</p>}
+      <ChipGroup<string> size="sm" label="Also log what I paid" value={log} onChange={(v) => v && setLog(v)} info={`Adds an expense of ${crc((uc + sh) * n)} so your budget sees the purchase.`}
+        options={[{ value: 'none', label: 'No' }, ...payFrom.map((a) => ({ value: a.id, label: `From ${a.name.replace(/\s*\((checking|savings)\)$/i, '')}` }))]} />
+      {log !== 'none' && <ChipGroup<string> size="sm" label="Expense category" value={catId || null} onChange={(v) => setCatId(v ?? '')} options={expenseCats.map((c) => ({ value: c.id, label: c.name }))} />}
       {err && <p className="small" role="alert" style={{ color: 'var(--expense)', margin: 0 }}>{err}</p>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        {product && <button type="button" className="btn btn-ghost" style={{ marginRight: 'auto' }} onClick={async () => { await saveProduct({ ...product, archived: true }); onDone(); }}>Remove product</button>}
-        <button type="submit" className="btn btn-primary">Save</button>
-      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" type="submit">Add to stock</button></div>
     </form>
   );
 }
+
