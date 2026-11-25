@@ -3,24 +3,33 @@
  * tabs; Settings lives on its own at the bottom left. URLs stay the same, so old
  * links, the command palette and the guided tour keep working.
  */
-import { ArrowLeftRight, Compass, CreditCard, LayoutDashboard, PieChart, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Compass, CreditCard, LayoutDashboard, Package, PieChart, TrendingUp, type LucideIcon } from 'lucide-react';
 
 export interface Page { to: string; label: string }
 export interface Section { id: string; label: string; icon: LucideIcon; pages: Page[]; blurb: string }
 
 export const SECTIONS: Section[] = [
-  { id: 'home', label: 'Home', icon: LayoutDashboard, blurb: 'Your month at a glance', pages: [{ to: '/', label: 'Overview' }, { to: '/review', label: 'Quincena review' }] },
-  { id: 'coach', label: 'Coach', icon: Compass, blurb: 'Alerts, safe-to-spend, forecast', pages: [{ to: '/coach', label: 'Inbox' }, { to: '/coach/forecast', label: 'Forecast' }, { to: '/coach/wants', label: 'Cooling-off' }, { to: '/coach/reports', label: 'Reports' }, { to: '/coach/history', label: 'History replay' }] },
-  { id: 'activity', label: 'Activity', icon: ArrowLeftRight, blurb: 'Every movement, Tasa Cero plans, bills and the calendar', pages: [{ to: '/transactions', label: 'Transactions' }, { to: '/tasa-cero', label: 'Tasa Cero' }, { to: '/bills', label: 'Bills & calendar' }] },
-  { id: 'budget', label: 'Budget', icon: PieChart, blurb: 'Budget vs actual, categories and reports', pages: [{ to: '/tracker', label: 'Budget' }, { to: '/categories', label: 'Categories' }, { to: '/reports', label: 'Reports' }] },
-  { id: 'debts', label: 'Debts & cards', icon: CreditCard, blurb: 'Loans, cards, funds and balance check-ins', pages: [{ to: '/debts', label: 'Debts' }, { to: '/funds', label: 'Funds' }, { to: '/check-in', label: 'Balance check-in' }] },
-  { id: 'wealth', label: 'Wealth', icon: TrendingUp, blurb: 'Net worth, accounts, goals and calculators', pages: [{ to: '/net-worth', label: 'Overview' }, { to: '/accounts', label: 'Accounts' }, { to: '/goals', label: 'Savings & goals' }, { to: '/calculators', label: 'Calculators' }] },
+  { id: 'home', label: 'Home', icon: LayoutDashboard, blurb: 'Your month at a glance', pages: [{ to: '/', label: 'Overview' }] },
+  { id: 'coach', label: 'Coach', icon: Compass, blurb: 'Alerts, safe-to-spend, forecast and cooling-off, in one window', pages: [{ to: '/coach', label: 'Coach' }] },
+  { id: 'activity', label: 'Activity', icon: ArrowLeftRight, blurb: 'Every movement, the calendar, bills and Tasa Cero plans', pages: [{ to: '/transactions', label: 'Transactions' }, { to: '/calendar', label: 'Calendar' }, { to: '/bills', label: 'Bills' }, { to: '/tasa-cero', label: 'Tasa Cero' }] },
+  { id: 'budget', label: 'Budget', icon: PieChart, blurb: 'Budget vs actual; categories top right', pages: [{ to: '/tracker', label: 'Budget' }] },
+  { id: 'reports', label: 'Reports', icon: BarChart3, blurb: 'Monthly P&L, cash flow, year in review, report card, history', pages: [{ to: '/reports', label: 'Money reports' }, { to: '/reports/card', label: 'Report card' }, { to: '/reports/history', label: 'History replay' }] },
+  { id: 'debts', label: 'Debts & cards', icon: CreditCard, blurb: 'What you owe, what others owe you, funds and check-ins', pages: [{ to: '/debts', label: 'Debts & lending' }, { to: '/funds', label: 'Funds' }, { to: '/check-in', label: 'Balance check-in' }] },
+  { id: 'wealth', label: 'Wealth', icon: TrendingUp, blurb: 'Net worth and accounts, goals and calculators', pages: [{ to: '/net-worth', label: 'Wealth' }, { to: '/goals', label: 'Savings & goals' }, { to: '/calculators', label: 'Calculators' }] },
+  { id: 'inventory', label: 'Inventory', icon: Package, blurb: 'Products, stock and sales', pages: [{ to: '/inventory', label: 'Inventory' }] },
 ];
+
+/** Pages that live inside another page now (a view switch top right): which tab to highlight. */
+const ALIASES: Record<string, string> = { '/categories': '/tracker', '/accounts': '/net-worth', '/net-worth/months': '/net-worth', '/review': '/' };
+
 
 export const SETTINGS_PATHS = ['/settings', '/import'];
 
+export const canonicalPath = (path: string) => { const raw = path.replace(/\/$/, '') || '/'; return ALIASES[raw] ?? raw; };
+
 export function sectionFor(path: string): Section | null {
-  const p = path.replace(/\/$/, '') || '/';
+  const raw = path.replace(/\/$/, '') || '/';
+  const p = ALIASES[raw] ?? raw;
   return SECTIONS.find((s) => s.pages.some((pg) => pg.to === p)) ?? null;
 }
 

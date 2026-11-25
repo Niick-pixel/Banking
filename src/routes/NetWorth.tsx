@@ -4,7 +4,7 @@ import { useLedger } from '../app/data';
 import { usePref } from '../app/prefs';
 import { useCssVar } from '../app/theme';
 import { Glass, Money, Pill, Segmented } from '../design/components';
-import { PageHeader, Sheet } from '../ui/Sheet';
+import { EmbedHead, Sheet } from '../ui/Sheet';
 import { emergencyFund, netWorthSeries } from '../domain/networth';
 import { computeTracker } from '../domain/tracker';
 import { saveSnapshot } from '../db/repo';
@@ -24,7 +24,7 @@ export function useEssentials(year: number) {
   }, [l, year]);
 }
 
-export default function NetWorth() {
+export default function NetWorth({ embedded }: { embedded?: boolean } = {}) {
   const l = useLedger();
   const today = todayISO();
   const [year, setYear] = useState(Number(today.slice(0, 4)));
@@ -44,11 +44,11 @@ export default function NetWorth() {
   const ledgerOnly = current?.accounts.filter((a) => a.source === 'ledger' && acc.get(a.accountId)?.type !== 'credit_card').length ?? 0;
 
   return (
-    <>
-      <PageHeader title="Net worth" sub="What you own minus what you owe, at each month end. Statements you enter win over the ledger.">
+    <div className={embedded ? 'scroll-box fill' : undefined} tabIndex={embedded ? 0 : undefined} aria-label={embedded ? 'Net worth month by month' : undefined}>
+      <EmbedHead embedded={embedded} title="Net worth" sub="What you own minus what you owe, at each month end. Statements you enter win over the ledger.">
         <select className="input" style={{ width: 110 }} aria-label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y}>{y}</option>)}</select>
         <button className="btn btn-primary" onClick={() => setEntry(true)}>Enter statement balances</button>
-      </PageHeader>
+      </EmbedHead>
 
       {!current ? <Glass><p className="muted" style={{ margin: 0 }}>No accounts yet for {year}.</p></Glass> : (
         <div style={{ display: 'grid', gap: 16 }}>
@@ -124,7 +124,7 @@ export default function NetWorth() {
       <Sheet open={entry} onClose={() => setEntry(false)} title="Statement balances" wide>
         {entry && <SnapshotForm onDone={() => setEntry(false)} />}
       </Sheet>
-    </>
+    </div>
   );
 }
 

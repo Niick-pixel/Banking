@@ -16,7 +16,7 @@ export interface CheckInStatus { account: Account; last?: BalanceSnapshot; due: 
 export function checkInStatus(accounts: Account[], snapshots: BalanceSnapshot[], today: ISODate): CheckInStatus[] {
   const start = quincenaStart(today);
   const rank = (a: Account) => (a.type === 'credit_card' ? 0 : a.type === 'checking' || a.type === 'cash' ? 1 : 2);
-  return accounts.filter((a) => !a.archived)
+  return accounts.filter((a) => !a.archived && a.type !== 'receivable')
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
     .map((account) => {
       const last = snapshots.filter((s) => s.accountId === account.id && s.date <= today).sort((x, y) => x.date.localeCompare(y.date)).at(-1);

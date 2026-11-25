@@ -82,6 +82,12 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 }
 
 /** Page title line: title (19px semibold), one quiet line under it, actions on the right. */
+/** A page's header, or (inside a hub page that already has one) just its action buttons. */
+export function EmbedHead({ embedded, title, sub, children }: { embedded?: boolean; title: string; sub?: ReactNode; children?: ReactNode }) {
+  if (!embedded) return <PageHeader title={title} sub={sub}>{children}</PageHeader>;
+  return <div className="embed-bar"><span className="small muted">{sub}</span><span className="embed-actions">{children}</span></div>;
+}
+
 export function PageHeader({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
   return (
     <header className="page-head">

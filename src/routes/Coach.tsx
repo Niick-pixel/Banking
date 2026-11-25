@@ -8,7 +8,8 @@ import { useLedger } from '../app/data';
 import { useQuickAdd } from '../app/QuickAdd';
 import { useCssVar, useTheme } from '../app/theme';
 import { Glass, Pill } from '../design/components';
-import { DataTable, fmt, fmtShort } from '../design/components/charts';
+import { fmt, fmtShort } from '../design/components/charts';
+import { InfoTip } from '../design/components/InfoTip';
 import { Empty, PageHeader } from '../ui/Sheet';
 import { formatMoney, parseAmountInput, type Minor } from '../lib/money';
 import { formatDateCR, todayISO } from '../lib/dates';
@@ -22,8 +23,18 @@ import type { SplitLine } from '../coach/windfall';
 import { usePersisted } from '../app/persist';
 import { DuplicateReview } from './DuplicateReview';
 import { legs as legsOf } from '../domain/ledger';
+import { plainFor } from '../coach/plain';
 
 const crc = (n: number) => formatMoney(Math.round(n) as Minor, 'CRC', { decimals: 0 });
+/** Scroll to a panel on the Coach page (forecast, wants) and briefly highlight it. */
+function jump(id: string) {
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('flash-panel'); setTimeout(() => el.classList.remove('flash-panel'), 1400);
+  }, 60);
+}
 
 export const SEVERITY: Record<Severity, { label: string; color: string; Icon: typeof Info }> = {
   critical: { label: 'Critical', color: 'var(--expense)', Icon: AlertOctagon },
@@ -59,6 +70,20 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
   const sev = SEVERITY[i.severity];
   const p = (i.action?.payload ?? {}) as Record<string, unknown>;
 
+  const plain = plainFor(i.ruleId);
+  const tx = p.transactionId ? l.transactions.find((t) => t.id === p.transactionId) : undefined;
+  const primaryTo = typeof p.to === 'string' ? p.to.split(/[?#]/)[0] : '';
+  // More ways to act on it, picked from what the alert is about. The primary action stays first.
+  const extras: { label: string; run: () => void }[] = [];
+  if (tx && i.action?.kind !== 'recategorize') extras.push({ label: 'Open the movement', run: () => qa.open(tx) });
+  if (typeof p.categoryId === 'string' && primaryTo !== '/transactions') extras.push({ label: `See ${l.category.get(p.categoryId)?.name ?? 'the'} movements`, run: () => nav(`/transactions?month=${String(p.month ?? todayISO().slice(0, 7))}&cat=${p.categoryId}`) });
+  if (['R6', 'R7', 'R9', 'R19', 'A2', 'R5'].includes(i.ruleId)) extras.push({ label: 'See the forecast', run: () => jump('forecast') });
+  if (['R4', 'R3', 'R14'].includes(i.ruleId) && i.action?.kind !== 'cooling_off') extras.push({ label: 'Wait before buying (cooling-off)', run: () => jump('wants') });
+  if (['R11', 'R12'].includes(i.ruleId) && primaryTo !== '/debts') extras.push({ label: 'Open Debts', run: () => nav('/debts') });
+  if (['R16', 'R20'].includes(i.ruleId) && primaryTo !== '/goals') extras.push({ label: 'Open Goals', run: () => nav('/goals') });
+  if (['R8', 'R13', 'R19'].includes(i.ruleId) && primaryTo !== '/bills') extras.push({ label: 'Open Bills', run: () => nav('/bills') });
+  if (['R6', 'R7', 'R9', 'R19'].includes(i.ruleId)) extras.push({ label: 'Log something I forgot', run: () => qa.open() });
+
   async function act() {
     if (!i.action) return;
     switch (i.action.kind) {
@@ -66,12 +91,12 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
         if (i.ruleId === 'R17' && Array.isArray(p.ids)) { setDup(true); return; }
         const tx = p.transactionId ? l.transactions.find((t) => t.id === p.transactionId) : undefined;
         if (tx && i.action.kind === 'recategorize') qa.open(tx);
-        else if (p.to) nav(String(p.to));
+        else if (p.to) { nav(String(p.to)); const h = String(p.to).split('#')[1]; if (h) jump(h); }
         return;
       }
       case 'set_limit': await coach.setCap(String(p.categoryId), String(p.month), Number(p.dailyCap)); setDone(`Cap set: ${crc(Number(p.dailyCap))}/day. Quick Add will ask before going over.`); return;
       case 'move_money': await coach.saveTo({ amount: Number(p.amount), potId: p.toPotId as string | undefined, accountId: p.toAccountId as string | undefined, note: 'Coach: save first' }); setDone(`Saved ${crc(Number(p.amount))}.`); return;
-      case 'cooling_off': nav(`/coach/wants?store=${encodeURIComponent(String(p.store ?? ''))}`); return;
+      case 'cooling_off': nav(`/coach?store=${encodeURIComponent(String(p.store ?? ''))}#wants`); jump('wants'); return;
       case 'split_windfall': setSplit((x) => !x); return;
       default: return;
     }
@@ -92,8 +117,14 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
         )}
       </header>
       {compact ? <h3 className="insight-title">{i.title}</h3> : <h2 className="insight-title">{i.title}</h2>}
-      {!compact && <p className="insight-body">{i.body}</p>}
-      {compact && <p className="insight-body small">{i.body}</p>}
+      {!compact && plain && (
+        <div className="insight-plain">
+          <p><b>What it means.</b> {plain.means}</p>
+          <p><b>Why it matters.</b> {plain.matters}</p>
+        </div>
+      )}
+      {!compact && <p className="insight-body small">{i.body}</p>}
+      {compact && <p className="insight-body small">{plain?.means ?? i.body}</p>}
 
       {i.requiresReason && (
         <form className="coach-inline" onSubmit={async (e) => { e.preventDefault(); if (reason.trim()) await coach.giveReason(i, reason.trim()); }}>
@@ -105,8 +136,10 @@ export function InsightCard({ i, compact }: { i: Insight; compact?: boolean }) {
 
       <div className="insight-actions">
         {i.action && !['log_reason', 'update_balance'].includes(i.action.kind) && <button className="btn btn-sm btn-primary" onClick={() => void act()}>{i.action.label}</button>}
+        {!compact && extras.map((x) => <button key={x.label} className="btn btn-sm" onClick={x.run}>{x.label}</button>)}
+        {!compact && !i.requiresReason && <button className="btn btn-sm btn-ghost" title="Hide it until tomorrow" onClick={() => void coach.snooze(i, 1)}>Remind me tomorrow</button>}
         <button className="btn btn-sm btn-ghost why-btn" aria-expanded={why} onClick={() => setWhy((x) => !x)}>
-          Why am I seeing this? <motion.span animate={{ rotate: why ? 180 : 0 }} transition={{ duration: dur(0.3) }} style={{ display: 'inline-flex' }}><ChevronDown size={14} /></motion.span>
+          Show the math <motion.span animate={{ rotate: why ? 180 : 0 }} transition={{ duration: dur(0.3) }} style={{ display: 'inline-flex' }}><ChevronDown size={14} /></motion.span>
         </button>
         {!i.requiresReason && <button className="btn btn-sm" style={{ marginLeft: 'auto' }} title="Mark as seen: it leaves the inbox until something changes" onClick={() => void coach.dismiss(i)}>✓ Got it</button>}
       </div>
@@ -216,7 +249,7 @@ export function SafeToSpendCard() {
         <div><dt>− savings due</dt><dd className="money">{crc(s.savings)}</dd></div>
         <div><dt>− buffer</dt><dd className="money">{crc(s.buffer)}</dd></div>
       </dl>
-      {!l.recurring.length && <p className="small muted" style={{ margin: 0 }}>Tip: add your bills in <Link to="/bills">Bills & calendar</Link> so they're counted here.</p>}
+      {!l.recurring.length && <p className="small muted" style={{ margin: 0 }}>Tip: add your bills in <Link to="/bills">Activity → Bills</Link> so they're counted here.</p>}
     </div>
   );
 }
@@ -238,9 +271,9 @@ export function CoachTop() {
   );
 }
 
-// ── Pages ─────────────────────────────────────────────────────────────────
+// ── The Coach page: one window ─────────────────────────────────────────────
 function Inbox() {
-  const { run, state, patchState } = useCoach();
+  const { run, patchState } = useCoach();
   const [filter, setFilter] = usePersisted<Severity[]>('coach.filters', []);
   if (!run) return null;
   const list = run.dispatch.inbox.filter((i) => !filter.length || filter.includes(i.severity));
@@ -248,81 +281,71 @@ function Inbox() {
   return (
     <div className="coach-grid fill">
       <div className="coach-main">
-        <ChipGroup<Severity> multi label="Show" note="all when none picked" value={filter} onChange={setFilter}
+        <ChipGroup<Severity> multi label="Alerts" note="all when none picked" value={filter} onChange={setFilter}
           options={counts.filter(([, n]) => n).map(([s, n]) => ({ value: s, label: `${SEVERITY[s].label} ${n}` }))} aside={`${list.length} of ${run.dispatch.inbox.length}`} />
         <div className="scroll-box fill stack" tabIndex={0} aria-label="Coach alerts">
-        {list.length === 0 ? <Glass strong><p className="muted" style={{ margin: 0 }}>Nothing here. The Coach checks again every time you log something.</p></Glass>
+        {list.length === 0 ? <Glass strong><p className="muted" style={{ margin: 0 }}>Nothing needs you right now. The Coach checks again every time you log something.</p></Glass>
           : <AnimatePresence>{list.map((i) => <InsightCard key={i.dedupeKey} i={i} />)}</AnimatePresence>}
         {run.dispatch.hidden > 0 && (
           <p className="small muted">{run.dispatch.hidden} dismissed or snoozed. <button className="btn btn-ghost btn-sm" onClick={() => void patchState({ dismissed: {}, snoozed: {} })}>Show them again</button></p>
         )}
+        {run.errors.length > 0 && <Glass strong><Pill tone="expense">Rule errors</Pill><ul className="small">{run.errors.map((e) => <li key={e.ruleId}>{e.ruleId}: {e.message}</li>)}</ul></Glass>}
         </div>
       </div>
-      <div className="scroll-box" style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+      <div className="scroll-box coach-side" tabIndex={0} aria-label="Safe to spend, forecast and cooling-off">
         <Glass strong><SafeToSpendCard /></Glass>
-        <Glass strong style={{ display: 'grid', gap: 8 }}>
-          <h2 className="card-h">Money not wasted</h2>
-          <b className="money" style={{ fontSize: 28, color: 'var(--income)' }}>{crc(state.moneyNotWasted)}</b>
-          <span className="small muted">From cooling-off items you decided not to buy. <Link to="/coach/wants">Cooling-off list →</Link></span>
-        </Glass>
-        {run.errors.length > 0 && <Glass strong><Pill tone="expense">Rule errors</Pill><ul className="small">{run.errors.map((e) => <li key={e.ruleId}>{e.ruleId}: {e.message}</li>)}</ul></Glass>}
+        <ForecastPanel />
+        <WantsPanel />
       </div>
     </div>
   );
 }
 
-function ForecastPage() {
+/** Next 60 days of the spending balance, small. */
+function ForecastPanel() {
   const { run } = useCoach();
   const [bal, axis, grid, exp, acc] = useCssVar(['--chart-1', '--chart-axis', '--chart-grid', '--chart-expense', '--accent']);
-  const [view, setView] = usePersisted<'chart' | 'table'>('view.forecast', 'chart');
-  if (!run) return null;
-  if (!run.safe.known) return <Glass strong><SafeToSpendCard /></Glass>;
+  if (!run || !run.safe.known) return null;
   const f = run.forecast;
   const data = f.days.map((d) => ({ date: d.date, label: formatDateCR(d.date).slice(0, 5), balance: d.balance, events: d.events }));
   const buffer = run.ctx.prefs.buffer;
+  const events = f.days.flatMap((d) => d.events);
   return (
-    <div className="coach-grid">
-      <Glass strong>
-        <figure style={{ margin: 0 }}>
-          <figcaption style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
-            <span style={{ display: 'grid' }}><b style={{ fontSize: 17 }}>Next 60 days</b><span className="small muted">Spending balance with your scheduled income, bills and savings, minus your usual {crc(f.dailyVariable)}/day. Lowest: {crc(f.min.balance)} on {formatDateCR(f.min.date).slice(0, 5)}.</span></span>
-            <span className="segmented" role="group" aria-label="View"><button aria-pressed={view === 'chart'} onClick={() => setView('chart')}>Chart</button><button aria-pressed={view === 'table'} onClick={() => setView('table')}>Table</button></span>
-          </figcaption>
-          {view === 'chart' ? (
-            <div style={{ height: 340 }} role="img" aria-label={`Forecast balance; lowest ${crc(f.min.balance)} on ${f.min.date}.`}>
-              <ResponsiveContainer>
-                <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <defs><linearGradient id="fc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={bal} stopOpacity={0.35} /><stop offset="100%" stopColor={bal} stopOpacity={0.02} /></linearGradient></defs>
-                  <CartesianGrid vertical={false} stroke={grid} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 12 }} interval={6} />
-                  <YAxis tickFormatter={fmtShort} tickLine={false} axisLine={false} width={64} tick={{ fill: axis, fontSize: 12 }} />
-                  <ReferenceLine y={buffer} stroke={acc} strokeDasharray="6 5" label={{ value: 'Buffer', fill: axis, fontSize: 11, position: 'insideTopRight' }} />
-                  <ReferenceLine y={0} stroke={exp} strokeOpacity={0.6} />
-                  <Tooltip content={({ active, payload }) => active && payload?.[0] ? (() => { const d = payload[0].payload as (typeof data)[number]; return (
-                    <div className="glass glass-strong" style={{ padding: '10px 14px', borderRadius: 14, fontSize: 13 }}>
-                      <b>{formatDateCR(d.date)}</b><div className="money">{fmt(d.balance)}</div>
-                      {d.events.map((e, k) => <div key={k} className="small" style={{ color: e.amount < 0 ? 'var(--expense)' : 'var(--income)' }}>{e.label}: {fmt(e.amount)}</div>)}
-                    </div>); })() : null} />
-                  <Area type="monotone" dataKey="balance" stroke={bal} strokeWidth={2} fill="url(#fc)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : <DataTable caption="Forecast" columns={['Day', 'Balance']} rows={data.map((d) => [d.label, d.balance])} />}
-        </figure>
-      </Glass>
-      <Glass strong style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-        <h2 className="card-h">Scheduled</h2>
-        {f.days.flatMap((d) => d.events).length === 0 ? <p className="small muted" style={{ margin: 0 }}>No recurring items yet. Add them in <Link to="/bills">Bills & calendar</Link>.</p> : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-            {f.days.flatMap((d) => d.events).slice(0, 20).map((e, k) => <li key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span><span className="small muted">{formatDateCR(e.date).slice(0, 5)}</span> {e.label}</span><span className="money" style={{ color: e.amount < 0 ? 'var(--expense)' : 'var(--income)' }}>{crc(e.amount)}</span></li>)}
+    <Glass strong id="forecast" className="coach-panel" style={{ display: 'grid', gap: 8 }}>
+      <h2 className="card-h" style={{ margin: 0 }}>Next 60 days <InfoTip text={`Your everyday balance day by day: scheduled income, bills and savings, minus your usual ${crc(f.dailyVariable)}/day. The dashed line is your cushion.`} /></h2>
+      <p className="small" style={{ margin: 0 }}>{f.firstBelowBuffer ? <>Drops under your cushion on <b>{formatDateCR(f.firstBelowBuffer.date).slice(0, 5)}</b>. </> : <>Stays above your cushion. </>}Lowest: <b className="money">{crc(f.min.balance)}</b> on {formatDateCR(f.min.date).slice(0, 5)}.</p>
+      <div style={{ height: 170 }} role="img" aria-label={`Forecast balance; lowest ${crc(f.min.balance)} on ${f.min.date}.`}>
+        <ResponsiveContainer>
+          <AreaChart data={data} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+            <defs><linearGradient id="fc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={bal} stopOpacity={0.35} /><stop offset="100%" stopColor={bal} stopOpacity={0.02} /></linearGradient></defs>
+            <CartesianGrid vertical={false} stroke={grid} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 11 }} interval={13} />
+            <YAxis tickFormatter={fmtShort} tickLine={false} axisLine={false} width={52} tick={{ fill: axis, fontSize: 11 }} />
+            <ReferenceLine y={buffer} stroke={acc} strokeDasharray="6 5" />
+            <ReferenceLine y={0} stroke={exp} strokeOpacity={0.6} />
+            <Tooltip content={({ active, payload }) => active && payload?.[0] ? (() => { const d = payload[0].payload as (typeof data)[number]; return (
+              <div className="glass glass-strong" style={{ padding: '8px 12px', borderRadius: 12, fontSize: 12 }}>
+                <b>{formatDateCR(d.date)}</b><div className="money">{fmt(d.balance)}</div>
+                {d.events.map((e, k) => <div key={k} className="small" style={{ color: e.amount < 0 ? 'var(--expense)' : 'var(--income)' }}>{e.label}: {fmt(e.amount)}</div>)}
+              </div>); })() : null} />
+            <Area type="monotone" dataKey="balance" stroke={bal} strokeWidth={2} fill="url(#fc)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <details className="small">
+        <summary>Scheduled ({events.length})</summary>
+        {events.length === 0 ? <p className="muted" style={{ margin: '6px 0 0' }}>No recurring items yet. Add them in <Link to="/bills">Activity → Bills</Link>.</p> : (
+          <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }}>
+            {events.slice(0, 20).map((e, k) => <li key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span><span className="muted">{formatDateCR(e.date).slice(0, 5)}</span> {e.label}</span><span className="money" style={{ color: e.amount < 0 ? 'var(--expense)' : 'var(--income)' }}>{crc(e.amount)}</span></li>)}
           </ul>
         )}
-      </Glass>
-    </div>
+      </details>
+    </Glass>
   );
 }
 
-function WantsPage() {
+/** Cooling-off: park a want, decide when the timer ends. */
+function WantsPanel() {
   const { run, state, addWant, decideWant } = useCoach();
   const loc = useLocation();
   const [name, setName] = useState(new URLSearchParams(loc.search).get('store') ?? '');
@@ -332,52 +355,33 @@ function WantsPage() {
   if (!run) return null;
   const p = run.ctx.prefs;
   const waiting = state.wants.filter((w) => w.status === 'waiting').sort((a, b) => a.readyAt.localeCompare(b.readyAt));
-  const decided = state.wants.filter((w) => w.status !== 'waiting').slice(-10).reverse();
   const left = (iso: string) => { const ms = Date.parse(iso) - now; if (ms <= 0) return 'ready to decide'; const h = Math.ceil(ms / 3_600_000); return h > 48 ? `${Math.ceil(h / 24)} days left` : `${h} h left`; };
   return (
-    <div className="coach-grid">
-      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
-        <Glass strong style={{ display: 'grid', gap: 10 }}>
-          <h2 className="card-h">Want to buy something?</h2>
-          <p className="small muted" style={{ margin: 0 }}>Put it here first. From {crc(p.coolingMin)} it waits {p.coolingShortHours} h; from {crc(p.coolingLong)} it waits {p.coolingLongDays} days. When the timer ends: buy it, wait longer, or drop it.</p>
-          <form className="coach-inline" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && amount) { await addWant({ name: name.trim(), amount }); setName(''); setRaw(''); } }}>
-            <input className="input" aria-label="What" placeholder="e.g. new controller on Amazon" value={name} onChange={(e) => setName(e.target.value)} />
-            <input className="input" aria-label="Price" placeholder="₡0" inputMode="decimal" style={{ maxWidth: 150 }} value={raw} onChange={(e) => setRaw(e.target.value)} />
-            <button className="btn btn-primary btn-sm" disabled={!name.trim() || !amount}>Add</button>
-          </form>
-          {amount ? <span className="small muted">≈ {hoursOfWork(run.ctx, amount).toFixed(1)} hours of work</span> : null}
-        </Glass>
-        {waiting.length === 0 ? <Glass strong><p className="muted" style={{ margin: 0 }}>Nothing waiting.</p></Glass> : (
-          <AnimatePresence>{waiting.map((w) => {
-            const ready = Date.parse(w.readyAt) <= now;
-            return (
-              <motion.div key={w.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 30 }} className="glass glass-strong" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200 }}><b>{w.name}</b><div className="small muted">{crc(w.amount)} · ≈ {hoursOfWork(run.ctx, w.amount).toFixed(1)} h of work · {left(w.readyAt)}</div></div>
-                <button className="btn btn-sm" disabled={!ready} onClick={() => void decideWant(w.id, 'bought')}>Buy it</button>
-                <button className="btn btn-sm" onClick={() => void decideWant(w.id, 'extend')}>Wait a week more</button>
-                <button className="btn btn-sm btn-primary" onClick={() => void decideWant(w.id, 'dropped')}>Drop it</button>
-              </motion.div>
-            );
-          })}</AnimatePresence>
-        )}
-      </div>
-      <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
-        <Glass strong style={{ display: 'grid', gap: 6 }}>
-          <h2 className="card-h">Money not wasted</h2>
-          <b className="money" style={{ fontSize: 34, color: 'var(--income)' }}>{crc(state.moneyNotWasted)}</b>
-        </Glass>
-        {decided.length > 0 && (
-          <Glass strong style={{ display: 'grid', gap: 6 }}>
-            <h2 className="card-h">Decided</h2>
-            {decided.map((w) => <div key={w.id} className="small" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{w.name}</span><span>{w.status === 'dropped' ? <Pill tone="income">dropped</Pill> : <Pill>bought</Pill>} {crc(w.amount)}</span></div>)}
-          </Glass>
-        )}
-      </div>
-    </div>
+    <Glass strong id="wants" className="coach-panel" style={{ display: 'grid', gap: 8 }}>
+      <h2 className="card-h" style={{ margin: 0 }}>Cooling-off <InfoTip text={`Want to buy something? Park it here first. From ${crc(p.coolingMin)} it waits ${p.coolingShortHours} h; from ${crc(p.coolingLong)} it waits ${p.coolingLongDays} days. Most wants fade.`} /></h2>
+      <form className="coach-inline" onSubmit={async (e) => { e.preventDefault(); if (name.trim() && amount) { await addWant({ name: name.trim(), amount }); setName(''); setRaw(''); } }}>
+        <input className="input" aria-label="What do you want to buy" placeholder="What do you want to buy?" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" aria-label="Price" placeholder="₡0" inputMode="decimal" style={{ maxWidth: 110 }} value={raw} onChange={(e) => setRaw(e.target.value)} />
+        <button className="btn btn-primary btn-sm" disabled={!name.trim() || !amount}>Wait</button>
+      </form>
+      {amount ? <span className="small muted">≈ {hoursOfWork(run.ctx, amount).toFixed(1)} hours of work</span> : null}
+      {waiting.map((w) => {
+        const ready = Date.parse(w.readyAt) <= now;
+        return (
+          <div key={w.id} className="want-row">
+            <span style={{ flex: 1, minWidth: 0 }}><b>{w.name}</b><span className="small muted"> · {crc(w.amount)} · {left(w.readyAt)}</span></span>
+            <button className="btn btn-sm" disabled={!ready} onClick={() => void decideWant(w.id, 'bought')}>Buy</button>
+            <button className="btn btn-sm" onClick={() => void decideWant(w.id, 'extend')}>+1 week</button>
+            <button className="btn btn-sm btn-primary" onClick={() => void decideWant(w.id, 'dropped')}>Drop</button>
+          </div>
+        );
+      })}
+      <span className="small muted">Money not wasted so far: <b className="money" style={{ color: 'var(--income)' }}>{crc(state.moneyNotWasted)}</b></span>
+    </Glass>
   );
 }
 
-function HistoryPage() {
+export function HistoryPage() {
   const coach = useCoach();
   const [open, setOpen] = useState<string | null>(null);
   const months = useMemo(() => (coach.run ? replay({ ...coach.run.ctx, state: coach.state }).reverse() : []), [coach.run, coach.state]);
@@ -416,7 +420,7 @@ function HistoryPage() {
   );
 }
 
-function ReportsPage() {
+export function ReportsPage() {
   const { run } = useCoach();
   const [mk, setMk] = useState(() => shiftMonth(todayISO().slice(0, 7), -1));
   if (!run) return null;
@@ -464,28 +468,16 @@ function ReportsPage() {
 }
 
 export default function Coach() {
-  const loc = useLocation();
   const l = useLedger();
   const coach = useCoach();
   if (l.ready && !l.accounts.length) return <><PageHeader title="Coach" /><Empty title="Nothing to coach yet"><p className="muted" style={{ margin: 0 }}>Import your workbook or add an account first.</p></Empty></>;
   if (!coach.enabled) return <><PageHeader title="Coach" /><Empty title="The Coach is off"><Link className="btn btn-primary" to="/settings?c=coach">Turn it on in Settings</Link></Empty></>;
-  const page = loc.pathname.split('/')[2] ?? '';
-  const titles: Record<string, [string, string]> = {
-    '': ['Coach', 'Watches your money and tells you what to do about it, in numbers. Every alert shows its math.'],
-    forecast: ['Forecast', 'Where your spending balance is heading.'],
-    wants: ['Cooling-off list', 'Wait before you buy. Most wants fade.'],
-    history: ['History replay', 'Which alerts would have fired each month.'],
-    reports: ['Reports', 'Your weekly check-in and month-end report card.'],
-  };
-  const [t, sub] = titles[page] ?? titles['']!;
   return (
-    <div className={page === '' ? 'fit' : undefined}>
-      <PageHeader title={t} sub={sub}>{page === '' && <span className="small muted">Updated {todayISO() === coach.run?.ctx.today ? 'just now' : coach.run?.ctx.today}</span>}</PageHeader>
-      {page === '' && <Inbox />}
-      {page === 'forecast' && <ForecastPage />}
-      {page === 'wants' && <WantsPage />}
-      {page === 'history' && <HistoryPage />}
-      {page === 'reports' && <ReportsPage />}
+    <div className="fit">
+      <PageHeader title="Coach" sub="What needs you, in plain words, with a few things you can do about each. Safe-to-spend, the next 60 days and your cooling-off list on the right.">
+        <span className="small muted">Updated {todayISO() === coach.run?.ctx.today ? 'just now' : coach.run?.ctx.today}</span>
+      </PageHeader>
+      <Inbox />
     </div>
   );
 }

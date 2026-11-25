@@ -13,10 +13,20 @@ import { guessCategory } from '../coach/autocat';
 import type { RateSource } from '../fx/rates';
 import { cuotaFirstDefault, todayISO } from '../lib/dates';
 import { TransactionSchema, type FxInfo, type Side, type Transaction } from '../domain/schemas';
-import { lastAuditId, newId, saveInstallmentPlan, saveTransaction, undoAudit } from '../db/repo';
+import { lastAuditId, newId, saveCategory, saveInstallmentPlan, saveTransaction, undoAudit } from '../db/repo';
+import { stockOf, unitsSold } from '../domain/inventory';
+import type { Category } from '../domain/schemas';
 
-export type Kind = 'expense' | 'income' | 'transfer' | 'savings' | 'debt_payment' | 'tasa_cero';
-interface Ctx { open: (tx?: Transaction, kind?: Kind) => void }
+/** The Income category store sales go to: yours if you have one ("Sales", "Ventas"…), else "Store sales" is created once. */
+async function salesCategory(categories: Category[]): Promise<Category> {
+  const found = categories.find((c) => c.group === 'Income' && !c.archived && /sales|ventas|store|tienda/i.test(c.name));
+  if (found) return found;
+  const now = Date.now();
+  return saveCategory({ id: newId(), name: 'Store sales', group: 'Income', discretionary: false, sortOrder: 99, archived: false, createdAt: now, updatedAt: now } as Category);
+}
+
+export type Kind = 'expense' | 'income' | 'sale' | 'transfer' | 'savings' | 'debt_payment' | 'tasa_cero';
+interface Ctx { open: (tx?: Transaction, kind?: Kind, productId?: string) => void }
 const QuickAddCtx = createContext<Ctx>({ open: () => {} });
 export const useQuickAdd = () => useContext(QuickAddCtx);
 
@@ -40,8 +50,8 @@ export function places(l: Ledger) {
 }
 
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ open: boolean; edit?: Transaction; kind?: Kind; n: number }>({ open: false, n: 0 });
-  const open = useCallback((tx?: Transaction, kind?: Kind) => setState((x) => ({ open: true, edit: tx, kind, n: x.n + 1 })), []);
+  const [state, setState] = useState<{ open: boolean; edit?: Transaction; kind?: Kind; productId?: string; n: number }>({ open: false, n: 0 });
+  const open = useCallback((tx?: Transaction, kind?: Kind, productId?: string) => setState((x) => ({ open: true, edit: tx, kind, productId, n: x.n + 1 })), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -54,12 +64,12 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   return (
     <QuickAddCtx.Provider value={{ open }}>
       {children}
-      <QuickAddForm key={state.n} open={state.open} edit={state.edit} startKind={state.kind} onDone={() => setState((x) => ({ ...x, open: false }))} />
+      <QuickAddForm key={state.n} open={state.open} edit={state.edit} startKind={state.kind} startProduct={state.productId} onDone={() => setState((x) => ({ ...x, open: false }))} />
     </QuickAddCtx.Provider>
   );
 }
 
-function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?: Transaction; startKind?: Kind; onDone: () => void }) {
+function QuickAddForm({ open, edit, startKind, startProduct, onDone }: { open: boolean; edit?: Transaction; startKind?: Kind; startProduct?: string; onDone: () => void }) {
   const l = useLedger();
   const plc = useMemo(() => places(l), [l]);
   const spending = plc.find((p) => !p.savings && l.account.get(p.key.split('|')[0]!)?.type === 'checking')?.key ?? plc.find((p) => !p.savings)?.key ?? plc[0]?.key ?? '';
@@ -67,7 +77,7 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const minePot = l.pots.find((p) => p.owner === 'mine' && !p.archived);
   const firstSavings = minePot ? `${minePot.accountId}|${minePot.id}` : plc.find((p) => p.savings && ['savings', 'goal_savings'].includes(l.account.get(p.key.split('|')[0]!)?.type ?? ''))?.key ?? plc.find((p) => p.savings)?.key ?? '';
 
-  const initKind: Kind = edit && edit.kind !== 'adjustment' ? edit.kind : startKind ?? 'expense';
+  const initKind: Kind = edit?.kind === 'income' && edit.productId ? 'sale' : edit && edit.kind !== 'adjustment' ? edit.kind : startKind ?? (startProduct ? 'sale' : 'expense');
   const [kind, setKind] = useState<Kind>(initKind);
   const [amountRaw, setAmountRaw] = useState(edit && 'amount' in edit ? String(edit.amount / 100) : '');
   const [description, setDescription] = useState(edit?.description ?? '');
@@ -76,6 +86,9 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const [direction, setDirection] = useState<'deposit' | 'withdrawal'>(edit?.kind === 'savings' ? edit.direction : 'deposit');
   const [from, setFrom] = useState(edit && 'from' in edit ? sideKey(edit.from) : spending);
   const [to, setTo] = useState(edit && 'to' in edit ? sideKey(edit.to) : firstSavings);
+  // Sale: a product from the inventory. Only products in stock are offered (the one being edited counts its own units back).
+  const [productId, setProductId] = useState(edit?.productId ?? startProduct ?? '');
+  const [qty, setQty] = useState(edit?.qty ?? 1);
   const [debtId, setDebtId] = useState(edit?.kind === 'debt_payment' ? edit.debtId : l.debts.find((d) => d.status === 'active')?.id ?? '');
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(false);
@@ -111,10 +124,26 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
 
   const amount = usdMode ? converted : parseAmountInput(amountRaw, 'CRC');
   const wantGroups: Record<Kind, string[]> = {
-    expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], tasa_cero: ['Fixed', 'Living', 'Discretionary'], income: ['Income'], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
+    expense: ['Fixed', 'Living', 'Discretionary', 'Debt Service'], tasa_cero: ['Fixed', 'Living', 'Discretionary'], income: ['Income'], sale: [], transfer: [], savings: ['Savings'], debt_payment: ['Debt Service'],
   };
   const cats = l.categories.filter((c) => !c.archived && wantGroups[kind].includes(c.group));
-  const txKind: Transaction['kind'] = kind === 'tasa_cero' ? 'expense' : kind;
+  const txKind: Transaction['kind'] = kind === 'tasa_cero' ? 'expense' : kind === 'sale' ? 'income' : kind;
+  const sold = useMemo(() => unitsSold(l.transactions), [l.transactions]);
+  const onHand = (pid: string) => { const p = l.products.find((x) => x.id === pid); return p ? stockOf(p, sold) + (edit?.productId === pid ? edit.qty ?? 1 : 0) : 0; };
+  const inStock = l.products.filter((p) => !p.archived && onHand(p.id) > 0).sort((a, b) => a.name.localeCompare(b.name));
+  const product = l.products.find((p) => p.id === productId);
+  // Picking a product (or changing how many) fills the amount and description; you can still type another price.
+  const lastFill = useRef<string>('');
+  useEffect(() => {
+    if (kind !== 'sale' || !product) return;
+    const sig = `${product.id}:${qty}`;
+    if (edit && !lastFill.current) { lastFill.current = sig; return; }
+    if (lastFill.current === sig) return;
+    lastFill.current = sig;
+    setAmountRaw(String((product.price * qty) / 100));
+    setDescription((d) => (!d || l.products.some((p) => p.name === d) ? product.name : d));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, productId, qty]);
   // Learned from your history: ≥ 90% sure → picked for you; 60–90% → suggested first.
   const guess = useMemo(() => (description.trim().length >= 3 ? guessCategory(l.transactions, description, txKind) : null), [l.transactions, description, txKind]);
   const [autoPicked, setAutoPicked] = useState(false);
@@ -171,6 +200,8 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
     setError('');
     if (usdMode && !usd) { setError('Enter the amount in dollars, e.g. 19.99'); amountRef.current?.focus(); return; }
     if (usdMode && !rate) { setError('Enter the exchange rate (colones per dollar)'); return; }
+    if (kind === 'sale' && !product) { setError('Pick the product you sold'); return; }
+    if (kind === 'sale' && qty > onHand(productId)) { setError(`Only ${onHand(productId)} of ${product!.name} in stock`); return; }
     if (!amount) { setError('Enter an amount, e.g. 12500 or 12.5k'); amountRef.current?.focus(); return; }
     if (kind === 'tasa_cero') {
       const card = l.account.get(from.split('|')[0]!);
@@ -205,6 +236,7 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
     switch (kind) {
       case 'expense': tx = { ...base, kind, from: f, amount, categoryId: categoryId || undefined }; break;
       case 'income': tx = { ...base, kind, to: f, amount, categoryId }; break;
+      case 'sale': tx = { ...base, kind: 'income', to: f, amount, categoryId: (await salesCategory(l.categories)).id, productId, qty, description: base.description || product?.name || '' }; break;
       case 'transfer': tx = { ...base, kind, from: f, to: t, amount }; break;
       case 'savings': tx = { ...base, kind, direction, from: f, to: t, amount, categoryId }; break;
       case 'debt_payment': tx = { ...base, kind, from: f, amount, debtId, categoryId, interestPortion: 0 }; break;
@@ -217,18 +249,19 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
     await saveTransaction(parsed.data);
     const auditId = await lastAuditId();
     if (again) {
-      setAmountRaw(''); setUsdRaw(''); setDescription(''); setCategoryId('');
+      setAmountRaw(''); setUsdRaw(''); setDescription(''); setCategoryId(''); setProductId(''); setQty(1); lastFill.current = '';
       setToast({ msg: `Saved ${formatMoney(amount, 'CRC')}${fx ? ` (${formatMoney(fx.amount as Minor, 'USD')})` : ''}`, auditId });
       amountRef.current?.focus();
     } else onDone();
   }
 
   // What's still unanswered, in the order you'd answer it.
-  const needsCategory = kind !== 'transfer' && kind !== 'expense';
+  const needsCategory = kind !== 'transfer' && kind !== 'expense' && kind !== 'sale';
   const missing = [
     !amount ? (usdMode ? 'amount in dollars' : 'amount') : null,
     usdMode && !rate ? 'rate' : null,
-    kind !== 'transfer' && !categoryId && (needsCategory || kind === 'expense') ? 'category' : null,
+    kind !== 'transfer' && kind !== 'sale' && !categoryId && (needsCategory || kind === 'expense') ? 'category' : null,
+    kind === 'sale' && !product ? 'product' : null,
     kind === 'debt_payment' && !debtId ? 'debt' : null,
     kind === 'tasa_cero' && l.account.get(from.split('|')[0]!)?.type !== 'credit_card' ? 'card' : null,
     (kind === 'transfer' || kind === 'savings') && (!to || to === from) ? 'where it goes' : null,
@@ -248,7 +281,7 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const similar = description.trim().length >= 3 ? l.transactions.filter((t) => t.kind === kind && t.description.toLowerCase().includes(description.trim().toLowerCase()) && t.id !== edit?.id) : [];
   const simAvg = similar.length ? Math.round(similar.reduce((s0, t) => s0 + ('amount' in t ? t.amount : 0), 0) / similar.length) : 0;
   const KINDS: { value: Kind; label: string; tone: 'loss' | 'win' | 'save' | 'accent' | 'amber' }[] = [
-    { value: 'expense', label: 'Expense', tone: 'loss' }, { value: 'income', label: 'Income', tone: 'win' }, { value: 'savings', label: 'Savings', tone: 'save' },
+    { value: 'expense', label: 'Expense', tone: 'loss' }, { value: 'income', label: 'Income', tone: 'win' }, ...(l.products.some((p) => !p.archived) || kind === 'sale' ? [{ value: 'sale' as Kind, label: 'Sale', tone: 'win' as const }] : []), { value: 'savings', label: 'Savings', tone: 'save' },
     { value: 'transfer', label: 'Transfer', tone: 'accent' }, { value: 'debt_payment', label: 'Debt payment', tone: 'amber' }, { value: 'tasa_cero', label: 'Tasa Cero', tone: 'amber' },
   ];
   const kindLabel = KINDS.find((k) => k.value === kind)!.label;
@@ -260,12 +293,12 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
   const SPENDING: AT[] = ['checking', 'cash', 'credit_card'];
   const SAVINGS: AT[] = ['savings', 'goal_savings', 'loan_fund', 'association_voluntary', 'association_cesantia', 'investment'];
   const ALL: AT[] = [...SPENDING, ...SAVINGS];
-  const fromTypes: AT[] = kind === 'tasa_cero' ? ['credit_card'] : kind === 'expense' ? SPENDING : kind === 'income' ? ['checking', 'cash', ...SAVINGS] : kind === 'debt_payment' ? ['checking', 'cash', ...SAVINGS]
+  const fromTypes: AT[] = kind === 'tasa_cero' ? ['credit_card'] : kind === 'expense' ? SPENDING : kind === 'income' || kind === 'sale' ? ['checking', 'cash', ...SAVINGS] : kind === 'debt_payment' ? ['checking', 'cash', ...SAVINGS]
     : kind === 'savings' ? (direction === 'deposit' ? ['checking', 'cash'] : SAVINGS) : ALL;
   const toTypes: AT[] = kind === 'savings' ? (direction === 'deposit' ? SAVINGS : ['checking', 'cash']) : ALL;
   const hasTo = kind === 'transfer' || kind === 'savings';
-  const fromLabel = kind === 'income' ? 'Into' : kind === 'tasa_cero' ? 'Card' : kind === 'savings' && direction === 'withdrawal' ? 'Take from' : 'From';
-  const fromInfo = kind === 'income' ? 'The account the money landed in.' : kind === 'tasa_cero' ? 'The card the purchase was made with.' : 'Where the money came out of. Card purchases: pick the card, so its balance stays right.';
+  const fromLabel = kind === 'income' || kind === 'sale' ? 'Into' : kind === 'tasa_cero' ? 'Card' : kind === 'savings' && direction === 'withdrawal' ? 'Take from' : 'From';
+  const fromInfo = kind === 'income' || kind === 'sale' ? 'The account the money landed in.' : kind === 'tasa_cero' ? 'The card the purchase was made with.' : 'Where the money came out of. Card purchases: pick the card, so its balance stays right.';
   const fromNote = kind === 'tasa_cero' ? 'only credit cards' : kind === 'expense' ? 'savings accounts: use Savings → Take out' : kind === 'savings' ? (direction === 'deposit' ? 'only everyday accounts' : 'only savings accounts') : undefined;
   const toNote = kind === 'savings' ? (direction === 'deposit' ? 'only savings accounts' : 'only everyday accounts') : undefined;
   const fromFunds = (kind === 'savings' && direction === 'withdrawal') || kind === 'transfer' || kind === 'debt_payment' || (kind === 'income' && l.pots.some((p) => p.accountId === accOf(from)))
@@ -353,7 +386,36 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
 
         {/* Column 2: category */}
         <div className={`qa-col qa-cats ${flash && !categoryId && kind !== 'transfer' ? 'missing-flash' : ''}`}>
-          {kind === 'transfer' ? (
+          {kind === 'sale' ? (
+            <div className="qa-sale">
+              <div className="chipgroup-head">
+                <span className="chipgroup-label">Product</span>
+                {!product && <span className="req">required</span>}
+                <InfoTip text="Only products in stock are listed. Saving the sale takes the units out of stock; deleting it puts them back. Manage stock in Inventory." />
+                <span className="chipgroup-aside">{inStock.length} in stock</span>
+              </div>
+              {inStock.length === 0 && !product ? <p className="small muted" style={{ margin: 0 }}>Nothing in stock. Add units in <b>Inventory</b>.</p> : (
+                <div className="qa-cat-box scroll-box" role="radiogroup" aria-label="Product">
+                  {[...inStock, ...(product && !inStock.includes(product) ? [product] : [])].map((p) => (
+                    <button key={p.id} type="button" role="radio" aria-checked={productId === p.id} className={`qa-prod ${productId === p.id ? 'on' : ''}`} onClick={() => { setProductId(p.id); setQty((q) => Math.min(q, Math.max(1, onHand(p.id)))); }}>
+                      <span className="qa-prod-name">{p.name}</span>
+                      <span className="small faint">{p.code ? `${p.code} · ` : ''}{onHand(p.id)} in stock</span>
+                      <b className="money">{formatMoney(p.price, p.currency)}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {product && (
+                <div className="qa-qty">
+                  <span className="label">How many</span>
+                  <button type="button" className="btn btn-sm" aria-label="One less" disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))}>−</button>
+                  <b aria-live="polite">{qty}</b>
+                  <button type="button" className="btn btn-sm" aria-label="One more" disabled={qty >= onHand(productId)} onClick={() => setQty((q) => Math.min(onHand(productId), q + 1))}>+</button>
+                  <span className="small faint">of {onHand(productId)} in stock</span>
+                </div>
+              )}
+            </div>
+          ) : kind === 'transfer' ? (
             <div className="qa-note group"><span className="label">Category · derived</span><span className="small">Transfers between your own accounts are neither income nor spending, so they have no category.</span>
               {crosses && <><span className="small">{crosses === 'deposit' ? 'This one puts spending money into savings, so it would be missing from your budget.' : 'This one takes money out of savings, so it would be missing from your budget.'}</span><button type="button" className="btn btn-sm" style={{ justifySelf: 'start' }} onClick={recordAsSavings}>Record as savings</button></>}
             </div>
@@ -411,9 +473,10 @@ function QuickAddForm({ open, edit, startKind, onDone }: { open: boolean; edit?:
           </>)}
           <div className="qa-summary group fill">
             <span className="label">This movement</span>
-            <span className="qa-big money" style={{ color: kind === 'income' ? 'var(--income)' : kind === 'expense' ? 'var(--expense)' : kind === 'savings' ? 'var(--savings)' : kind === 'debt_payment' ? 'var(--debt)' : 'var(--text)' }}>{amount ? formatMoney(amount, 'CRC') : '₡—'}</span>
+            <span className="qa-big money" style={{ color: kind === 'income' || kind === 'sale' ? 'var(--income)' : kind === 'expense' ? 'var(--expense)' : kind === 'savings' ? 'var(--savings)' : kind === 'debt_payment' ? 'var(--debt)' : 'var(--text)' }}>{amount ? formatMoney(amount, 'CRC') : '₡—'}</span>
             <span className="small faint">{kindLabel} · {date.split('-').reverse().join('/')} · {plc.find((p) => p.key === from)?.label ?? '—'}{(kind === 'transfer' || kind === 'savings') && to ? ` → ${plc.find((p) => p.key === to)?.label}` : ''}</span>
-            <span className="small faint">{categoryId ? l.category.get(categoryId)?.name : kind === 'transfer' ? 'No category · derived' : 'No category yet'}</span>
+            <span className="small faint">{kind === 'sale' ? (product ? `${qty} × ${product.name}` : 'No product yet') : categoryId ? l.category.get(categoryId)?.name : kind === 'transfer' ? 'No category · derived' : 'No category yet'}</span>
+            {kind === 'sale' && product && amount ? <span className="small">Profit <b className="money" style={{ color: 'var(--income)' }}>{formatMoney(amount - (product.unitCost + product.shipping) * qty, 'CRC')}</b> <span className="derived">· price − cost − shipping</span></span> : null}
             {kind === 'tasa_cero' && amount ? <span className="small">{months} cuotas of <b className="money">{formatMoney(Math.round(amount / months), 'CRC')}</b> <span className="derived">· derived</span>, {firstCharge.split('-').reverse().join('/')} to {(() => { const [y, m, d] = firstCharge.split('-').map(Number) as [number, number, number]; const i = y * 12 + m - 1 + months - 1; return `${String(d).padStart(2, '0')}/${String((i % 12) + 1).padStart(2, '0')}/${Math.floor(i / 12)}`; })()}</span> : null}
           </div>
         </div>

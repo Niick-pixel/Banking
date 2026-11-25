@@ -21,13 +21,16 @@ const short = (v: number) => { const c = Math.abs(v) / 100; return c >= 1_000_00
 const TONE: Record<CalendarEvent['tone'], string> = { income: 'var(--income)', expense: 'var(--expense)', savings: 'var(--savings)', debt: 'var(--debt)', card: 'rgb(var(--accent))', info: 'var(--text-3)' };
 const addDays = (d: string, n: number) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
-export default function Bills() {
+/** Activity → Calendar (month grid + what happened / is due each day) and Activity → Bills (recurring items, to confirm, suggestions). */
+export default function Bills({ mode = 'bills' }: { mode?: 'calendar' | 'bills' }) {
   const l = useLedger();
   const today = todayISO();
   const [ym, setYm] = useState(today.slice(0, 7));
   const [day, setDay] = useState<string | null>(today);
   const [edit, setEdit] = useState<RecurringRule | 'new' | null>(null);
-  const [tab, setTab] = usePersisted<'day' | 'next' | 'rec' | 'sug'>('bills.tab', 'day');
+  const [tabRaw, setTab] = usePersisted<'day' | 'next' | 'rec' | 'sug'>('bills.tab2', 'next');
+  const tab = mode === 'calendar' ? 'day' : tabRaw === 'day' ? 'next' : tabRaw;
+  const cal = mode === 'calendar';
   const [payroll] = usePref('payroll');
   const pending = usePendingReminders();
   const [y, m] = ym.split('-').map(Number) as [number, number];
@@ -73,11 +76,11 @@ export default function Bills() {
 
   return (
     <div className="fit">
-      <PageHeader title="Bills & recurring" sub="Everything that comes back: pay, bills, savings, cuotas and card due dates.">
+      <PageHeader title={cal ? 'Calendar' : 'Bills & recurring'} sub={cal ? 'Each day: what you logged and what is due. Pick a day to see it.' : 'Everything that comes back: pay, bills, savings, cuotas and card due dates.'}>
         <button className="btn btn-primary" onClick={() => setEdit('new')}>+ Recurring</button>
       </PageHeader>
 
-      {pending.length > 0 && (
+      {pending.length > 0 && !cal && (
         <Glass strong pad={12} style={{ display: 'grid', gap: 6, flex: 'none', maxHeight: '26vh', overflow: 'auto', borderColor: 'var(--debt)' }} role="region" aria-label="Waiting for confirmation">
           <h2 className="card-h">To confirm ({pending.length})</h2>
           <p className="small muted" style={{ margin: 0 }}>Reminders don't post by themselves. Check the real amount, then confirm or skip.</p>
@@ -85,8 +88,8 @@ export default function Bills() {
         </Glass>
       )}
 
-      <div className="bills-grid fill">
-        <Glass strong pad={14} className="bills-cal">
+      <div className={`bills-grid fill ${cal ? '' : 'bills-only'}`}>
+        {cal && <Glass strong pad={14} className="bills-cal">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button className="btn btn-sm" aria-label="Previous month" onClick={() => shift(-1)}>‹</button>
             <h2 className="card-h">{MN[m - 1]} {y}</h2>
@@ -104,7 +107,7 @@ export default function Bills() {
               if (!d) return <div key={`x${i}`} className="cal-cell empty" />;
               const evs = byDay.get(d) ?? [];
               return (
-                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => { setDay(d); setTab('day'); }} >
+                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} >
                   <span className="cal-top"><span className="cal-num">{Number(d.slice(8))}</span>
                     {d <= today && spentByDay.get(d)?.out ? <span className="cal-spent" title="Spent that day">−{short(spentByDay.get(d)!.out)}</span> : null}</span>
                   {evs.slice(0, 3).map((e, k) => (
@@ -125,10 +128,10 @@ export default function Bills() {
             {(['income', 'expense', 'savings', 'debt', 'card', 'info'] as const).map((t) => <span key={t}><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: TONE[t], marginRight: 4 }} />{{ income: 'Income', expense: 'Bills', savings: 'Savings', debt: 'Debt', card: 'Card / Tasa Cero', info: 'Payroll (info)' }[t]}</span>)}
             {suggestions.length > 0 && <span><i className="cal-legend-suggested" aria-hidden />Spotted in your history, not added yet</span>}
           </div>
-        </Glass>
+        </Glass>}
 
         <Glass strong pad={14} className="bills-side">
-          <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'day', label: day ? formatDateCR(day).slice(0, 5) : 'Day' }, { value: 'next', label: `Next 60 days · ${next60.length}` }, { value: 'rec', label: `Recurring · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />
+          {!cal && <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'next', label: `Next 60 days · ${next60.length}` }, { value: 'rec', label: `Recurring · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />}
           <div className="scroll-box fill" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tab === 'day' && (<>
           <h2 className="card-h">{day ? formatDateCR(day) : 'Pick a day'}</h2>

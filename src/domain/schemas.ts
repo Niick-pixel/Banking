@@ -26,6 +26,8 @@ const Timestamps = { createdAt: z.number().int(), updatedAt: z.number().int() };
 export const ACCOUNT_TYPES = [
   'checking', 'savings', 'goal_savings', 'cash', 'credit_card',
   'association_voluntary', 'association_cesantia', 'investment', 'loan_fund',
+  /** Money other people owe you (you lent it). An asset; lending/repayments are transfers, never spending or income. */
+  'receivable',
 ] as const;
 export const AccountType = z.enum(ACCOUNT_TYPES);
 
@@ -120,6 +122,11 @@ const TxBase = {
   linkId: Id.optional(),
   /** Set when you entered the amount in dollars: `amount` is the colón conversion. */
   fx: FxInfoSchema.optional(),
+  /** A product from the inventory sold in this movement, and how many units. */
+  productId: Id.optional(),
+  qty: z.number().int().positive().optional(),
+  /** Money lent to someone (or repaid by them): the lending it belongs to. */
+  lendingId: Id.optional(),
   ...Timestamps,
 };
 
@@ -337,3 +344,43 @@ export const InstallmentPlanSchema = z.object({
   ...Timestamps,
 });
 export type InstallmentPlan = z.infer<typeof InstallmentPlanSchema>;
+
+// ── Inventory (store stock) ────────────────────────────────────────────────
+/**
+ * One product you sell. Stock on hand is derived, never stored:
+ * stockIn − stockOut − units sold in movements that reference it (deleting a sale gives the units back).
+ */
+export const ProductSchema = z.object({
+  id: Id,
+  code: z.string().default(''),
+  name: z.string().min(1),
+  category: z.string().default(''),
+  currency: CurrencySchema.default('CRC'),
+  /** Per unit, in minor units. */
+  unitCost: z.number().int().nonnegative().default(0),
+  shipping: z.number().int().nonnegative().default(0),
+  price: z.number().int().nonnegative().default(0),
+  /** Units ever added (initial count + restocks) and taken out without a sale (damaged, gift, own use). */
+  stockIn: z.number().int().nonnegative().default(0),
+  stockOut: z.number().int().nonnegative().default(0),
+  notes: z.string().default(''),
+  archived: z.boolean().default(false),
+  ...Timestamps,
+});
+export type Product = z.infer<typeof ProductSchema>;
+
+// ── Money I lent ───────────────────────────────────────────────────────────
+/** Someone owes me money. What's still owed comes from the movements tagged with this lendingId. */
+export const LendingSchema = z.object({
+  id: Id,
+  person: z.string().min(1),
+  /** What it was for. */
+  description: z.string().default(''),
+  currency: CurrencySchema.default('CRC'),
+  lentOn: ISODateSchema,
+  dueDate: ISODateSchema.optional(),
+  status: z.enum(['open', 'repaid', 'forgiven']).default('open'),
+  notes: z.string().default(''),
+  ...Timestamps,
+});
+export type Lending = z.infer<typeof LendingSchema>;

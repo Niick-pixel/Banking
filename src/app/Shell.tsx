@@ -15,7 +15,7 @@ import { todayISO } from '../lib/dates';
 import { useQuickAdd } from './QuickAdd';
 import { postDueCuotas, postDueRecurring, fixPaydaySavingsRules } from '../db/repo';
 import { Aurora, GlassDefs } from '../design/components';
-import { ALL_PAGES, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
+import { ALL_PAGES, canonicalPath, SECTIONS, SETTINGS_PATHS, sectionFor } from './nav';
 import { GuidedTour } from './Tour';
 import { NotificationBell } from './Notifications';
 import { FxCalc } from './FxCalc';
@@ -47,7 +47,7 @@ function SectionTabs() {
   return (
     <nav className="section-tabs" aria-label={`${s.label} pages`} data-tour="tabs">
       {s.pages.map((p) => {
-        const active = loc.pathname === p.to;
+        const active = canonicalPath(loc.pathname) === p.to;
         return (
           <Link key={p.to} to={p.to} className={`section-tab ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}>
             {active && <motion.span layoutId="section-tab-pill" className="section-tab-pill" transition={SPRING.snappy} />}
@@ -87,7 +87,7 @@ export default function Shell() {
     return () => { clearTimeout(first); clearInterval(every); };
   }, []);
   const current = sectionFor(loc.pathname);
-  // Each section reopens on the tab you used last (e.g. Activity → Bills & calendar).
+  // Each section reopens on the tab you used last (e.g. Activity → Calendar).
   useEffect(() => { if (current && current.pages.some((p) => p.to === loc.pathname)) writePersisted(`lastPage.${current.id}`, loc.pathname); }, [current, loc.pathname]);
   const entry = (s: (typeof SECTIONS)[number]) => { const last = readPersisted<string>(`lastPage.${s.id}`, s.pages[0]!.to); return s.pages.some((p) => p.to === last) ? last : s.pages[0]!.to; };
   const inSettings = SETTINGS_PATHS.includes(loc.pathname);

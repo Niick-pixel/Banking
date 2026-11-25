@@ -5,7 +5,7 @@
  */
 import { db, type AufwindDB } from './db';
 import {
-  AccountSchema, CategorySchema, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, RecurringRuleSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
+  AccountSchema, CategorySchema, ProductSchema, LendingSchema, type Product, type Lending, SelfLoanSchema, GoalSchema, BalanceSnapshotSchema, RecurringRuleSchema, InstallmentPlanSchema, PotSchema, TransactionSchema, DebtSchema,
   type Account, type Category, type SelfLoan, type Goal, type BalanceSnapshot, type RecurringRule, type InstallmentPlan, type Pot, type Transaction, type Debt, type ImportBatch,
 } from '../domain/schemas';
 import type { ImportPlan } from '../import/workbook';
@@ -15,10 +15,11 @@ import { todayISO } from '../lib/dates';
 
 export const newId = () => crypto.randomUUID();
 
-type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans' | 'goals' | 'snapshots' | 'recurring';
+type Table = 'transactions' | 'accounts' | 'pots' | 'categories' | 'installments' | 'debts' | 'selfLoans' | 'goals' | 'snapshots' | 'recurring' | 'products' | 'lendings';
 const schemas = {
   transactions: TransactionSchema, accounts: AccountSchema, pots: PotSchema, categories: CategorySchema,
   installments: InstallmentPlanSchema, debts: DebtSchema, selfLoans: SelfLoanSchema, goals: GoalSchema, snapshots: BalanceSnapshotSchema, recurring: RecurringRuleSchema,
+  products: ProductSchema, lendings: LendingSchema,
 } as const;
 
 async function audited<T extends { id: string }>(d: AufwindDB, table: Table, record: T): Promise<T> {
@@ -43,6 +44,18 @@ export async function saveCategory(c: Category, d = db) {
 }
 export async function saveSelfLoan(x: SelfLoan, d = db) {
   return d.transaction('rw', d.selfLoans, d.audit, () => audited(d, 'selfLoans', { ...x, updatedAt: Date.now() }));
+}
+export async function saveProduct(x: Product, d = db) {
+  return d.transaction('rw', d.products, d.audit, () => audited(d, 'products', { ...x, updatedAt: Date.now() }));
+}
+/** Add (+) or take out (−) units without a sale: restock, damaged, gift, own use. */
+export async function adjustStock(id: string, delta: number, d = db) {
+  const p = await d.products.get(id);
+  if (!p || !delta) return;
+  return saveProduct(delta > 0 ? { ...p, stockIn: p.stockIn + delta } : { ...p, stockOut: p.stockOut - delta }, d);
+}
+export async function saveLending(x: Lending, d = db) {
+  return d.transaction('rw', d.lendings, d.audit, () => audited(d, 'lendings', { ...x, updatedAt: Date.now() }));
 }
 export async function saveGoal(x: Goal, d = db) {
   return d.transaction('rw', d.goals, d.audit, () => audited(d, 'goals', { ...x, updatedAt: Date.now() }));

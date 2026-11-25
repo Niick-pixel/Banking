@@ -56,7 +56,7 @@ export const R4 = rule({
         body: ctx.say(`${win.map((t) => t.description || catOf(t)?.name).join(', ')}. That's a cluster. Pause the next one for ${p.hours} h.`, `A few treats close together (${crc(sum)}). Maybe give the next one a day or two.`),
         why: { formula: `discretionary purchases within ${p.hours} h`, inputs: { first: disc[i]!.date, count: win.length, total: crc(sum) }, threshold: `≥ ${p.count} within ${p.hours} h` },
         impactCRC: sum, actWithinDays: 2, confidence: 0.9,
-        action: { label: 'Open cooling-off list', kind: 'open', payload: { to: '/coach?tab=wants' } },
+        action: { label: 'Open cooling-off list', kind: 'open', payload: { to: '/coach#wants' } },
         dedupeKey: `R4:${disc[i]!.date}:cluster`,
       }));
       break;
