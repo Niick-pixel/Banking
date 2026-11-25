@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { mergeImported, parseInventory, productMath, sales, stockOf, unitsSold } from './inventory';
+import { mergeImported, parseInventory, productMath, restock, sales, stockOf, unitsSold } from './inventory';
 import type { Product, Transaction } from './schemas';
 import type { Grid } from '../import/grid';
 
-const prod = (id: string, over: Partial<Product> = {}): Product => ({ id, code: id, name: `P ${id}`, category: '', currency: 'CRC', unitCost: 1_000_000, shipping: 200_000, price: 2_000_000, stockIn: 2, stockOut: 0, notes: '', archived: false, createdAt: 0, updatedAt: 0, ...over });
+const prod = (id: string, over: Partial<Product> = {}): Product => ({ id, code: id, name: `P ${id}`, category: '', currency: 'CRC', unitCost: 1_000_000, shipping: 200_000, price: 2_000_000, stockIn: 2, stockOut: 0, notes: '', archived: false, restocks: [], createdAt: 0, updatedAt: 0, ...over });
 const sale = (id: string, productId: string, qty: number, amount: number): Transaction => ({ id, kind: 'income', date: '2026-11-20', dateEstimated: false, currency: 'CRC', description: '', tags: [], notes: '', to: { accountId: 'chk' }, amount, categoryId: 'sales', productId, qty, createdAt: 0, updatedAt: 0 });
 
 describe('inventory', () => {
@@ -21,6 +21,17 @@ describe('inventory', () => {
     expect(m.marginPct).toBeCloseTo(0.4, 6);
     expect(m.minPrice).toBe(1_500_000);
     expect(m.maxPrice).toBe(2_666_667);
+  });
+  it('restock: new cost or weighted average with what is on the shelf', () => {
+    const p = prod('a', { unitCost: 1_000_000, shipping: 0 });
+    const r = { date: '2026-11-25', qty: 2, unitCost: 1_600_000, shipping: 100_000 };
+    expect(restock(p, 2, r, 'new')).toMatchObject({ stockIn: 4, unitCost: 1_600_000, shipping: 100_000 });
+    expect(restock(p, 2, r, 'average')).toMatchObject({ stockIn: 4, unitCost: 1_300_000, shipping: 50_000 });
+    expect(restock(p, 2, r, 'new').restocks).toHaveLength(1);
+  });
+  it('a sale keeps the cost it had when sold', () => {
+    const t = { ...sale('s1', 'a', 1, 2_000_000), costEach: 500_000 };
+    expect(sales([t], new Map([['a', prod('a')]]))[0]!.profit).toBe(1_500_000);
   });
   it('profit per sale', () => {
     const r = sales([sale('s1', 'a', 2, 4_600_000)], new Map([['a', prod('a')]]));

@@ -236,7 +236,7 @@ function QuickAddForm({ open, edit, startKind, startProduct, onDone }: { open: b
     switch (kind) {
       case 'expense': tx = { ...base, kind, from: f, amount, categoryId: categoryId || undefined }; break;
       case 'income': tx = { ...base, kind, to: f, amount, categoryId }; break;
-      case 'sale': tx = { ...base, kind: 'income', to: f, amount, categoryId: (await salesCategory(l.categories)).id, productId, qty, description: base.description || product?.name || '' }; break;
+      case 'sale': tx = { ...base, kind: 'income', to: f, amount, categoryId: (await salesCategory(l.categories)).id, productId, qty, costEach: edit?.productId === productId && edit?.costEach !== undefined ? edit.costEach : product ? product.unitCost + product.shipping : undefined, description: base.description || product?.name || '' }; break;
       case 'transfer': tx = { ...base, kind, from: f, to: t, amount }; break;
       case 'savings': tx = { ...base, kind, direction, from: f, to: t, amount, categoryId }; break;
       case 'debt_payment': tx = { ...base, kind, from: f, amount, debtId, categoryId, interestPortion: 0 }; break;

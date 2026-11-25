@@ -24,14 +24,12 @@ const Pots = lazy(() => import('./routes/Pots'));
 const CheckIn = lazy(() => import('./routes/CheckIn'));
 const Goals = lazy(() => import('./routes/Goals'));
 const Calculators = lazy(() => import('./routes/Calculators'));
-const Reports = lazy(() => import('./routes/Reports'));
+const ReportsSummary = lazy(() => import('./routes/ReportsSummary'));
 const Bills = lazy(() => import('./routes/Bills'));
 const Coach = lazy(() => import('./routes/Coach'));
 const Review = lazy(() => import('./routes/Review'));
 const Inventory = lazy(() => import('./routes/Inventory'));
 const WealthHub = lazy(() => import('./routes/WealthHub'));
-const CoachReportCard = lazy(() => import('./routes/CoachReports').then((m) => ({ default: m.CoachReportCard })));
-const CoachHistory = lazy(() => import('./routes/CoachReports').then((m) => ({ default: m.CoachHistory })));
 const lazyEl = (el: ReactElement) => <Suspense fallback={<div className="page-loading" aria-busy="true" />}>{el}</Suspense>;
 const page = (C: LazyExoticComponent<ComponentType>) => <Suspense fallback={<div className="page-loading" aria-busy="true" />}><C /></Suspense>;
 
@@ -40,16 +38,15 @@ const router = createBrowserRouter([
     element: <CoachProvider><QuickAddProvider><Shell /></QuickAddProvider></CoachProvider>,
     children: [
       { path: '/', element: <Dashboard /> },
-      { path: '/reports', element: page(Reports) },
+      { path: '/reports', element: page(ReportsSummary) },
       { path: '/review', element: page(Review) },
-      { path: '/bills', element: page(Bills) },
+      { path: '/bills', element: <Navigate to="/calendar" replace /> },
       { path: '/calendar', element: lazyEl(<Bills mode="calendar" />) },
       { path: '/inventory', element: page(Inventory) },
-      { path: '/reports/card', element: page(CoachReportCard) },
-      { path: '/reports/history', element: page(CoachHistory) },
+      { path: '/reports/card', element: <Navigate to="/reports" replace /> },
+      { path: '/reports/history', element: <Navigate to="/reports" replace /> },
       { path: '/coach', element: page(Coach) },
-      { path: '/coach/reports', element: <Navigate to="/reports/card" replace /> },
-      { path: '/coach/history', element: <Navigate to="/reports/history" replace /> },
+
       { path: '/coach/:page', element: <Navigate to="/coach" replace /> },
       { path: '/design', element: page(DesignPage) },
       { path: '/transactions', element: page(Transactions) },

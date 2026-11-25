@@ -28,9 +28,10 @@ export default function Bills({ mode = 'bills' }: { mode?: 'calendar' | 'bills' 
   const [ym, setYm] = useState(today.slice(0, 7));
   const [day, setDay] = useState<string | null>(today);
   const [edit, setEdit] = useState<RecurringRule | 'new' | null>(null);
-  const [tabRaw, setTab] = usePersisted<'day' | 'next' | 'rec' | 'sug'>('bills.tab2', 'next');
-  const tab = mode === 'calendar' ? 'day' : tabRaw === 'day' ? 'next' : tabRaw;
   const cal = mode === 'calendar';
+  // The calendar is also where bills live now: the side panel switches between the picked day, recurring items and suggestions.
+  const [tabRaw, setTab] = usePersisted<'day' | 'next' | 'rec' | 'sug'>(cal ? 'cal.tab' : 'bills.tab2', cal ? 'day' : 'next');
+  const tab = cal ? (tabRaw === 'next' ? 'day' : tabRaw) : tabRaw === 'day' ? 'next' : tabRaw;
   const [payroll] = usePref('payroll');
   const pending = usePendingReminders();
   const [y, m] = ym.split('-').map(Number) as [number, number];
@@ -76,11 +77,11 @@ export default function Bills({ mode = 'bills' }: { mode?: 'calendar' | 'bills' 
 
   return (
     <div className="fit">
-      <PageHeader title={cal ? 'Calendar' : 'Bills & recurring'} sub={cal ? 'Each day: what you logged and what is due. Pick a day to see it.' : 'Everything that comes back: pay, bills, savings, cuotas and card due dates.'}>
+      <PageHeader title={cal ? 'Calendar' : 'Bills & recurring'} sub={cal ? 'Each day: what you spent and what is due. Pick a day; your recurring bills are on the right.' : 'Everything that comes back: pay, bills, savings, cuotas and card due dates.'}>
         <button className="btn btn-primary" onClick={() => setEdit('new')}>+ Recurring</button>
       </PageHeader>
 
-      {pending.length > 0 && !cal && (
+      {pending.length > 0 && (
         <Glass strong pad={12} style={{ display: 'grid', gap: 6, flex: 'none', maxHeight: '26vh', overflow: 'auto', borderColor: 'var(--debt)' }} role="region" aria-label="Waiting for confirmation">
           <h2 className="card-h">To confirm ({pending.length})</h2>
           <p className="small muted" style={{ margin: 0 }}>Reminders don't post by themselves. Check the real amount, then confirm or skip.</p>
@@ -107,7 +108,7 @@ export default function Bills({ mode = 'bills' }: { mode?: 'calendar' | 'bills' 
               if (!d) return <div key={`x${i}`} className="cal-cell empty" />;
               const evs = byDay.get(d) ?? [];
               return (
-                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => setDay(d)} >
+                <button key={d} className={`cal-cell ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} onClick={() => { setDay(d); setTab('day'); }} >
                   <span className="cal-top"><span className="cal-num">{Number(d.slice(8))}</span>
                     {d <= today && spentByDay.get(d)?.out ? <span className="cal-spent" title="Spent that day">−{short(spentByDay.get(d)!.out)}</span> : null}</span>
                   {evs.slice(0, 3).map((e, k) => (
@@ -131,7 +132,8 @@ export default function Bills({ mode = 'bills' }: { mode?: 'calendar' | 'bills' 
         </Glass>}
 
         <Glass strong pad={14} className="bills-side">
-          {!cal && <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'next', label: `Next 60 days · ${next60.length}` }, { value: 'rec', label: `Recurring · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />}
+          {cal ? <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'day', label: day ? formatDateCR(day).slice(0, 5) : 'Day' }, { value: 'rec', label: `Bills · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />
+            : <Segmented label="Show" value={tab} onChange={setTab} options={[{ value: 'next', label: `Next 60 days · ${next60.length}` }, { value: 'rec', label: `Recurring · ${l.recurring.length}` }, { value: 'sug', label: `Suggested · ${suggestions.length}` }]} />}
           <div className="scroll-box fill" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tab === 'day' && (<>
           <h2 className="card-h">{day ? formatDateCR(day) : 'Pick a day'}</h2>
