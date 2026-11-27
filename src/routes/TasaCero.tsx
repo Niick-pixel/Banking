@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useLedger } from '../app/data';
 import { Glass, Money, Pill } from '../design/components';
@@ -55,6 +56,7 @@ export default function TasaCero() {
   return (
     <>
       <PageHeader title="Tasa Cero" sub="0% interest card purchases split into monthly cuotas. Each cuota posts to Activity by itself on its date, and the bell reminds you a week before.">
+        <Link className="btn" to="/transactions">← Activity</Link>
         <button className="btn btn-primary" onClick={() => qa.open(undefined, 'tasa_cero')}>+ Tasa Cero purchase</button>
       </PageHeader>
 
