@@ -4,6 +4,7 @@ import { useLedger } from '../app/data';
 import { useQuickAdd } from '../app/QuickAdd';
 import { Money, Pill } from '../design/components';
 import { Empty, PageHeader, Sheet, Toast } from '../ui/Sheet';
+import { TasaCeroStrip } from './TasaCeroStrip';
 import { formatDateCR, monthKey } from '../lib/dates';
 import { deleteTransaction, lastAuditId, saveTransaction, undoAudit } from '../db/repo';
 import type { Transaction } from '../domain/schemas';
@@ -130,6 +131,7 @@ export default function Transactions() {
       <PageHeader title="Transactions" sub={`${filtered.length} of ${l.transactions.length} movements`}>
         <button className="btn btn-primary" onClick={() => qa.open()}>+ Add <kbd className="small" style={{ opacity: .7 }}>N</kbd></button>
       </PageHeader>
+      <TasaCeroStrip />
 
       {(pDate || pMonth || pGroup || pUncat) && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>

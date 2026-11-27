@@ -814,3 +814,10 @@ h2 { font-size: 15px; }
 .inv-list .scroll-box { overflow-x: auto; }
 .inv-grid { grid-template-columns: minmax(0, 4fr) minmax(220px, 1fr); }
 @media (max-width: 1500px) { .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; } .inv-sales { max-height: 190px; } }
+/* Activity → Tasa Cero strip */
+.tc-strip { display: flex; gap: 12px; align-items: center; flex: none; padding: 8px 12px; border-radius: 14px; border: 1px solid var(--glass-stroke); background: var(--glass-fill); margin-bottom: 8px; flex-wrap: wrap; }
+.tc-head { display: grid; gap: 1px; min-width: 200px; flex: 1 1 220px; }
+.tc-plans { display: flex; gap: 8px; flex-wrap: wrap; }
+.tc-plan { display: grid; gap: 1px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--glass-stroke); background: var(--solid-surface); color: inherit; text-decoration: none; font-size: 13px; }
+.tc-plan:hover { border-color: rgb(var(--accent)); }
+.tc-more { align-content: center; }
